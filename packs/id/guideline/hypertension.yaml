@@ -81,16 +81,39 @@ targets:
     citation: "perki_htn_cv#targets"
     confidence: verified
 
+# Each group matches on the derived flag OR the recorded diagnosis code.
+# Both, deliberately. A patient whose diabetes exists only as an ICD code that
+# nobody flagged must still trigger abstention — relying on the flag alone
+# means a coding-only comorbidity silently gets the general adult target, which
+# is the exact failure this section exists to prevent.
 no_target_groups:
   - group: diabetes
-    predicate: {flag: has_dm}
+    predicate:
+      any_of:
+        - {flag: has_dm}
+        - {diagnosis_prefix: "E10"}
+        - {diagnosis_prefix: "E11"}
     reason: "Target not yet extracted from the InaSH 2024 consensus."
   - group: chronic_kidney_disease
-    predicate: {flag: has_ckd}
+    predicate:
+      any_of:
+        - {flag: has_ckd}
+        - {diagnosis_prefix: "N18"}
     reason: "Target not yet extracted from the InaSH 2024 consensus."
   - group: elderly
     predicate: {age: {op: ">=", value: 65}}
     reason: "Target not yet extracted from the InaSH 2024 consensus."
+
+# -------------------------------------------------------- derived problem flags
+# Diagnosis codes to clinical flags. Consumed by service/state/derive.py.
+# Belt and braces with the no_target_groups predicates above: either route
+# alone would be enough, and neither is trusted to be the only one.
+
+problem_flags:
+  - {flag: has_dm,              any_diagnosis_prefix: ["E10", "E11"]}
+  - {flag: has_ckd,             any_diagnosis_prefix: ["N18"]}
+  - {flag: has_lv_dysfunction,  any_diagnosis_prefix: ["I50"]}
+  - {flag: has_ascvd,           any_diagnosis_prefix: ["I21", "I25", "I63"]}
 
 # ----------------------------------------------------------------- red flags
 # SPEC-V1 §2.4. Evaluated on structured state, never on model output.
@@ -249,6 +272,46 @@ sufficiency:
   required_for_raas_action:
     - {code: k,    max_age_days: 90, label: "potassium within 90 days"}
     - {code: egfr, max_age_days: 90, label: "eGFR within 90 days"}
+
+# ------------------------------------------------------- patient instructions
+# Plain Bahasa Indonesia, written for a patient rather than a clinician.
+# In the pack because language is national, and because a clinician should be
+# able to change the wording without a release.
+
+patient_instructions:
+  controlled: >-
+    Tekanan darah Anda terkontrol. Lanjutkan obat seperti biasa, jangan
+    dihentikan sendiri. Kontrol kembali sesuai jadwal.
+  uncontrolled: >-
+    Tekanan darah Anda masih di atas target. Minum obat setiap hari pada jam
+    yang sama, kurangi garam, dan kontrol ulang dalam 4 minggu.
+
+# ---------------------------------------------------------- escalation ladder
+# SPEC-V1 §10 Q3. The order in which classes are added, and whether to titrate
+# an existing agent before adding a new one.
+#
+# This lives in the pack rather than in code for two reasons. It is national
+# clinical guidance, so /service must not name these molecules. And it is an
+# open question for the clinical lead, so it must be changeable without a
+# release.
+
+escalation_ladder:
+  policy: titrate_before_adding
+  confidence: unverified   # Q3. Placeholder ordering until the clinical lead confirms.
+  citation: "perki_htn_cv#targets"
+  steps:
+    - drug_class: ccb_dihydropyridine
+      preferred_molecule: amlodipine
+      start_mg: 5
+      doses_per_day: 1
+    - drug_class: acei
+      preferred_molecule: captopril
+      start_mg: 25
+      doses_per_day: 2
+    - drug_class: thiazide
+      preferred_molecule: hydrochlorothiazide
+      start_mg: 25
+      doses_per_day: 1
 
 # --------------------------------------------------------------- abstention
 # SPEC-V1 §5.7 check 8 and §10 Q5. Below this calibrated confidence the system

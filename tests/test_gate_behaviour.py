@@ -213,3 +213,30 @@ def test_handoff_message_carries_no_clinical_content(rules):
     message = check_eligibility(rules.guideline, Context(state)).handoff_message()
     for word in ("mmHg", "dose", "mg", "prescribe"):
         assert word not in message
+
+
+def test_comorbidity_recorded_only_as_a_code_still_abstains(rules):
+    """The gap that flag-only matching would leave open.
+
+    A diabetic whose diagnosis exists purely as an ICD code, with no upstream
+    system having set has_dm, must still get abstention rather than the
+    general adult target.
+    """
+    from service.state.models import Diagnosis
+
+    state = make_patient(20, controlled=False)
+    state.flags.pop("has_dm", None)
+    state.diagnoses.append(Diagnosis(code="E11.9"))
+
+    decision = _decide(rules, state, propose(state, rules))
+    assert not decision.rendered
+    assert "no_target_defined" in _fired(decision)
+
+
+def test_derived_flags_never_clear_an_upstream_flag(rules):
+    from service.state.derive import derive_flags
+
+    state = make_patient(21, controlled=True)
+    state.flags["has_ckd"] = True          # known upstream, no code recorded
+    derive_flags(state, rules)
+    assert state.flags["has_ckd"] is True

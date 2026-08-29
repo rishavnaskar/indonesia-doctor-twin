@@ -1,4 +1,4 @@
-.PHONY: install test score checks all clean
+.PHONY: install test score checks demo all clean
 
 PY := ./.venv/bin/python
 
@@ -21,3 +21,6 @@ all: checks test score
 
 clean:
 	rm -rf .pytest_cache **/__pycache__ .eval_out
+
+demo:
+	$(PY) -m tools.walkthrough

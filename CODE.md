@@ -6,6 +6,7 @@ building; start at [README.md](README.md) if you are deciding.
 ```bash
 make install    # venv + two dependencies
 make all        # architectural checks, tests, scorecard — what CI runs
+make demo       # six scripted encounters, waiting room to signed
 ```
 
 ## What exists today
@@ -14,21 +15,38 @@ The deterministic core, end to end, on synthetic patients:
 
 | Piece | State |
 |---|---|
-| Indonesia pack — formulary, interactions, guideline, sites, payer | Real rules, awaiting clinical sign-off |
+| Indonesia pack — formulary, interactions, guideline, ladder, sites, payer | Real rules, awaiting clinical sign-off |
 | Patient state with mandatory provenance | Working |
 | Predicate evaluator (fails closed) | Working |
 | Eligibility routing — the 7 hard exclusions | Working |
 | The nine-check gate | Working |
 | Signature line — roster and licence enforced | Working |
 | Durable runtime interface — interrupt / resume / replay | Reference implementation |
-| Synthetic patients, reference proposer, 19 planted-error mutations | Working |
+| Encounter workflow — the full state machine | Working |
+| Model router | Interface + deterministic reference reasoner |
+| Coding, with evidence on every secondary code | Working |
+| Referral-back draft — the payer's own 3B criteria | Working |
+| Synthetic patients, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
 | EMR adapter | Interface only — deliberately raises |
-| Model, retrieval, coding, FHIR emission | Not started |
+| Real model, retrieval, intake interview, FHIR emission | Not started |
 
 **No model is involved anywhere yet.** That is on purpose: the gate is the part
 that has to be right, it needs nothing else running, and building it first means
 the model arrives into a system that already refuses bad output.
+
+## The walkthrough
+
+`make demo` runs six encounters end to end. Four of them end without a
+recommendation — a handoff, two refusals and an escalation — and that ratio is
+the point rather than an embarrassment. A demo where the assistant always has an
+answer is a demo of a system nobody should deploy.
+
+The one worth reading closely is the sixth: a patient at a basic-tier site who
+needs an ACE inhibitor added. Three layers fire at once and agree — the drug
+rule wants potassium and eGFR, the sufficiency check says both are absent, and
+the capability registry says this hospital cannot run either test. The output is
+a referral, not an order nobody can fill.
 
 ## Layout
 
@@ -79,8 +97,8 @@ Indonesian physicians. The scorecard prints this caveat on every run.
    round trip. Resolves assumption A1 properly.
 2. Parse the formulary decree into the pack and have a pharmacist verify 200
    rows. Resolves A4.
-3. Put a real model behind the router, implementing the same proposer
-   interface. The gate does not change.
+3. Put a real model behind the router. It implements the same three-argument
+   signature as the reference reasoner, and the gate does not change.
 4. Get the clinical lead to answer the nine open questions in SPEC-V1 §10 —
    three BP targets are blocking whole patient subgroups today, and the system
    correctly abstains on all of them until then.
