@@ -1,0 +1,6 @@
+# Runtime. Deliberately tiny.
+# /service/gate imports nothing from this list — it is stdlib only, by rule.
+PyYAML>=6.0
+
+# Dev
+pytest>=8.0

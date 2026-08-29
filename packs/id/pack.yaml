@@ -1,0 +1,33 @@
+# Indonesia pack.
+#
+# Everything national lives here: terminology, formulary, guideline, payer,
+# interop, language, capability, regulatory. Nothing under /service may name a
+# country, a payer, a drug or a guideline — enforced by tools/ci_checks.py.
+#
+# Swapping this directory swaps the country. That is the whole point.
+
+pack_id: id
+country_name: Indonesia
+language_primary: id-ID
+
+version: "id-2026-08-29"
+
+components:
+  formulary: formulary/molecules.yaml
+  interactions: formulary/interactions.yaml
+  guideline: guideline/hypertension.yaml
+  capability: capability/sites.yaml
+  payer: payer/coding.yaml
+
+# SPEC-V1 §2, clinical governance gate.
+# No rule in this pack is active in a live setting until the clinical lead
+# (STR + SIP) has signed it off against the primary source document.
+review:
+  status: awaiting_clinical_signoff
+  signed_off_by: null
+  signed_off_at: null
+  note: >
+    Values are drawn from published Indonesian guidance and each carries its own
+    confidence marker. They are engineering inputs, not clinical authority.
+    The loader refuses to run in a non-synthetic environment while status is
+    awaiting_clinical_signoff.

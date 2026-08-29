@@ -1,0 +1,84 @@
+# Site capability registry. BUILD.md §2c, gate check 9.
+#
+# Two jobs from day one:
+#   1. Clinical  - is this plan executable at this site today? AMIE's one loss to
+#                  human physicians was on plan practicality.
+#   2. Compliance- Permenkes 6/2026 Art. 12 grades capability per service group
+#                  on six axes, and Art. 74 requires operational reporting.
+#                  `evidence_ref` is the row that matters: naming a service is no
+#                  longer sufficient, you have to show it happened.
+#
+# A13 is unverified (RESEARCH §6a): we do not know how current a site can keep
+# this. So `as_of` is mandatory, it is surfaced on the panel, and the registry is
+# capped at slow-moving facts. A stale registry producing confidently wrong
+# "executable" verdicts is worse than having no check at all.
+
+version: "id-sites-2026-08-29"
+
+sites:
+
+  - site_id: SITE-A
+    label: "Urban, mid-tier"
+    service_group: rawat_jalan_penyakit_dalam
+    tier: madya
+    hours: {continuous_24h: true}
+    as_of: "2026-08-25"
+    diagnoses: ["I10", "I11", "I12", "I13", "E11", "N18", "E78"]
+    procedures: []
+    competencies:
+      - {role: general_practitioner, count: 6, sip_valid: true}
+      - {role: internist, count: 2, sip_valid: true}
+    practitioners:
+      - {practitioner_id: "PRAC-A-001", role: internist, sip_expires: "2027-03-31"}
+      - {practitioner_id: "PRAC-A-002", role: general_practitioner, sip_expires: "2026-12-31"}
+      - {practitioner_id: "PRAC-A-003", role: general_practitioner, sip_expires: "2026-02-28"}
+    equipment:
+      - {item: bp_monitor, working: true, last_checked: "2026-08-20"}
+      - {item: ecg, working: true, last_checked: "2026-08-01"}
+    labs_available: [k, egfr, creatinine, hba1c, lipids, urine_protein]
+    stocked_molecules:
+      [amlodipine, captopril, lisinopril, ramipril, candesartan,
+       hydrochlorothiazide, furosemide, bisoprolol]
+    evidence_ref: []
+
+  - site_id: SITE-B
+    label: "Peri-urban, mid-tier"
+    service_group: rawat_jalan_penyakit_dalam
+    tier: madya
+    hours: {continuous_24h: true}
+    as_of: "2026-08-18"
+    diagnoses: ["I10", "I11", "E11", "N18"]
+    procedures: []
+    competencies:
+      - {role: general_practitioner, count: 4, sip_valid: true}
+      - {role: internist, count: 1, sip_valid: true}
+    practitioners:
+      - {practitioner_id: "PRAC-B-001", role: internist, sip_expires: "2027-06-30"}
+      - {practitioner_id: "PRAC-B-002", role: general_practitioner, sip_expires: "2027-01-31"}
+    equipment:
+      - {item: bp_monitor, working: true, last_checked: "2026-08-15"}
+      - {item: ecg, working: false, last_checked: "2026-08-15"}
+    labs_available: [k, egfr, creatinine, hba1c]
+    stocked_molecules:
+      [amlodipine, captopril, hydrochlorothiazide, furosemide, nifedipine]
+    evidence_ref: []
+
+  - site_id: SITE-C
+    label: "Remote, basic tier — the hard case, in from week one"
+    service_group: rawat_jalan_umum
+    tier: dasar
+    hours: {continuous_24h: false}
+    as_of: "2026-08-11"
+    diagnoses: ["I10"]
+    procedures: []
+    competencies:
+      - {role: general_practitioner, count: 2, sip_valid: true}
+    practitioners:
+      - {practitioner_id: "PRAC-C-001", role: general_practitioner, sip_expires: "2027-09-30"}
+    equipment:
+      - {item: bp_monitor, working: true, last_checked: "2026-07-30"}
+    # No potassium assay on site. This is why gate check 9 exists: a plan that
+    # requires a lab this site cannot run is a referral, not a recommendation.
+    labs_available: [creatinine]
+    stocked_molecules: [amlodipine, captopril, hydrochlorothiazide]
+    evidence_ref: []

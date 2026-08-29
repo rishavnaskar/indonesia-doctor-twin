@@ -1,0 +1,156 @@
+# PRB formulary subset — adult hypertension follow-up.
+#
+# Source: Fornas, Kepmenkes HK.01.07/MENKES/1199/2025 (31 Dec 2025).
+# Claim pricing is a separate instrument (KMK 730/2025, 14 Jul 2025) and is not
+# modelled here — we never compute a tariff.
+#
+# SPEC-V1 §2.3. The restrictions are the point. A generic clinical model will
+# violate them; they are checkable deterministically against the patient's own
+# record.
+
+version: "fornas-prb-2025-12-31"
+source:
+  document: "Kepmenkes HK.01.07/MENKES/1199/2025"
+  dated: "2025-12-31"
+  scope: "Program Rujuk Balik (PRB) subset, cardiovascular"
+
+review:
+  status: awaiting_clinical_signoff
+  verified_rows: 0
+  note: "A hospital pharmacist must verify every row against e-Fornas before live use."
+
+# Restriction primitives the gate engine understands. The engine is
+# country-agnostic; these names are a closed vocabulary, the values are national.
+#   dose_range                     - min/max daily, max per dose, max doses/day
+#   requires_documented_intolerance- to_drug_class, min_duration_days
+#   requires_diagnosis             - any_of_codes (ICD-10 prefixes)
+#   requires_recent_labs           - codes, within_days
+#
+molecules:
+
+  - molecule: amlodipine
+    drug_class: ccb_dihydropyridine
+    forms_mg: [5, 10]
+    dosing: {min_mg_daily: 5, max_mg_daily: 10, max_mg_per_dose: 10, max_doses_daily: 1}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#amlodipine"
+    confidence: verified
+    note: "First-line. Start at the lowest dose."
+
+  - molecule: nifedipine
+    drug_class: ccb_dihydropyridine
+    forms_mg: [30]
+    dosing: {min_mg_daily: 30, max_mg_daily: 60, max_mg_per_dose: 30, max_doses_daily: 2}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#nifedipine"
+    confidence: partial
+    note: "Extended-release only. Immediate-release is not a follow-up drug."
+
+  - molecule: captopril
+    drug_class: acei
+    forms_mg: [12.5, 25]
+    # The hard ceiling. SPEC-V1 §2.3.
+    dosing: {min_mg_daily: 25, max_mg_daily: 75, max_mg_per_dose: 25, max_doses_daily: 3}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#captopril"
+    confidence: verified
+    note: "Maximum 3 x 25 mg daily under the PRB restriction."
+
+  - molecule: lisinopril
+    drug_class: acei
+    forms_mg: [5, 10]
+    dosing: {min_mg_daily: 5, max_mg_daily: 40, max_mg_per_dose: 20, max_doses_daily: 2}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#lisinopril"
+    confidence: partial
+
+  - molecule: ramipril
+    drug_class: acei
+    forms_mg: [2.5, 5, 10]
+    dosing: {min_mg_daily: 2.5, max_mg_daily: 10, max_mg_per_dose: 10, max_doses_daily: 1}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#ramipril"
+    confidence: partial
+
+  - molecule: candesartan
+    drug_class: arb
+    forms_mg: [8, 16]
+    dosing: {min_mg_daily: 8, max_mg_daily: 16, max_mg_per_dose: 16, max_doses_daily: 1}
+    # The rule no amount of model quality substitutes for.
+    restrictions:
+      - type: requires_documented_intolerance
+        to_drug_class: acei
+        min_duration_days: 30
+        message: >
+          An ARB is not prescribable until at least one month of documented
+          ACE-inhibitor intolerance exists in this patient's own record.
+    citation: "fornas-prb-2025-12-31#candesartan"
+    confidence: verified
+
+  - molecule: valsartan
+    drug_class: arb
+    forms_mg: [80, 160]
+    dosing: {min_mg_daily: 80, max_mg_daily: 320, max_mg_per_dose: 160, max_doses_daily: 2}
+    restrictions:
+      - type: requires_documented_intolerance
+        to_drug_class: acei
+        min_duration_days: 30
+        message: "Same ARB restriction as candesartan."
+    citation: "fornas-prb-2025-12-31#valsartan"
+    confidence: unverified
+    note: "Availability requires verification in e-Fornas. Clinical lead, week one."
+
+  - molecule: bisoprolol
+    drug_class: beta_blocker
+    forms_mg: [2.5, 5]
+    dosing: {min_mg_daily: 2.5, max_mg_daily: 10, max_mg_per_dose: 10, max_doses_daily: 1}
+    restrictions:
+      - type: requires_diagnosis
+        any_of_codes: ["I50"]
+        message: >
+          Restricted to compensated chronic heart failure. Recording of the
+          'compensated' qualifier is an open question for the clinical lead —
+          the code prefix alone is a weaker test than the restriction states.
+    citation: "fornas-prb-2025-12-31#bisoprolol"
+    confidence: verified
+
+  - molecule: hydrochlorothiazide
+    drug_class: thiazide
+    forms_mg: [25]
+    dosing: {min_mg_daily: 12.5, max_mg_daily: 25, max_mg_per_dose: 25, max_doses_daily: 1}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#hydrochlorothiazide"
+    confidence: verified
+
+  - molecule: furosemide
+    drug_class: loop_diuretic
+    forms_mg: [40]
+    dosing: {min_mg_daily: 20, max_mg_daily: 80, max_mg_per_dose: 40, max_doses_daily: 2}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#furosemide"
+    confidence: partial
+    note: "Fluid-retention indications, not first-line for hypertension."
+
+  - molecule: spironolactone
+    drug_class: mra
+    forms_mg: [25, 100]
+    dosing: {min_mg_daily: 25, max_mg_daily: 100, max_mg_per_dose: 100, max_doses_daily: 1}
+    restrictions:
+      - type: requires_recent_labs
+        codes: [k, egfr]
+        within_days: 90
+        message: "Potassium and eGFR within 90 days are required before any MRA action."
+    citation: "fornas-prb-2025-12-31#spironolactone"
+    confidence: partial
+    note: "NYHA-restricted on PRB. Out of V1's prescribing set; present so the gate can reason about it."
+
+# Molecules we never prescribe in this pathway but must recognise, because
+# patients arrive taking them — bought over the counter, or prescribed
+# elsewhere and picked up at reconciliation. Without these the NSAID
+# interaction rules can never fire, since an unknown molecule has no class.
+recognised_molecules:
+  - {molecule: ibuprofen,      drug_class: nsaid}
+  - {molecule: diclofenac,     drug_class: nsaid}
+  - {molecule: mefenamic_acid, drug_class: nsaid}
+  - {molecule: naproxen,       drug_class: nsaid}
+  - {molecule: piroxicam,      drug_class: nsaid}

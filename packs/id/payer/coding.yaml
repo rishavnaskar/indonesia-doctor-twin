@@ -1,0 +1,46 @@
+# Payer pack — coding rules for the national scheme.
+#
+# Hard boundary, stated once and enforced everywhere: we produce accurate
+# diagnosis and procedure codes and feed the official government grouper.
+# We never compute a tariff and we never assign a severity level.
+# (RESEARCH §6a, A6 — corrected scope.)
+
+version: "id-payer-2026-08"
+
+grouper:
+  build_our_own: false
+  interface: "official grouper application, claim draft only"
+  note: >
+    1,075 case groups at three severity levels, assigned by the government
+    grouper from primary diagnosis, secondary diagnoses and procedures.
+    Severity migrates from three levels to four under the successor scheme;
+    comorbidity capture matters more then, not less. No national go-live date,
+    so nothing here depends on that timing.
+
+coding:
+  diagnosis_system: "ICD-10"
+  procedure_system: "ICD-9-CM"
+  typical_primary: "I10"
+
+  # The secondary diagnoses are where the money is. A comorbidity written in
+  # free text and never coded is care delivered and not paid for.
+  comorbidity_capture:
+    - {code_prefix: "I11", label: "hypertensive heart disease"}
+    - {code_prefix: "I12", label: "hypertensive chronic kidney disease"}
+    - {code_prefix: "I13", label: "hypertensive heart and kidney disease"}
+    - {code_prefix: "E11", label: "type 2 diabetes mellitus"}
+    - {code_prefix: "N18", label: "chronic kidney disease, by stage"}
+    - {code_prefix: "E78", label: "hyperlipidaemia"}
+
+  # Not upcoding. Every suggested secondary code must be supported by something
+  # already in the record, and the supporting evidence is carried with it.
+  rules:
+    - id: C1
+      text: "A secondary code may only be suggested when a supporting record entry exists."
+      enforcement: hard
+    - id: C2
+      text: "Every suggested code carries the record reference that supports it."
+      enforcement: hard
+    - id: C3
+      text: "Never suggest a code to reach a higher severity band."
+      enforcement: hard

@@ -1,0 +1,71 @@
+# Interaction and contraindication rules. SPEC-V1 §2.5.
+#
+# There is no Indonesian RxNorm or First Databank equivalent — BPOM publishes a
+# product registration database, which is marketing authorisation data, not
+# clinical pharmacology (RESEARCH §6a, A3). So this table is hand-curated for
+# the molecules this pathway actually uses. Ten molecules, a handful of rules,
+# small enough for a pharmacist to verify by hand. That is the whole answer to
+# A3 for V1.
+#
+# `type` selects the engine's check family. `severity` decides what happens:
+#   block - the proposal does not render
+#   warn  - renders, amber, clinician sees one line
+
+version: "id-interactions-2026-08"
+
+review:
+  status: awaiting_clinical_signoff
+  note: "Pharmacist verification required before live use."
+
+rules:
+
+  - id: X1
+    type: class_combination
+    classes: [acei, arb]
+    severity: block
+    message: "ACE inhibitor and ARB must never be combined."
+    citation: "id-interactions-2026-08#X1"
+
+  - id: X2
+    type: requires_recent_labs
+    applies_to_classes: [acei, arb, mra]
+    codes: [k, egfr]
+    within_days: 90
+    severity: block
+    message: >
+      Potassium and eGFR within 90 days are required before starting or
+      titrating a RAAS-acting drug.
+    citation: "id-interactions-2026-08#X2"
+
+  - id: X3
+    type: forbidden_in_state
+    applies_to_classes: [acei, arb]
+    state_flag: pregnancy_positive
+    severity: block
+    message: "ACE inhibitors and ARBs are teratogenic and must stop in pregnancy."
+    citation: "id-interactions-2026-08#X3"
+
+  - id: X4
+    type: class_combination
+    classes: [nsaid, acei]
+    severity: warn
+    message: >
+      NSAID with an ACE inhibitor reduces antihypertensive effect and raises
+      renal risk.
+    citation: "id-interactions-2026-08#X4"
+
+  - id: X5
+    type: class_combination
+    classes: [nsaid, arb]
+    severity: warn
+    message: "NSAID with an ARB reduces antihypertensive effect and raises renal risk."
+    citation: "id-interactions-2026-08#X5"
+
+  - id: X6
+    type: class_combination
+    classes: [acei, mra]
+    severity: warn
+    message: >
+      ACE inhibitor with an MRA carries hyperkalaemia risk. Permitted only with
+      current potassium, which X2 already requires.
+    citation: "id-interactions-2026-08#X6"

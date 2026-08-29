@@ -1,0 +1,279 @@
+# Adult hypertension follow-up — the clinical rule set. SPEC-V1 §2.
+#
+# Predicate vocabulary (the engine validates strictly and fails closed on
+# anything it does not recognise — an unparseable red-flag rule must never
+# silently evaluate to "no red flag"):
+#
+#   composites : all_of / any_of / none_of
+#   leaves     : {obs: <code>, op: <>=,>,<,<=,==>, value: <n>}
+#                {symptom: <name>}
+#                {flag: <name>}
+#                {age: {op: <>, value: <n>}}
+#                {diagnosis_prefix: <icd10 prefix>}
+#                {obs_missing: <code>}
+#                {obs_older_than_days: {code: <code>, days: <n>}}
+#                {relative_fall: {code: <code>, fraction: <0-1>}}
+#                {always: true}
+
+version: "id-htn-2026-08"
+
+sources:
+  - id: perki_htn_cv
+    title: "PERKI — Pedoman Tatalaksana Hipertensi pada Penyakit Kardiovaskular"
+    body: "Perhimpunan Dokter Spesialis Kardiovaskular Indonesia"
+  - id: inash_2024
+    title: "InaSH consensus on the management of hypertension"
+    body: "Indonesian Society of Hypertension"
+
+review:
+  status: awaiting_clinical_signoff
+
+# ---------------------------------------------------------------- definition
+definition:
+  hypertension:
+    any_of:
+      - {obs: sbp, op: ">=", value: 140}
+      - {obs: dbp, op: ">=", value: 90}
+    citation: "inash_2024#definition"
+    confidence: verified
+
+staging:
+  - grade: 1
+    predicate:
+      any_of:
+        - {all_of: [{obs: sbp, op: ">=", value: 140}, {obs: sbp, op: "<", value: 160}]}
+        - {all_of: [{obs: dbp, op: ">=", value: 90},  {obs: dbp, op: "<", value: 100}]}
+    citation: "inash_2024#staging"
+    confidence: verified
+  - grade: 2
+    predicate:
+      any_of:
+        - {obs: sbp, op: ">=", value: 160}
+        - {obs: dbp, op: ">=", value: 100}
+    citation: "inash_2024#staging"
+    confidence: partial   # SPEC-V1 §10 Q1 — confirm against the InaSH 2024 consensus
+
+measurement_standard:
+  text: "Seated, rested, correct cuff size, mean of at least two readings."
+  confidence: partial
+
+# ------------------------------------------------------------------- targets
+#
+# The target is a FUNCTION of patient attributes, not a constant. Resolution is
+# ordered: any blocking group wins first, then the most specific match.
+#
+# Groups whose targets we have not extracted are listed in `no_target_groups`.
+# A patient in one of those gets NO_TARGET_DEFINED and the system abstains.
+# It does NOT fall back to 140/90. That is the entire point of SPEC-V1 §2.2.
+
+targets:
+  - group: ventricular_dysfunction
+    predicate: {flag: has_lv_dysfunction}
+    sbp_lt: 130
+    dbp_lt: 80
+    citation: "perki_htn_cv#targets"
+    confidence: verified
+
+  - group: general_adult
+    predicate: {always: true}
+    sbp_lt: 140
+    dbp_lt: 90
+    citation: "perki_htn_cv#targets"
+    confidence: verified
+
+no_target_groups:
+  - group: diabetes
+    predicate: {flag: has_dm}
+    reason: "Target not yet extracted from the InaSH 2024 consensus."
+  - group: chronic_kidney_disease
+    predicate: {flag: has_ckd}
+    reason: "Target not yet extracted from the InaSH 2024 consensus."
+  - group: elderly
+    predicate: {age: {op: ">=", value: 65}}
+    reason: "Target not yet extracted from the InaSH 2024 consensus."
+
+# ----------------------------------------------------------------- red flags
+# SPEC-V1 §2.4. Evaluated on structured state, never on model output.
+
+red_flags:
+
+  - id: R1
+    label: "Hypertensive emergency"
+    severity: red
+    action: escalate
+    predicate:
+      all_of:
+        - any_of:
+            - {obs: sbp, op: ">=", value: 180}
+            - {obs: dbp, op: ">=", value: 120}
+        - any_of:
+            - {symptom: chest_pain}
+            - {symptom: dyspnoea}
+            - {symptom: focal_neurological_deficit}
+            - {symptom: visual_disturbance}
+            - {symptom: severe_headache}
+            - {symptom: altered_consciousness}
+    message: "Hypertensive emergency. Immediate clinician alert. No draft produced."
+    citation: "inash_2024#emergency"
+
+  - id: R2
+    label: "Hypertensive urgency"
+    severity: red
+    action: acknowledge
+    predicate:
+      all_of:
+        - any_of:
+            - {obs: sbp, op: ">=", value: 180}
+            - {obs: dbp, op: ">=", value: 120}
+        - none_of:
+            - {symptom: chest_pain}
+            - {symptom: dyspnoea}
+            - {symptom: focal_neurological_deficit}
+            - {symptom: visual_disturbance}
+            - {symptom: severe_headache}
+            - {symptom: altered_consciousness}
+    message: "Hypertensive urgency. Clinician must acknowledge before proceeding."
+    citation: "inash_2024#urgency"
+
+  - id: R3
+    label: "Over-treatment"
+    severity: red
+    action: reduce_only
+    predicate:
+      all_of:
+        - {flag: on_antihypertensive_treatment}
+        - any_of:
+            - {obs: sbp, op: "<", value: 90}
+            - {symptom: symptomatic_hypotension}
+    message: "Over-treatment. Draft a reduction; never draft an increase."
+    citation: "inash_2024#hypotension"
+
+  - id: R4
+    label: "New cardiovascular or neurological symptom"
+    severity: red
+    action: escalate
+    predicate:
+      any_of:
+        - {symptom: chest_pain}
+        - {symptom: syncope}
+        - {symptom: focal_neurological_deficit}
+    message: "New chest pain, syncope or focal neurological symptom. Route out of the pathway."
+    citation: "inash_2024#redflags"
+
+  - id: R5
+    label: "Renal function fall"
+    severity: red
+    action: escalate
+    predicate:
+      relative_fall: {code: egfr, fraction: 0.30}
+    message: "eGFR has fallen more than 30% from baseline. ACEi/ARB review required."
+    citation: "inash_2024#renal"
+
+  - id: R6
+    label: "Hyperkalaemia"
+    severity: red
+    action: escalate
+    predicate: {obs: k, op: ">", value: 5.5}
+    message: "Potassium above 5.5 mmol/L. Blocks any ACEi, ARB or MRA action."
+    citation: "inash_2024#electrolytes"
+
+  - id: R7
+    label: "Newly positive pregnancy"
+    severity: red
+    action: escalate
+    predicate: {flag: pregnancy_positive}
+    message: "Pregnancy. ACE inhibitors and ARBs must stop immediately."
+    citation: "inash_2024#pregnancy"
+
+# ---------------------------------------------------------------- exclusions
+# SPEC-V1 §1. Routing rules, not "not yet". Evaluated before any model call, on
+# structured data only. An excluded encounter costs zero tokens.
+
+exclusions:
+
+  - id: E1
+    label: "Pregnant, or childbearing potential without documented status"
+    predicate:
+      any_of:
+        - {flag: pregnancy_positive}
+        - all_of:
+            - {flag: childbearing_potential}
+            - {flag: pregnancy_status_unknown}
+    reason: "ACEi/ARB are teratogenic. Peripartum hypertension is a separate pathway."
+
+  - id: E2
+    label: "Under 18"
+    predicate: {age: {op: "<", value: 18}}
+    reason: "Different thresholds, different drugs, different evidence."
+
+  - id: E3
+    label: "First presentation"
+    predicate: {flag: is_first_presentation}
+    reason: "Diagnostic workup, not follow-up. Different workflow."
+
+  - id: E4
+    label: "Secondary hypertension"
+    predicate: {diagnosis_prefix: "I15"}
+    reason: "Needs investigation this pathway does not model."
+
+  - id: E5
+    label: "Resistant hypertension"
+    predicate: {flag: resistant_hypertension}
+    reason: "InaSH publishes a separate 2024 resistant-hypertension consensus."
+
+  - id: E6
+    label: "Advanced renal impairment or dialysis"
+    predicate:
+      any_of:
+        - {obs: egfr, op: "<", value: 30}
+        - {flag: on_dialysis}
+    reason: "Dosing and drug choice change materially."
+
+  - id: E7
+    label: "Concurrent oncology, psychiatric crisis, or controlled-substance request"
+    predicate:
+      any_of:
+        - {flag: active_oncology}
+        - {flag: psychiatric_crisis}
+        - {flag: controlled_substance_request}
+    reason: "Out of scope for V1 (DECISION §7)."
+
+# --------------------------------------------------------------- sufficiency
+# SPEC-V1 §5.5. What must be present before a titration decision is even
+# attempted. Missing items produce a REQUEST INFO, never a recommendation.
+
+sufficiency:
+  always_required:
+    - {code: sbp, max_age_days: 1,  label: "a blood pressure reading from this visit"}
+    - {code: dbp, max_age_days: 1,  label: "a blood pressure reading from this visit"}
+  required_for_raas_action:
+    - {code: k,    max_age_days: 90, label: "potassium within 90 days"}
+    - {code: egfr, max_age_days: 90, label: "eGFR within 90 days"}
+
+# --------------------------------------------------------------- abstention
+# SPEC-V1 §5.7 check 8 and §10 Q5. Below this calibrated confidence the system
+# abstains and escalates rather than producing a low-confidence plan.
+# This is a clinical risk decision, not a modelling one — the value belongs to
+# the clinical lead, and it lives in the pack so changing it is a reviewed data
+# change rather than a code change.
+
+abstention:
+  confidence_floor: 0.70
+  confidence: unverified   # Q5. Placeholder until the clinical lead sets it.
+
+# ------------------------------------------------------- referral-back (PRB)
+# SPEC-V1 §5.10. BPJS's own 3B checklist, as a deterministic test.
+# N (consecutive at-target visits) is SPEC-V1 §10 Q9 — an open question for the
+# clinical lead. The value below is a placeholder and is marked as such.
+
+referral_back:
+  enabled: true
+  criteria:
+    right_diagnosis:
+      predicate: {diagnosis_prefix: "I10"}
+    truly_stable:
+      consecutive_at_target_visits: 3
+      confidence: unverified   # Q9. Placeholder until the clinical lead sets it.
+    right_drugs:
+      all_medications_on_formulary: true
+      all_restrictions_satisfied: true
