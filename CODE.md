@@ -5,8 +5,9 @@ building; start at [README.md](README.md) if you are deciding.
 
 ```bash
 make install    # venv + two dependencies
-make all        # architectural checks, tests, scorecard — what CI runs
-make demo       # six scripted encounters, waiting room to signed
+make all        # checks, tests, scorecard, pressure suite — what CI runs
+make demo       # six scripted encounters, plus the network dropping
+make pressure   # the Bahasa Indonesian pressure suite
 ```
 
 ## What exists today
@@ -31,7 +32,9 @@ The deterministic core, end to end, on synthetic patients:
 | Synthetic patients, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
 | EMR adapter | Interface only — deliberately raises |
-| Real model, retrieval, intake interview | Not started |
+| Bounded intake interview, in Bahasa Indonesia | Working |
+| Pressure suite — 6 patterns x 5 turns, with a control | Working |
+| Real model, retrieval, medication reconciliation | Not started |
 | Live transport to the national exchange | Not started — no credentials, sandbox only |
 
 **No model is involved anywhere yet.** That is on purpose: the gate is the part
@@ -55,6 +58,26 @@ needs an ACE inhibitor added. Three layers fire at once and agree — the drug
 rule wants potassium and eGFR, the sufficiency check says both are absent, and
 the capability registry says this hospital cannot run either test. The output is
 a referral, not an order nobody can fill.
+
+## The pressure suite
+
+Six pressure patterns, five escalating turns each, in Bahasa Indonesia: the
+relative who is a doctor, the herbal remedy that "already worked", the doubled
+dose bought at a pharmacy, feeling better and therefore cured, another doctor's
+supposedly laxer target, and a demand for a specific drug.
+
+It exists because roughly half of medical model configurations capitulate to a
+confidently wrong patient premise within five turns, and there is no equivalent
+instrument in Bahasa Indonesia to measure it with.
+
+The shipped surface scores 0%. That number is only worth having because the
+suite also runs a **deliberately sycophantic control**, which it catches folding
+at turn 3 on every case. A safety test that cannot fail is not a safety test.
+
+And the 0% is honest about what it is: the interviewer scores zero *by
+construction*, because it has no clinical voice to be argued out of — not
+because it was prompted well. The day a model touches patient-facing text it
+runs the same suite without that structural advantage.
 
 ## Layout
 

@@ -1,4 +1,4 @@
-.PHONY: install test score checks demo all clean
+.PHONY: install test score checks pressure demo all clean
 
 PY := ./.venv/bin/python
 
@@ -16,8 +16,11 @@ score:
 checks:
 	$(PY) tools/ci_checks.py
 
+pressure:
+	$(PY) -m eval.pressure
+
 # What CI runs. A bad commit fails here.
-all: checks test score
+all: checks test score pressure
 
 clean:
 	rm -rf .pytest_cache **/__pycache__ .eval_out

@@ -50,6 +50,7 @@ class EncounterResult:
     message: str = ""
     proposal: Any = None
     decision: GateDecision | None = None
+    questions_for_clinician: list[str] = field(default_factory=list)
     claim: ClaimDraft | None = None
     referral_back: ReferralBackAssessment | None = None
     bundle: Bundle | None = None
@@ -74,6 +75,7 @@ def run_encounter(
     audit: AuditLog | None = None,
     now: datetime | None = None,
     queue=None,
+    intake=None,
 ) -> EncounterResult:
     trail: list[str] = []
     now = now or datetime(2026, 8, 29, 10, 0)
@@ -87,15 +89,29 @@ def run_encounter(
         return EncounterResult(
             outcome=Outcome.HANDOFF,
             message=eligibility.handoff_message(),
+            questions_for_clinician=_patient_questions(intake),
             trail=trail + ["HANDOFF"],
         )
 
-    # ---- INTAKE / RECONCILE ------------------------------------------------
-    # Both are placeholders in this build: intake needs a bounded interviewer
-    # and reconciliation needs a model to match free-text drug mentions. The
-    # states exist so the shape is right and so nothing downstream has to
-    # change when they are filled in.
-    trail += ["INTAKE", "RECONCILE"]
+    # ---- INTAKE ------------------------------------------------------------
+    # Answers from the bounded interviewer, if one ran. The symptom checklist
+    # is what the red-flag rules evaluate, so this is the path by which a
+    # patient reporting chest pain reaches R1 and R4.
+    #
+    # Note what is NOT merged: the questions the patient asked. Those go to the
+    # clinician verbatim and are never answered by anything in between.
+    if intake is not None:
+        state.symptoms.update(intake.symptoms())
+        for field_name in ("adherence", "outside_medication"):
+            if field_name in intake.answers:
+                state.flags[f"reported_{field_name}"] = bool(intake.answers[field_name])
+    trail.append("INTAKE")
+
+    # ---- RECONCILE ---------------------------------------------------------
+    # Still a placeholder: matching free-text drug mentions to molecules needs a
+    # model. The state exists so nothing downstream changes when it is filled
+    # in, and discrepancies must be surfaced rather than silently resolved.
+    trail.append("RECONCILE")
     runtime.checkpoint(thread_id, "reconciled", state)
 
     # ---- PROPOSE -----------------------------------------------------------
@@ -116,6 +132,7 @@ def run_encounter(
             message=message,
             proposal=proposal,
             decision=gate_decision,
+            questions_for_clinician=_patient_questions(intake),
             trail=trail + [outcome.value.upper()],
         )
 
@@ -179,8 +196,19 @@ def run_encounter(
         claim=claim,
         referral_back=referral,
         bundle=bundle,
+        questions_for_clinician=_patient_questions(intake),
         trail=trail,
     )
+
+
+def _patient_questions(intake) -> list[str]:
+    """Whatever the patient asked, passed through untouched.
+
+    Deliberately verbatim. The interviewer did not answer them and nothing
+    between the patient and the doctor gets to paraphrase a clinical question
+    into something more convenient.
+    """
+    return list(getattr(intake, "questions_for_clinician", []) or [])
 
 
 def _route_refusal(decision: GateDecision) -> tuple[Outcome, str]:

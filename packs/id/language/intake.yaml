@@ -1,0 +1,90 @@
+# The intake interview — bounded, in Bahasa Indonesia.
+#
+# A structured interviewer, not an advisor. Fixed schema, fixed question set,
+# and no negotiation of clinical conclusions with the patient.
+#
+# The reason this is a closed question set rather than a conversation is
+# evidence, not caution. Under multi-turn pressure roughly half of medical
+# model configurations capitulate to a confidently wrong patient premise, and
+# symptom triage is the worst category of all. Anti-sycophancy prompting buys
+# only a little. A system that cannot be argued with, because it has no clinical
+# voice to argue from, is not vulnerable to that failure at all.
+#
+# The interviewer collects. The doctor decides. Nothing in this file gives an
+# answer to a clinical question, and nothing should ever be added that does.
+
+version: "id-intake-2026-08"
+
+# Returned verbatim for ANY request for advice, reassurance, a diagnosis, or a
+# medication decision. Never varied, never softened, never elaborated.
+deflection:
+  text: >-
+    Maaf, saya tidak dapat memberikan saran medis. Pertanyaan Anda akan saya
+    catat dan sampaikan kepada dokter.
+  gloss: >-
+    I am not able to give medical advice. I will record your question and pass
+    it to the doctor.
+
+closing:
+  text: "Terima kasih. Jawaban Anda sudah dicatat untuk dokter."
+  gloss: "Thank you. Your answers have been recorded for the doctor."
+
+# Every question is closed or numeric. There is no free-text clinical question,
+# because a free-text clinical question invites a clinical answer.
+questions:
+  - id: adherence
+    field: adherence
+    type: choice
+    text: "Dalam 4 minggu terakhir, seberapa sering Anda minum obat tekanan darah?"
+    gloss: "In the last 4 weeks, how often did you take your blood pressure medicine?"
+    options:
+      - {value: always,    text: "Setiap hari"}
+      - {value: mostly,    text: "Hampir setiap hari"}
+      - {value: sometimes, text: "Kadang-kadang"}
+      - {value: stopped,   text: "Sudah berhenti"}
+
+  - id: side_effects
+    field: side_effects
+    type: multi_choice
+    text: "Apakah Anda mengalami keluhan berikut sejak kunjungan terakhir?"
+    gloss: "Have you had any of these since your last visit?"
+    options:
+      - {value: cough,       text: "Batuk kering"}
+      - {value: dizziness,   text: "Pusing"}
+      - {value: swelling,    text: "Kaki bengkak"}
+      - {value: none,        text: "Tidak ada"}
+
+  - id: red_flag_symptoms
+    field: symptoms
+    type: multi_choice
+    text: "Apakah Anda mengalami hal berikut?"
+    gloss: "Have you experienced any of the following?"
+    # These map onto the red-flag rules. A yes here routes the encounter, and
+    # the routing is done by the rules, not by the interviewer.
+    options:
+      - {value: chest_pain,                text: "Nyeri dada"}
+      - {value: dyspnoea,                  text: "Sesak napas"}
+      - {value: severe_headache,           text: "Sakit kepala hebat"}
+      - {value: visual_disturbance,        text: "Gangguan penglihatan"}
+      - {value: focal_neurological_deficit, text: "Lemah separuh badan"}
+      - {value: syncope,                   text: "Pingsan"}
+      - {value: none,                      text: "Tidak ada"}
+
+  - id: home_bp
+    field: home_bp
+    type: numeric_pair
+    text: "Jika Anda mengukur tekanan darah di rumah, berapa hasil terakhir?"
+    gloss: "If you measure your blood pressure at home, what was the last reading?"
+    optional: true
+    range: {min: 50, max: 300}
+
+  - id: outside_medication
+    field: outside_medication
+    type: choice
+    text: "Apakah Anda minum obat lain dari luar rumah sakit ini?"
+    gloss: "Are you taking any other medicine from outside this hospital?"
+    options:
+      - {value: none,     text: "Tidak"}
+      - {value: painkiller, text: "Ya, obat nyeri"}
+      - {value: herbal,   text: "Ya, jamu atau herbal"}
+      - {value: other,    text: "Ya, lainnya"}
