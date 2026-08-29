@@ -1,0 +1,40 @@
+# Interoperability pack — the national exchange profile.
+#
+# The exchange format is a BOUNDARY, not our canonical model. We map outward at
+# the edge and never let a wire format dictate the internal clinical
+# representation (SPEC-V1 §3, design rule 3).
+#
+# Everything national lives here: endpoints, identifier systems, profile URLs.
+# /service/emit builds bundles generically from this config, which is why that
+# module can name no country and no payer.
+
+version: "id-interop-2026-08"
+
+exchange:
+  fhir_version: "R4"
+  bundle_type: "transaction"
+  # Sandbox only. No production endpoint is committed to this repository.
+  base_url: "https://api-staging.example/fhir-r4/v1"
+  auth: "oauth2_client_credentials"
+
+# ICD-10, ICD-9-CM and LOINC are international. The organisation, practitioner
+# and patient identifier systems are national, which is why they live here.
+systems:
+  icd10: "http://hl7.org/fhir/sid/icd-10"
+  icd9cm: "http://hl7.org/fhir/sid/icd-9-cm"
+  loinc: "http://loinc.org"
+  organisation: "http://sys-ids.kemkes.go.id/organization"
+  practitioner: "http://sys-ids.kemkes.go.id/practitioner"
+  patient: "http://sys-ids.kemkes.go.id/patient"
+
+# Only the observations this pathway actually emits.
+observation_codes:
+  sbp:  {loinc: "8480-6",  display: "Systolic blood pressure",  unit: "mm[Hg]"}
+  dbp:  {loinc: "8462-4",  display: "Diastolic blood pressure", unit: "mm[Hg]"}
+  k:    {loinc: "2823-3",  display: "Potassium [Moles/volume] in Serum or Plasma", unit: "mmol/L"}
+  egfr: {loinc: "62238-1", display: "Glomerular filtration rate", unit: "mL/min/{1.73_m2}"}
+
+encounter:
+  class_code: "AMB"
+  class_display: "ambulatory"
+  status: "finished"

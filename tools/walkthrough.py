@@ -18,6 +18,7 @@ from service.graph.workflow import Outcome, run_encounter
 from service.packs.loader import load_pack
 from service.router.router import default_router
 from service.signing import AuditLog, Signer
+from service.emit.queue import OutboundQueue
 from service.state.models import Diagnosis, Medication, Observation, Source
 
 NOW = datetime(2026, 8, 29, 10, 0)
@@ -95,6 +96,53 @@ def show(title: str, note: str, state, rules, site, *, tamper=None) -> None:
         print(f"  provenance {' | '.join(audit.records[-1].proposal_provenance)}")
 
 
+def offline_demo(rules, site) -> None:
+    """Pull the cable mid-consultation and prove nothing is lost or duplicated."""
+    import tempfile
+    from pathlib import Path
+
+    print(f"\n{RULE}\n  7. The network drops mid-clinic\n"
+          "  One site in five has unreliable connectivity. This is the normal case.\n"
+          f"{RULE}")
+
+    path = Path(tempfile.mkdtemp()) / "outbound.jsonl"
+    queue = OutboundQueue(path=path)
+
+    for n in range(3):
+        state = make_patient(300 + n, controlled=True)
+        run_encounter(
+            state, rules, site, default_router(), InMemoryRuntime(),
+            thread_id=f"OFF-{n}", signer=Signer(site["practitioners"][0]["practitioner_id"], True),
+            audit=AuditLog(), now=NOW, queue=queue,
+        )
+    print(f"  three encounters seen with no network   queued: {len(queue)}")
+
+    def offline(item):
+        raise ConnectionError("no route to host")
+
+    result = queue.drain(offline)
+    print(f"  attempted to send while still offline   {result}")
+
+    reopened = OutboundQueue(path=path)
+    print(f"  power cut, process restarted            recovered: {len(reopened)}, "
+          f"pending: {len(reopened.pending())}")
+
+    result = reopened.drain(lambda item: None)
+    print(f"  network returns                         {result}")
+
+    replay = OutboundQueue(path=path)
+    before = len(replay)
+    for n in range(3):
+        state = make_patient(300 + n, controlled=True)
+        run_encounter(
+            state, rules, site, default_router(), InMemoryRuntime(),
+            thread_id=f"OFF-{n}", signer=Signer(site["practitioners"][0]["practitioner_id"], True),
+            audit=AuditLog(), now=NOW, queue=replay,
+        )
+    print(f"  same encounters replayed after recovery queue still {len(replay)} "
+          f"(was {before}) — no duplicates in the national record")
+
+
 def main() -> None:
     rules = load_pack("id")
     site_a, site_c = rules.sites["SITE-A"], rules.sites["SITE-C"]
@@ -154,6 +202,8 @@ def main() -> None:
     show("6. Remote basic-tier site, plan needs a test it cannot run",
          "A plan is only a plan if this hospital can actually carry it out.",
          remote, rules, site_c)
+
+    offline_demo(rules, site_a)
 
     declined = sum(1 for o in OUTCOMES if o is not Outcome.COMMITTED)
     print(f"\n{RULE}")

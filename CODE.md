@@ -25,11 +25,14 @@ The deterministic core, end to end, on synthetic patients:
 | Encounter workflow — the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
+| FHIR R4 bundle construction | Working — builds, does not transmit |
+| Offline-first outbound queue, idempotent, file-backed | Working |
 | Referral-back draft — the payer's own 3B criteria | Working |
 | Synthetic patients, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
 | EMR adapter | Interface only — deliberately raises |
-| Real model, retrieval, intake interview, FHIR emission | Not started |
+| Real model, retrieval, intake interview | Not started |
+| Live transport to the national exchange | Not started — no credentials, sandbox only |
 
 **No model is involved anywhere yet.** That is on purpose: the gate is the part
 that has to be right, it needs nothing else running, and building it first means
@@ -41,6 +44,11 @@ the model arrives into a system that already refuses bad output.
 recommendation — a handoff, two refusals and an escalation — and that ratio is
 the point rather than an embarrassment. A demo where the assistant always has an
 answer is a demo of a system nobody should deploy.
+
+The seventh is not an encounter at all: it pulls the network out mid-clinic,
+kills the process, and shows three encounters surviving and syncing without
+duplicating. At a site with unreliable power and connectivity that is the normal
+case rather than the edge case.
 
 The one worth reading closely is the sixth: a patient at a basic-tier site who
 needs an ACE inhibitor added. Three layers fire at once and agree — the drug

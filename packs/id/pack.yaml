@@ -17,6 +17,7 @@ components:
   interactions: formulary/interactions.yaml
   guideline: guideline/hypertension.yaml
   capability: capability/sites.yaml
+  interop: interop/fhir.yaml
   payer: payer/coding.yaml
 
 # SPEC-V1 §2, clinical governance gate.

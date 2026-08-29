@@ -26,6 +26,7 @@ from enum import Enum
 from typing import Any
 
 from service.emit.coding import ClaimDraft, build_claim
+from service.emit.fhir import Bundle, build_bundle
 from service.emit.referral_back import ReferralBackAssessment, assess as assess_referral_back
 from service.gate import GateContext, GateDecision, run_gate
 from service.rules.eligibility import check_eligibility
@@ -51,6 +52,7 @@ class EncounterResult:
     decision: GateDecision | None = None
     claim: ClaimDraft | None = None
     referral_back: ReferralBackAssessment | None = None
+    bundle: Bundle | None = None
     trail: list[str] = field(default_factory=list)
 
     @property
@@ -71,6 +73,7 @@ def run_encounter(
     decision: str = "accepted",
     audit: AuditLog | None = None,
     now: datetime | None = None,
+    queue=None,
 ) -> EncounterResult:
     trail: list[str] = []
     now = now or datetime(2026, 8, 29, 10, 0)
@@ -150,16 +153,32 @@ def run_encounter(
     # ---- COMMIT ------------------------------------------------------------
     claim = build_claim(state, rules)
     referral = assess_referral_back(state, rules)
+
+    # Build the outbound bundle and hand it to the queue. Nothing is sent
+    # inline: at a site that loses power or signal mid-consultation, an inline
+    # send is how an encounter goes missing.
+    bundle = build_bundle(
+        state, claim, proposal, site, signer.practitioner_id, rules,
+        encounter_id=thread_id,
+    )
+    if queue is not None:
+        queue.enqueue("encounter_bundle", bundle.payload, bundle.idempotency_key, now)
+
     trail += ["COMMIT", "FOLLOW-UP"]
     runtime.checkpoint(thread_id, "committed", state)
 
     return EncounterResult(
         outcome=Outcome.COMMITTED,
-        message="Signed, coded and queued for submission.",
+        message=(
+            "Signed, coded and queued for submission."
+            if queue is not None
+            else "Signed and coded. No queue attached, so nothing was enqueued."
+        ),
         proposal=proposal,
         decision=gate_decision,
         claim=claim,
         referral_back=referral,
+        bundle=bundle,
         trail=trail,
     )
 

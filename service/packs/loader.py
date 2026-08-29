@@ -49,6 +49,7 @@ class RuleSet:
     guideline: dict[str, Any] = field(default_factory=dict)
     sites: dict[str, dict[str, Any]] = field(default_factory=dict)
     payer: dict[str, Any] = field(default_factory=dict)
+    interop: dict[str, Any] = field(default_factory=dict)
 
     # Every citation string any rule may legitimately point at. Gate check 6
     # tests membership against exactly this set: no source, no answer.
@@ -100,6 +101,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
     guideline = _read(base / components["guideline"])
     capability = _read(base / components["capability"])
     payer = _read(base / components["payer"])
+    interop = _read(base / components["interop"]) if "interop" in components else {}
 
     molecules: dict[str, Molecule] = {}
     for row in formulary.get("molecules", []):
@@ -139,6 +141,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
         guideline=guideline,
         sites={s["site_id"]: s for s in capability.get("sites", [])},
         payer=payer,
+        interop=interop,
         citations=citations,
     )
     _validate(rs)
