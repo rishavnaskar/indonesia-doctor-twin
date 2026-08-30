@@ -234,3 +234,94 @@ particular flag, and the interactive surface shows the refusal rather than
 smoothing it away.
 
 **Overturned if:** never.
+
+---
+
+### D19 — A `fullUrl` is derived from the resource id, never generated
+
+**Why.** Every write is replayed after a connectivity gap. A random UUID would
+differ between attempts, so one encounter submitted twice would arrive as two
+encounters — the exact duplicate the offline queue exists to prevent. `uuid5`
+over a fixed namespace makes the same resource always yield the same urn.
+
+**Overturned if:** never, while replay exists. Randomness and idempotency are
+the same decision pointing in opposite directions.
+
+---
+
+### D20 — A blood pressure is one Observation with two components
+
+**Why.** It was two Observations, one per reading, which reads naturally and is
+not a legal FHIR blood pressure: a systolic or diastolic LOINC code triggers the
+blood-pressure profile, which requires the panel code, both readings as
+components, and a vital-signs category. Six of the official validator's nine
+errors came from that one modelling choice.
+
+**Overturned if:** the profile changes. It is the spec's decision, not ours.
+
+---
+
+### D21 — A code's `display` is omitted rather than guessed
+
+**Why.** We were writing our own label into it — a role description in the
+ICD-10 display, and a short name for a LOINC code whose registered name runs to
+a line and a half. The validator rejects a display that is not the code's
+registered name, and it is right to: a wrong display is worse than none, because
+a reader believes it. FHIR permits omitting it.
+
+**Overturned if:** we hold the authoritative display names, which means shipping
+the terminology, which is a real project rather than a field.
+
+---
+
+### D22 — English leads, and which language leads is one flag
+
+**Why.** Both strings are always carried and no rule reads either, so this is
+display and nothing else. It defaults to English because the people reading this
+build are reviewing it, not practising from it. `Labels.english_first=False`
+flips it, and a deployed clinic sets that — a doctor should not read past a
+second language to reach the sentence that matters.
+
+**Overturned if:** the surface is deployed. Then the default is wrong and the
+flag is why that costs nothing.
+
+---
+
+### D23 — A reading dated after the encounter was not available at it
+
+**Why.** Age is `as_of - taken_at`, so a future-dated observation produces a
+negative age and satisfies *every* freshness rule in the pack — "potassium
+within 90 days" would pass on a lab that does not exist yet. One clock skew or
+mistyped year and the sufficiency check silently stops asking for the test it
+exists to demand. Excluded at the source rather than patched at the six
+comparison sites, because `as_of` already means "what the system saw".
+
+**Overturned if:** never.
+
+---
+
+### D24 — A proposal naming one drug twice is rejected, not reconciled
+
+**Why.** The resulting regimen is keyed by molecule, so a second entry
+overwrote the first and the discarded one was never dose-checked. Observed
+live: "increase metformin 1000 mg x3" beside "continue metformin 1000 mg x2" —
+3000 mg against a 2000 ceiling, vanished, survivor passed. Choosing which
+instruction the model meant is the guess this system refuses to make about a
+medication list, and a splittable dose is a route around check 3 for anything
+that learns to split it.
+
+**Overturned if:** never.
+
+---
+
+### D25 — Conformance is checked against the validator, not against our reading of the spec
+
+**Why.** There is a hand-written conformance test and it is worth having: it
+runs in CI, needs no download, and catches regressions. It is not a substitute.
+The official validator found nine errors it had missed, and one of those was a
+bug the hand-written test had itself introduced — a `fullUrl` fix that broke
+bundle reference resolution. Approximating a specification is not the same as
+checking against it.
+
+**Overturned if:** never. Keep both: the approximation for every commit, the
+real one before anything is submitted.

@@ -4,7 +4,7 @@ The code that implements [SPEC-V1.md](SPEC-V1.md). Start here if you are
 building; start at [README.md](../README.md) if you are deciding.
 
 ```bash
-make install       # venv + two dependencies
+make install       # venv + two runtime dependencies
 make all           # checks, tests, scorecard, pressure suite — what CI runs
 make e2e           # all of the above, then the walkthrough and live encounters
 

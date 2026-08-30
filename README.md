@@ -13,6 +13,9 @@ make install && make all      # architecture rules, tests, scorecard, pressure s
 make surface                  # the clinician surface — open /clinic from the header link
 ```
 
+Everything above runs offline and needs no key. `make live` and `make
+surface-live` put a real model behind the router; both default to a free one.
+
 Then, in order:
 
 1. **[DECISION.md](docs/DECISION.md) § The reframe** — why "60–70% of what a doctor does" is buildable and "60–70% of what a doctor decides" is not.
@@ -54,7 +57,9 @@ If you have four, read **[DECISION.md](docs/DECISION.md)** and stop.
 
 The safety gate, the Indonesian rule packs, eligibility routing, the signature line and the scorecard all run today, on synthetic patients, with no model involved. That ordering is deliberate: the gate is the part that has to be right, it needs nothing else running, and building it first means a model arrives into a system that already refuses bad output.
 
-A real model now sits behind the router and changed nothing downstream, which is the architectural claim discharged rather than asserted. **A second pathway — type 2 diabetes follow-up — was added as two pack files and no engine code**, which is the other claim discharged. Building it found three places where that claim had been false: the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, and three engine messages named a blood pressure. All three are fixed and tested; the finding is more useful than the feature.
+A real model now sits behind the router and changed nothing downstream, which is the architectural claim discharged rather than asserted. **A second pathway — type 2 diabetes follow-up — was added as two pack files and no engine code**, which is the other claim discharged. Building it found places where that claim had been false — the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, the claim coder produced no primary diagnosis for a second disease, and the FHIR emitter shipped a diabetes encounter without its HbA1c. All fixed and tested; the finding is more useful than the feature.
+
+The outbound bundles validate with **0 errors against the official HL7 FHIR R4 validator** (`make fhir`). It found nine errors that a hand-written conformance test had missed, one of which that test had itself introduced.
 
 This has been through six drafts and four adversarial review passes, the last a full independent review by a second model. Twenty-three claims were found wrong, overstated or internally inconsistent and corrected — the full list, including the ones that were mine, is in [RESEARCH.md § Corrections log](docs/RESEARCH.md#corrections). If you are reviewing this, start there; it is the fastest way to find the parts of the argument that have already moved.
 
