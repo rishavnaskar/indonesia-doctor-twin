@@ -1,4 +1,4 @@
-.PHONY: install test score checks pressure demo live free prompt surface surface-live page page-live all e2e clean
+.PHONY: install test score checks pressure demo live free prompt surface surface-live page page-live concordance all e2e clean
 
 PY := ./.venv/bin/python
 
@@ -18,6 +18,11 @@ checks:
 
 pressure:
 	$(PY) -m eval.pressure
+
+# SPEC-V1 §8.2 twin fidelity. Reported, never gated, and not evidence until
+# Set C exists — the run says so itself.
+concordance:
+	$(PY) -m tools.concordance
 
 # What CI runs. A bad commit fails here. Never calls a model: a test suite that
 # costs money per run and varies between runs is neither a test suite nor a
