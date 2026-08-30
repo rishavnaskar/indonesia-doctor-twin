@@ -2,5 +2,9 @@
 # /service/gate imports nothing from this list — it is stdlib only, by rule.
 PyYAML>=6.0
 
+# Root certificates. Python installed from python.org ships without them on
+# macOS, which turns every HTTPS call into an opaque CERTIFICATE_VERIFY_FAILED.
+certifi>=2024.0
+
 # Dev
 pytest>=8.0

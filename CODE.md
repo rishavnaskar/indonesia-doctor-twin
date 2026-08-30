@@ -15,18 +15,27 @@ make live       # 5 encounters through a real model (needs a key, costs money)
 ### Running against a real model
 
 ```bash
-pip install -r requirements-model.txt          # optional extra, not core
-echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env    # .env is gitignored
-make live
+echo 'OPENROUTER_API_KEY=sk-or-...' >> .env    # .env is gitignored
+make free                                      # what costs nothing right now
+make live                                      # 5 encounters, free model
 ```
+
+**This runs for free.** The default backend is a free model, and the free list
+is queried live rather than hard-coded — availability changes, and a stale slug
+in a source file fails at demo time with a confusing 404.
+
+Free models are weaker and rate-limited. For this prototype that is closer to a
+feature than a problem: a weak model exercises the strict parser and the gate
+instead of flattering them, and the whole architectural claim is that the system
+stays safe when the model is not good.
 
 Two backends exist, and that is the point rather than indecision — a router
 with one implementation is a claim, not an architecture:
 
 | Provider | Flag | Notes |
 |---|---|---|
-| Anthropic (default) | `--provider anthropic` | Official SDK. Constrains the response to a JSON schema at the API level, so a malformed proposal is close to impossible rather than merely caught afterwards. Adaptive thinking on by default; `--no-thinking` is cheaper and faster. |
-| OpenRouter | `--provider openrouter` | OpenAI-compatible, stdlib only. Useful for comparing models across vendors. |
+| Anthropic | `--provider anthropic` | Needs paid API credits (a Pro subscription is not API access). Official SDK. Constrains the response to a JSON schema at the API level, so a malformed proposal is close to impossible rather than merely caught afterwards. Adaptive thinking on by default; `--no-thinking` is cheaper and faster. |
+| OpenRouter (default) | `--provider openrouter` | OpenAI-compatible, stdlib only. Has free models. `--list-free` shows what is free right now. |
 
 Everything downstream is identical across them. Swapping is a flag.
 

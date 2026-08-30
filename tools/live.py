@@ -51,9 +51,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run encounters through a real model.")
     parser.add_argument("--n", type=int, default=5, help="encounters (each one API call)")
     parser.add_argument("--model", default=None, help="model slug")
-    parser.add_argument("--provider", default="anthropic",
+    parser.add_argument("--provider", default="openrouter",
                         choices=["anthropic", "openrouter"],
-                        help="which backend (default: anthropic)")
+                        help="which backend (default: openrouter, which has free models)")
+    parser.add_argument("--list-free", action="store_true",
+                        help="list models that cost nothing right now, then exit")
     parser.add_argument("--no-thinking", action="store_true",
                         help="disable adaptive thinking (cheaper, faster)")
     parser.add_argument("--site", default="SITE-A")
@@ -61,6 +63,18 @@ def main() -> int:
     args = parser.parse_args()
 
     load_env()
+
+    if args.list_free:
+        from service.router.backends.hosted import list_free_models
+
+        print("\n  Free models available right now (queried live, not hard-coded):\n")
+        for model in list_free_models():
+            mark = "json" if model["structured"] else "  — "
+            print(f"    [{mark}] {model['id']:<52} ctx {model['context']:,}")
+        print("\n  [json] = advertises structured output. Prefer those; the others")
+        print("  still work, because the strict parser does not trust either.\n")
+        print("  Use with: python -m tools.live --n 5 --model <id>\n")
+        return 0
 
     rules = load_pack("id")
     site = rules.sites[args.site]
