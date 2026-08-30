@@ -10,3 +10,6 @@ demo.html
 
 # Internal: the running order for presenting this. Not part of the deliverable.
 docs/DEMO.md
+
+# The HL7 validator, fetched by `make fhir-setup`. 190 MB.
+.tools/

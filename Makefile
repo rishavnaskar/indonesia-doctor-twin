@@ -24,8 +24,16 @@ pressure:
 concordance:
 	$(PY) -m tools.concordance
 
+# Download the official HL7 validator once. ~190 MB, into .tools/ (gitignored).
+fhir-setup:
+	@mkdir -p .tools
+	@echo "  Downloading the HL7 FHIR validator (~190 MB) into .tools/ ..."
+	@curl -L --progress-bar -o .tools/validator_cli.jar \
+	  https://github.com/hapifhir/org.hl7.fhir.core/releases/latest/download/validator_cli.jar
+	@echo "  Done. Now run: make fhir"
+
 # The official HL7 validator, over the bundles this system emits.
-# Needs FHIR_VALIDATOR_JAR; the tool prints the one-line download if unset.
+# Run `make fhir-setup` first; this says so rather than failing if it is absent.
 fhir:
 	$(PY) -m tools.validate_fhir
 

@@ -36,6 +36,18 @@ from service.rules import pathways
 
 RESULT = re.compile(r"(?:Success|\*FAILURE\*): (\d+) errors?, (\d+) warnings?")
 
+# Where `make fhir-setup` puts it. Gitignored: 190 MB does not belong in a
+# repository, and it is the same file for everyone.
+DEFAULT_JAR = Path(__file__).resolve().parents[1] / ".tools" / "validator_cli.jar"
+
+
+def _find_jar(explicit: str | None) -> Path | None:
+    """--jar, then FHIR_VALIDATOR_JAR, then the location make fhir-setup uses."""
+    for candidate in (explicit, os.environ.get("FHIR_VALIDATOR_JAR"), DEFAULT_JAR):
+        if candidate and Path(candidate).exists():
+            return Path(candidate)
+    return None
+
 
 def sample_bundles(rules) -> dict[str, dict]:
     """One bundle per pathway per control state, at different sites."""
@@ -74,18 +86,23 @@ def validate(jar: Path, payload: dict, name: str) -> tuple[int, int, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate emitted bundles against HL7 R4.")
-    parser.add_argument("--jar", default=os.environ.get("FHIR_VALIDATOR_JAR"))
+    parser.add_argument("--jar", default=None)
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    if not args.jar or not Path(args.jar).exists():
-        print("\n  The HL7 validator was not found.")
-        print("  Set FHIR_VALIDATOR_JAR, or pass --jar, after downloading it once:\n")
-        print("    curl -L -o validator_cli.jar \\")
-        print("      https://github.com/hapifhir/org.hl7.fhir.core/releases/latest/"
-              "download/validator_cli.jar\n")
-        print("  It is ~190 MB, which is why it is neither vendored nor a dependency.\n")
-        return 2
+    jar = _find_jar(args.jar)
+    if jar is None:
+        # Not a failure. A missing optional tool is a missing prerequisite, and
+        # exiting non-zero here made `make fhir` print "Error 2" underneath the
+        # instructions — which reads as something broken rather than something
+        # not yet downloaded.
+        print("\n  The HL7 validator is not here yet. One command, once:\n")
+        print("      make fhir-setup\n")
+        print(f"  It downloads ~190 MB to {DEFAULT_JAR.parent}/ (gitignored), which is")
+        print("  why it is neither vendored nor a dependency. FHIR_VALIDATOR_JAR")
+        print("  overrides the location if you already have one.\n")
+        return 0
+    args.jar = str(jar)
 
     rules = load_pack("id")
     print("\n  Official HL7 FHIR R4 validator")

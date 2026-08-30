@@ -402,12 +402,15 @@ Indonesian physicians. The scorecard prints this caveat on every run.
 ## Conformance
 
 ```bash
-make fhir     # the official HL7 validator over the emitted bundles
+make fhir-setup   # once: downloads the validator (~190 MB) into .tools/
+make fhir         # the official HL7 validator over the emitted bundles
 ```
 
-The validator is a ~190 MB Java distribution, so it is neither vendored nor a
-dependency; `make fhir` prints the one-line download if `FHIR_VALIDATOR_JAR` is
-unset. Four bundles — both pathways, controlled and uncontrolled, three
+The validator is a Java distribution, so it is gitignored rather than vendored
+— it is the same file for everyone and does not belong in a repository. A
+missing validator is a missing prerequisite, not a failure: `make fhir` says
+which command to run and exits cleanly. `FHIR_VALIDATOR_JAR` overrides the
+location. Four bundles — both pathways, controlled and uncontrolled, three
 different sites — validate with **0 errors** against FHIR R4.
 
 There is also a hand-written conformance test that runs in CI with no download.

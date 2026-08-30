@@ -59,7 +59,7 @@ The safety gate, the Indonesian rule packs, eligibility routing, the signature l
 
 A real model now sits behind the router and changed nothing downstream, which is the architectural claim discharged rather than asserted. **A second pathway — type 2 diabetes follow-up — was added as two pack files and no engine code**, which is the other claim discharged. Building it found places where that claim had been false — the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, the claim coder produced no primary diagnosis for a second disease, and the FHIR emitter shipped a diabetes encounter without its HbA1c. All fixed and tested; the finding is more useful than the feature.
 
-The outbound bundles validate with **0 errors against the official HL7 FHIR R4 validator** (`make fhir`). It found nine errors that a hand-written conformance test had missed, one of which that test had itself introduced.
+The outbound bundles validate with **0 errors against the official HL7 FHIR R4 validator** (`make fhir-setup` once, then `make fhir`). It found nine errors that a hand-written conformance test had missed, one of which that test had itself introduced.
 
 This has been through six drafts and four adversarial review passes, the last a full independent review by a second model. Twenty-three claims were found wrong, overstated or internally inconsistent and corrected — the full list, including the ones that were mine, is in [RESEARCH.md § Corrections log](docs/RESEARCH.md#corrections). If you are reviewing this, start there; it is the fastest way to find the parts of the argument that have already moved.
 
