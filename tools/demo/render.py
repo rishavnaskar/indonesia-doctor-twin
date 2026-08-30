@@ -149,7 +149,8 @@ button.act[disabled]{ background:transparent; color:var(--muted); border-color:v
   <div class="lede">A doctor's assistant, not a doctor. It drafts a plan for a return visit;
     a licensed doctor reviews and signs every one. Nine safety checks — plain code, no AI —
     sit between the draft and the doctor, and any one of them can stop it.
-    Every figure below came from a real run of the system. Nothing is written by hand.</div>
+    Every figure below came from a real run of the system. Nothing is written by hand.
+    <div style="margin-top:8px"><a href="/clinic">Build your own patient and run it &rarr;</a></div></div>
   <div class="meta" id="meta"></div>
   <div class="stat" id="drafter" style="background:var(--panel)"></div>
   <div class="stat" id="stat"></div>

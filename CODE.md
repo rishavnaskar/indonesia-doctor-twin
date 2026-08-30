@@ -83,7 +83,26 @@ make page                         # one self-contained file you can send
 python -m tools.demo --live       # drive the same scenarios with a real model
 ```
 
-Two views, and the toggle between them is the whole argument. **What the
+There are two pages. `/` is the scripted scenarios — a record of a run, six
+cases chosen so that four of them refuse. `/clinic` is interactive: generate
+patients, edit anything about them, paste in a record, then run the clinician
+and watch the verdict move. Both drive the identical pipeline; a demo whose
+interactive mode took a different path through the system would be
+demonstrating something other than the system.
+
+The clearest thing to show on `/clinic`: take a patient on maximum first-line
+therapy with no recent potassium, run it at SITE-A, then run the same patient at
+SITE-C. SITE-A asks for the test. SITE-C refers, because it cannot run one. Same
+patient, same gap, two right answers — that is gate check 9 earning its place.
+
+**The residency guard is visible there too.** A record is not synthetic unless it
+says so, so pasting one in and asking a hosted model to draft it is refused
+before any request is built. That refusal appears as a failed visit with its own
+words. It is the guard working, and it is worth showing rather than designing
+around.
+
+On the scenarios page, two views, and the toggle between them is the whole
+argument. **What the
 clinician sees** is the consultation surface: on a green visit, no alert at all.
 **What the system did** is every check that ran, every finding with its rule id
 and citation, the three provenance pins, and the signature record.

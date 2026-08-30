@@ -27,8 +27,9 @@ import time
 import webbrowser
 from pathlib import Path
 
+from tools.demo.clinic import CLINIC_HTML
 from tools.demo.render import render
-from tools.demo.run import collect
+from tools.demo.run import collect, run_patients, vocabulary
 from tools.live import load_env
 
 
@@ -193,6 +194,54 @@ def main() -> int:
             except (BrokenPipeError, ConnectionResetError):
                 pass  # the browser hung up; nothing to report
 
+        def _json(self, payload: dict, code: int = 200) -> None:
+            self._send(json.dumps(payload).encode("utf-8"), "application/json", code)
+
+        def _router(self, live: bool):
+            if not live:
+                return None
+            load_env()
+            from service.router.router import router_with_model
+
+            return router_with_model(args.model, provider=args.provider)
+
+        def do_POST(self):  # noqa: N802 - stdlib naming
+            path = self.path.split("?", 1)[0]
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, json.JSONDecodeError) as exc:
+                self._json({"error": f"could not read the request: {exc}"}, 400)
+                return
+
+            try:
+                if path == "/api/generate":
+                    from tools.demo.patients import generate
+
+                    self._json({"patients": generate(
+                        int(body.get("n", 3)),
+                        seed=int(body.get("seed", 0)),
+                        profile=str(body.get("profile", "clean")),
+                    )})
+                    return
+
+                if path == "/api/run":
+                    self._json(run_patients(
+                        body.get("patients") or [],
+                        site_id=str(body.get("site_id", "SITE-A")),
+                        pack_id=args.pack,
+                        router=self._router(bool(body.get("live"))),
+                    ))
+                    return
+            except Exception as exc:  # noqa: BLE001
+                # Including ResidencyError, which is the guard doing its job and
+                # therefore belongs on screen with its own words rather than as
+                # a 500 the browser renders as "something went wrong".
+                self._json({"error": f"{type(exc).__name__}: {exc}"}, 400)
+                return
+
+            self._json({"error": "not found"}, 404)
+
         def do_GET(self):  # noqa: N802 - stdlib naming
             path = self.path.split("?", 1)[0]
 
@@ -200,6 +249,12 @@ def main() -> int:
             # favicon request used to cost a full set of model calls.
             if path == "/favicon.ico":
                 self._send(b"", "image/x-icon", 204)
+                return
+            if path == "/clinic":
+                self._send(CLINIC_HTML.encode("utf-8"), "text/html; charset=utf-8")
+                return
+            if path == "/api/vocabulary":
+                self._json(vocabulary(args.pack))
                 return
             if path == "/status":
                 self._send(json.dumps(build.status()).encode(), "application/json")
@@ -238,7 +293,8 @@ def main() -> int:
         print("  progress while the scenarios run.")
         if args.live:
             print("  Live mode: one model call per scenario, built once and reused.")
-        print("  Visit /rerun to run them again.  Ctrl-C to stop.\n")
+        print(f"  Build your own patients at {url}clinic")
+        print("  Visit /rerun to run the scripted scenarios again.  Ctrl-C to stop.\n")
         if not args.no_open:
             webbrowser.open(url)
         try:

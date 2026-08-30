@@ -363,6 +363,116 @@ def _encounter(scenario, rules, labels, router) -> dict:
     }
 
 
+def run_patients(
+    wire_patients: list[dict],
+    site_id: str = "SITE-A",
+    pack_id: str = "id",
+    router=None,
+    on_progress=None,
+) -> dict:
+    """Run patients the user built or uploaded, through the identical pipeline.
+
+    Deliberately the same `_encounter` the scripted scenarios use. A demo whose
+    interactive mode takes a different path through the system is demonstrating
+    something other than the system.
+    """
+    from tools.demo.patients import from_wire
+    from tools.scenarios import Scenario
+
+    rules = load_pack(pack_id)
+    labels = Labels.from_pack(rules.language)
+    router = router or default_router()
+
+    if site_id not in rules.sites:
+        raise KeyError(f"unknown site {site_id!r}. Known: {sorted(rules.sites)}")
+    site = rules.sites[site_id]
+
+    encounters = []
+    for index, wire in enumerate(wire_patients, start=1):
+        state = from_wire(wire)
+        scenario = Scenario(
+            key=state.patient_id,
+            title=f"{state.patient_id} — {state.age}, {state.sex}",
+            note=f"Built in the browser, run at {site_id}.",
+            state=state,
+            site=site,
+            watch_for="",
+        )
+        encounter = _encounter(scenario, rules, labels, router)
+        encounters.append(encounter)
+        if on_progress:
+            on_progress(index, len(wire_patients), scenario.title,
+                        encounter.get("error") or encounter["outcome"])
+
+    reasoner = "rule-following reference reasoner (no AI model)"
+    is_model = False
+    try:
+        reasoner = router.get(router.default).backend.version()
+        is_model = True
+    except (KeyError, AttributeError):
+        pass
+
+    return {
+        "encounters": encounters,
+        "reasoner": reasoner,
+        "is_model": is_model,
+        "declined": sum(1 for e in encounters if not e["committed"] and not e.get("error")),
+        "drafter_failures": sum(1 for e in encounters if e.get("error")),
+        "total": len(encounters),
+    }
+
+
+def vocabulary(pack_id: str = "id") -> dict:
+    """What the browser needs to build a patient form.
+
+    Read from the pack rather than written into the page, for the same reason
+    everything else clinical is: a drug list, a symptom set and a site roster are
+    national vocabulary, and hard-coding them in JavaScript would put the country
+    back into the engine by the back door.
+    """
+    rules = load_pack(pack_id)
+    glossary = rules.glossary
+    return {
+        "molecules": [
+            {"molecule": name, "drug_class": mol.drug_class,
+             "forms_mg": mol.forms_mg,
+             "label": (glossary.get("drug_classes") or {}).get(mol.drug_class, {}).get("label", "")}
+            for name, mol in sorted(rules.molecules.items())
+        ],
+        "sites": [
+            {"site_id": s["site_id"], "label": s.get("label", ""), "tier": s.get("tier", ""),
+             "labs_available": sorted(s.get("labs_available") or []),
+             "stocked": sorted(s.get("stocked_molecules") or [])}
+            for s in rules.sites.values()
+        ],
+        "symptoms": [
+            {"code": k, "plain": v} for k, v in sorted((glossary.get("symptoms") or {}).items())
+        ],
+        "flags": [
+            {"code": k, "plain": v} for k, v in sorted((glossary.get("flags") or {}).items())
+        ],
+        "observations": [
+            {"code": k, "label": v.get("label", k), "unit": v.get("unit", ""),
+             "plain": v.get("plain", "")}
+            for k, v in (glossary.get("observations") or {}).items()
+        ],
+        "diagnoses": glossary.get("diagnoses") or {},
+        "profiles": [
+            {"key": "clean", "label": "In scope — should produce a draft"},
+            {"key": "no_target", "label": "In a group whose target is not extracted"},
+            {"key": "stale_labs", "label": "Labs months out of date"},
+            {"key": "excluded_pregnancy", "label": "Pregnant — hard exclusion"},
+            {"key": "excluded_minor", "label": "Under 18 — hard exclusion"},
+            {"key": "excluded_renal", "label": "Severe kidney impairment"},
+            {"key": "excluded_first_presentation", "label": "First presentation, not a follow-up"},
+        ],
+        "pack": {"pack_id": rules.pack_id, "version": rules.version,
+                 "language": rules.language.get("output_language", "")},
+        "glossary": glossary,
+        "checks": check_catalogue(),
+    }
+
+
 def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
     """Run every scenario and return the whole page's data.
 
