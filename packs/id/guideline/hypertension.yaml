@@ -29,6 +29,17 @@ review:
   status: awaiting_clinical_signoff
 
 # ---------------------------------------------------------------- definition
+# When this pathway claims a patient. Read by the pathway router before
+# eligibility runs — "is this the right pathway" comes before "is this patient
+# suitable for it".
+applies_to:
+  any_of:
+    - {diagnosis_prefix: "I10"}
+    - {diagnosis_prefix: "I11"}
+    - {diagnosis_prefix: "I12"}
+    - {diagnosis_prefix: "I13"}
+    - {flag: on_antihypertensive_treatment}
+
 definition:
   hypertension:
     any_of:

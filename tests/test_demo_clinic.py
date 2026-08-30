@@ -160,7 +160,7 @@ def test_the_workflow_reports_the_phase_it_is_entering():
         signer=Signer("PRAC-A-001", True), audit=AuditLog(),
         now=datetime(2026, 8, 29, 10, 0), on_step=seen.append,
     )
-    assert seen[:5] == ["ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE", "GATE"]
+    assert seen[:6] == ["ROUTE", "ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE", "GATE"]
     # `on_step` says what is starting; `trail` says what finished. Conflating
     # them would make a crashed encounter look like a completed one.
     assert "FOLLOW-UP" in result.trail

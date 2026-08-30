@@ -214,7 +214,7 @@ def m_low_confidence(seed, rules):
 def m_wrong_target(seed, rules):
     st = _uncontrolled(seed)
     pr = propose(st, rules)
-    pr.target_used = Target(sbp_lt=150, dbp_lt=95,
+    pr.target_used = Target(thresholds={"sbp": 150, "dbp": 95},
                             citation="perki_htn_cv#targets")
     return BrokenCase("wrong_target", st, pr, "SITE-A",
                       {"target_mismatch"},

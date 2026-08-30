@@ -1,0 +1,200 @@
+# Type 2 diabetes — routine follow-up. The second pathway.
+#
+# It exists to test one claim: that the engine is pathway-agnostic and a new
+# disease is data rather than a release. Nothing under /service was changed to
+# add it. The same nine checks, the same gate, the same signature line, the same
+# scorecard.
+#
+# **Clinical status: engineering input, not clinical authority.** Every value
+# here needs a clinical lead with STR + SIP to sign it against the primary
+# source before it goes anywhere near a patient, exactly like the hypertension
+# pack. Values are drawn from widely published guidance and each carries its own
+# confidence marker; `unverified` means nobody clinical has checked it and the
+# system must not be run live on it.
+#
+# The pathway is deliberately narrow: established type 2 diabetes on oral
+# therapy, coming back for review. Insulin initiation, type 1, gestational
+# diabetes and acute complications are all out and route elsewhere.
+
+version: "id-dm2-2026-08"
+
+sources:
+  - id: perkeni_2021
+    label: "National consensus on the management of type 2 diabetes in adults"
+    confidence: unverified
+    note: >
+      Cited as the intended primary source. The values below were not extracted
+      from the document by a clinician and must be before use.
+  - id: fornas-prb-2025-12-31
+    label: "National formulary, chronic disease programme list"
+    confidence: unverified
+
+review:
+  status: awaiting_clinical_signoff
+
+applies_to:
+  any_of:
+    - {diagnosis_prefix: "E11"}
+    - {flag: has_dm}
+
+definition:
+  diabetes_uncontrolled:
+    any_of:
+      - {obs: hba1c, op: ">=", value: 7.0}
+    citation: "perkeni_2021#definition"
+    confidence: unverified
+
+staging:
+  - {label: "at target",        predicate: {obs: hba1c, op: "<",  value: 7.0}}
+  - {label: "above target",     predicate: {obs: hba1c, op: ">=", value: 7.0}}
+
+measurement_standard:
+  code: hba1c
+  note: >
+    HbA1c reflects roughly three months of glycaemia, so it is not repeated
+    sooner than that. A reading older than six months is not a current picture.
+  confidence: unverified
+
+targets:
+  - group: general_adult
+    predicate: {always: true}
+    hba1c_lt: 7.0
+    citation: "perkeni_2021#targets"
+    confidence: unverified
+
+# Groups whose target this pack has NOT extracted. The system abstains rather
+# than applying the general adult target — the same discipline the hypertension
+# pack applies to diabetics, now pointing the other way.
+no_target_groups:
+  - group: elderly
+    predicate: {age: {op: ">=", value: 65}}
+    reason: "A relaxed target applies with age and frailty. Not yet extracted."
+  - group: chronic_kidney_disease
+    predicate: {any_of: [{flag: has_ckd}, {diagnosis_prefix: "N18"}]}
+    reason: "Target and drug choice both change with kidney function. Not yet extracted."
+  - group: pregnancy
+    predicate: {flag: pregnancy_positive}
+    reason: "A separate pathway entirely."
+
+problem_flags:
+  - {id: P1, label: "Recurrent hypoglycaemia", predicate: {symptom: hypoglycaemia}}
+  - {id: P2, label: "Unintentional weight loss", predicate: {symptom: weight_loss}}
+
+red_flags:
+  - id: D1
+    label: "Very high glucose with symptoms"
+    predicate:
+      all_of:
+        - {obs: hba1c, op: ">=", value: 10.0}
+        - {any_of: [{symptom: polyuria}, {symptom: weight_loss}]}
+    message: >
+      Markedly elevated HbA1c with osmotic symptoms. Immediate clinician review.
+      No draft produced.
+    citation: "perkeni_2021#red_flags"
+  - id: D2
+    label: "Suspected ketoacidosis"
+    predicate:
+      any_of: [{symptom: vomiting}, {symptom: abdominal_pain}, {symptom: dyspnoea}]
+    message: >
+      Symptoms that may indicate acute metabolic decompensation. Route out of
+      the pathway immediately.
+    citation: "perkeni_2021#red_flags"
+  - id: D3
+    label: "Severe or recurrent hypoglycaemia"
+    predicate: {symptom: hypoglycaemia}
+    message: >
+      Hypoglycaemia requires the regimen to be reduced, not escalated. Clinician
+      decision, no draft.
+    citation: "perkeni_2021#red_flags"
+  - id: D4
+    label: "New focal neurological symptom"
+    predicate:
+      any_of: [{symptom: focal_neurological_deficit}, {symptom: visual_disturbance}]
+    message: "Route out of the pathway."
+    citation: "perkeni_2021#red_flags"
+
+exclusions:
+  - id: DE1
+    label: "Type 1 diabetes"
+    predicate: {any_of: [{flag: has_type1_diabetes}, {diagnosis_prefix: "E10"}]}
+    reason: "Insulin-dependent from the outset. A different pathway."
+  - id: DE2
+    label: "Pregnant"
+    predicate: {flag: pregnancy_positive}
+    reason: "Targets, drugs and monitoring all differ."
+  - id: DE3
+    label: "Under 18"
+    predicate: {age: {op: "<", value: 18}}
+    reason: "Paediatric diabetes is a separate service."
+  - id: DE4
+    label: "Already on insulin"
+    predicate: {flag: on_insulin}
+    reason: "Insulin titration is not modelled by this pathway."
+  - id: DE5
+    label: "First presentation"
+    predicate: {flag: is_first_presentation}
+    reason: "A new diagnosis needs a full workup, not a follow-up review."
+  - id: DE6
+    label: "Severe kidney impairment"
+    predicate: {obs: egfr, op: "<", value: 30}
+    reason: "Metformin is contraindicated and dosing changes throughout. Refer."
+  - id: DE7
+    label: "On dialysis"
+    predicate: {flag: on_dialysis}
+    reason: "Out of scope."
+
+sufficiency:
+  always_required:
+    - {code: hba1c, max_age_days: 180, label: "an HbA1c within 6 months"}
+  required_for_metformin_action:
+    - {code: egfr, max_age_days: 180, label: "eGFR within 6 months"}
+
+patient_instructions_gloss:
+  controlled: >-
+    Your blood sugar is at target. Keep taking your medicine as usual, keep to
+    your eating plan, and come back for your scheduled check-up.
+  uncontrolled: >-
+    Your blood sugar is above target. Take your medicine every day, reduce sweet
+    drinks and rice portions, walk for 30 minutes most days, and come back for a
+    re-check in 3 months.
+
+patient_instructions:
+  controlled: >-
+    Gula darah Anda sudah sesuai target. Lanjutkan obat seperti biasa, jaga pola
+    makan, dan kontrol kembali sesuai jadwal.
+  uncontrolled: >-
+    Gula darah Anda masih di atas target. Minum obat setiap hari, kurangi minuman
+    manis dan porsi nasi, jalan kaki 30 menit hampir setiap hari, dan kontrol
+    ulang dalam 3 bulan.
+
+escalation_ladder:
+  note: >
+    First-line, then one addition. Beyond that this pathway refers rather than
+    drafting: multi-agent diabetes management is a specialist decision.
+  policy: titrate_before_adding
+  steps:
+    - drug_class: biguanide
+      preferred_molecule: metformin
+      start_mg: 500
+      doses_per_day: 2
+    - drug_class: sulfonylurea
+      preferred_molecule: glimepiride
+      start_mg: 1
+      doses_per_day: 1
+  confidence: unverified
+  citation: "perkeni_2021#ladder"
+
+abstention:
+  confidence_floor: 0.70
+  confidence: unverified
+
+referral_back:
+  criteria:
+    - {id: B1, label: "benar diagnosanya", predicate: {diagnosis_prefix: "E11"}}
+    - {id: B2, label: "benar sudah stabil", predicate: {obs: hba1c, op: "<", value: 7.0}}
+    - {id: B3, label: "benar obatnya", predicate: {always: true}}
+  note: >
+    The payer's own three-part test, applied to this pathway. All three are
+    deterministically checkable.
+
+output_language: "Bahasa Indonesia"

@@ -37,7 +37,7 @@ nothing and costs the clinician trust.
 Rules you must follow:
 - Use ONLY the drugs, doses and restrictions supplied in the rule set below. \
 Anything not on that list is not prescribable.
-- Use ONLY the blood-pressure target supplied. Do not substitute a target from \
+- Use ONLY the target supplied. Do not substitute a target from \
 your own training.
 - Every clinical assertion must carry a citation string taken verbatim from the \
 supplied rules. Do not invent citation identifiers.
@@ -75,7 +75,8 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
 
     context = {
         "target": (
-            {"sbp_lt": target.sbp_lt, "dbp_lt": target.dbp_lt, "citation": target.citation}
+            {**{f"{code}_lt": value for code, value in target.thresholds.items()},
+             "citation": target.citation}
             if target
             else None
         ),
@@ -119,7 +120,11 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
                 "continue | titrate_up | titrate_down | add_agent | switch_agent | refer"
             ),
             "bp_trend_summary": "string",
-            "target_used": {"sbp_lt": "number", "dbp_lt": "number", "citation": "string"},
+            "target_used": {
+                **{f"{code}_lt": "number" for code in sorted(
+                    (target.thresholds if target else {}))},
+                "citation": "string",
+            },
             "medication_changes": [
                 {
                     "action": "start | stop | increase | decrease | continue",

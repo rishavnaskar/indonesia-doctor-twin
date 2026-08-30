@@ -75,12 +75,14 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
         #
         # A non-null value that is not a number is different: that IS malformed,
         # and it still raises.
-        sbp_raw, dbp_raw = target_raw.get("sbp_lt"), target_raw.get("dbp_lt")
-        if sbp_raw is not None and dbp_raw is not None:
+        raw_thresholds = {
+            key[:-3]: value for key, value in target_raw.items()
+            if key.endswith("_lt")
+        }
+        if raw_thresholds and all(v is not None for v in raw_thresholds.values()):
             try:
                 target = Target(
-                    sbp_lt=float(sbp_raw),
-                    dbp_lt=float(dbp_raw),
+                    thresholds={k: float(v) for k, v in raw_thresholds.items()},
                     citation=str(target_raw["citation"]),
                 )
             except (KeyError, TypeError, ValueError) as exc:

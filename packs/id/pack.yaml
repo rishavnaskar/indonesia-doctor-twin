@@ -15,12 +15,28 @@ version: "id-2026-08-29"
 components:
   formulary: formulary/molecules.yaml
   interactions: formulary/interactions.yaml
-  guideline: guideline/hypertension.yaml
   capability: capability/sites.yaml
   interop: interop/fhir.yaml
   language: language/intake.yaml
   payer: payer/coding.yaml
   glossary: glossary.yaml
+
+# Clinical pathways. Each is a self-contained guideline: its own definition,
+# targets, red flags, exclusions, sufficiency rules, escalation ladder and
+# patient wording.
+#
+# A second pathway is a file, not a release. The engine reads whichever one the
+# router selected and has no idea there are others — which is the same trick
+# that makes the country swappable, applied one level down.
+pathways:
+  hypertension: guideline/hypertension.yaml
+  diabetes: guideline/diabetes.yaml
+
+# Which pathway runs when more than one could. First match wins, so order is
+# meaningful and belongs here rather than in code.
+# Hypertension leads when a patient has both. That is a clinical judgement
+# about which problem this service is built to manage, and it belongs here.
+pathway_order: [hypertension, diabetes]
 
 # SPEC-V1 §2, clinical governance gate.
 # No rule in this pack is active in a live setting until the clinical lead

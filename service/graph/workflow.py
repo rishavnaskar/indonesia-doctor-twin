@@ -32,6 +32,7 @@ from service.gate import GateContext, GateDecision, run_gate
 from service.rules.eligibility import check_eligibility
 from service.rules.predicates import Context
 from service.reconcile.engine import Reconciliation, reconcile
+from service.rules import pathways as pathway_router
 from service.signing import AuditLog, Signer, sign
 from service.state.derive import derive_flags
 
@@ -118,9 +119,25 @@ def run_encounter(
     # at its proper place.
     reconciliation = reconcile(state, rules, intake)
 
+    # ---- ROUTE: which pathway, before whether this patient suits it --------
+    at("ROUTE")
+    derive_flags(state, rules)
+    choice = pathway_router.select(rules, state)
+    if not choice.matched:
+        trail.append("ROUTE")
+        at("HANDOFF")
+        return EncounterResult(
+            outcome=Outcome.HANDOFF,
+            message=choice.reason,
+            questions_for_clinician=_patient_questions(intake),
+            reconciliation=reconciliation,
+            trail=trail + ["HANDOFF"],
+        )
+    rules = pathway_router.with_pathway(rules, choice.name)
+    trail.append("ROUTE")
+
     # ---- ELIGIBLE: structured checks only, no model, zero tokens ----------
     at("ELIGIBLE")
-    derive_flags(state, rules)
     eligibility = check_eligibility(rules.guideline, Context(state))
     trail.append("ELIGIBLE")
     if not eligibility.eligible:
@@ -263,15 +280,30 @@ def _patient_questions(intake) -> list[str]:
     return list(getattr(intake, "questions_for_clinician", []) or [])
 
 
+# Which check produced a finding is engine vocabulary and stable across packs.
+# A rule *id* is not: it is whatever the pack author typed.
+_RED_FLAGS, _SUFFICIENCY = 1, 7
+
+
 def _route_refusal(decision: GateDecision) -> tuple[Outcome, str]:
-    """A refusal is not one thing. What the clinician sees depends on why."""
+    """A refusal is not one thing. What the clinician sees depends on why.
+
+    Routing used to read rule ids, matching `R<digit>` for a red flag. That
+    worked while one pack existed and silently broke the moment a second one
+    numbered its red flags D1..D4 — hypoglycaemia was correctly caught by check
+    1 and then reported as a quiet abstention instead of alerting anyone. The
+    engine had learned a pack's naming convention and called it a rule.
+
+    Route on the check number, which the engine owns.
+    """
+    checks = {f.check for f in decision.blocking}
     fired = {f.rule_id for f in decision.blocking}
 
     if decision.referral:
         return Outcome.ABSTAIN, "Not deliverable at this site — routed as a referral."
-    if any(rid and rid.startswith("R") and rid[1:2].isdigit() for rid in fired):
+    if _RED_FLAGS in checks:
         return Outcome.ESCALATE, "Red flag. Clinician alerted; no draft produced."
-    if fired & {"insufficient_data", "X2"}:
+    if _SUFFICIENCY in checks:
         return Outcome.REQUEST_INFO, decision.reasons()[0]
     if "no_target_defined" in fired:
         return Outcome.ABSTAIN, decision.reasons()[0]

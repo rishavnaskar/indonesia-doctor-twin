@@ -63,18 +63,20 @@ def propose(state, rules, site: dict[str, Any] | None = None) -> Proposal:
 
     target = resolution.target
     sbp, dbp = state.latest("sbp"), state.latest("dbp")
-    at_target = (
-        sbp is not None and dbp is not None
-        and sbp.value < target.sbp_lt and dbp.value < target.dbp_lt
+    # Control is "every measurement this pathway targets is below its
+    # threshold". Reading the codes from the target rather than naming sbp and
+    # dbp is what lets a second pathway, whose target is one HbA1c, use the
+    # identical reasoner.
+    readings = {code: state.latest(code) for code in target.thresholds}
+    at_target = all(
+        observation is not None and observation.value < target.thresholds[code]
+        for code, observation in readings.items()
     )
 
-    target_used = Target(target.sbp_lt, target.dbp_lt, target.citation)
+    target_used = Target(dict(target.thresholds), target.citation)
     assertions = [
         Assertion(
-            text=(
-                f"Target for this patient is below "
-                f"{target.sbp_lt:.0f}/{target.dbp_lt:.0f} mmHg."
-            ),
+            text=f"Target for this patient is {target.describe()}.",
             citation=target.citation,
         )
     ]
@@ -212,7 +214,7 @@ def _instructions(rules, situation: str) -> str:
 def _trend(state) -> str:
     series = state.bp_series(limit=4)
     if not series:
-        return "No blood-pressure readings recorded."
+        return "No readings recorded."
     parts = [
         f"{day.isoformat()} {int(s)}/{int(d)}"
         for day, s, d in series

@@ -198,5 +198,21 @@ class PatientState:
         rows = [(d, v.get("sbp"), v.get("dbp")) for d, v in sorted(by_date.items())]
         return rows[-limit:]
 
+    def series(self, codes: tuple[str, ...], limit: int = 6
+               ) -> list[tuple[date, dict[str, float]]]:
+        """The last `limit` visits that recorded any of `codes`, oldest first.
+
+        The generic form of bp_series. A pathway whose target is one HbA1c needs
+        the same "how many visits in a row were at target" question answered,
+        and it should not need a method named after someone else's measurement.
+        """
+        by_date: dict[date, dict[str, float]] = {}
+        for observation in self.observations:
+            if observation.code in codes:
+                by_date.setdefault(observation.taken_at, {})[observation.code] = (
+                    observation.value
+                )
+        return sorted(by_date.items())[-limit:]
+
     def medication_molecules(self) -> set[str]:
         return {m.molecule for m in self.medications}

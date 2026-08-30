@@ -148,9 +148,42 @@ molecules:
 # patients arrive taking them — bought over the counter, or prescribed
 # elsewhere and picked up at reconciliation. Without these the NSAID
 # interaction rules can never fire, since an unknown molecule has no class.
+  # --- type 2 diabetes pathway -------------------------------------------
+  # Added with the diabetes pathway. Same shape as everything above; the
+  # formulary does not know which pathway a molecule belongs to, and should
+  # not — a drug is a drug.
+  - molecule: metformin
+    drug_class: biguanide
+    forms_mg: [500, 850]
+    dosing: {min_mg_daily: 500, max_mg_daily: 2000, max_mg_per_dose: 1000, max_doses_daily: 3}
+    restrictions:
+      - type: requires_recent_labs
+        codes: [egfr]
+        within_days: 180
+    citation: "fornas-prb-2025-12-31#metformin"
+    confidence: unverified
+    note: >
+      Contraindicated below eGFR 30 and dose-reduced below 45. The exclusion
+      handles the first; the second is a clinical-lead question (SPEC §10).
+
+  - molecule: glimepiride
+    drug_class: sulfonylurea
+    forms_mg: [1, 2, 4]
+    dosing: {min_mg_daily: 1, max_mg_daily: 4, max_mg_per_dose: 4, max_doses_daily: 1}
+    restrictions: []
+    citation: "fornas-prb-2025-12-31#glimepiride"
+    confidence: unverified
+    note: >
+      Carries hypoglycaemia risk, which is why recurrent hypoglycaemia is a red
+      flag on this pathway rather than a warning.
+
 recognised_molecules:
   - {molecule: ibuprofen,      drug_class: nsaid}
   - {molecule: diclofenac,     drug_class: nsaid}
   - {molecule: mefenamic_acid, drug_class: nsaid}
   - {molecule: naproxen,       drug_class: nsaid}
   - {molecule: piroxicam,      drug_class: nsaid}
+  # Never prescribed by this pathway, but a patient on it is excluded (DE4) and
+  # the interaction table names the class, so it must be recognisable.
+  - {molecule: insulin_basal,   drug_class: insulin}
+  - {molecule: insulin_rapid,   drug_class: insulin}

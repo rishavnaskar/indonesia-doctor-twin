@@ -65,7 +65,8 @@ sites:
     labs_available: [k, egfr, creatinine, hba1c, lipids, urine_protein]
     stocked_molecules:
       [amlodipine, captopril, lisinopril, ramipril, candesartan,
-       hydrochlorothiazide, furosemide, bisoprolol]
+       hydrochlorothiazide, furosemide, bisoprolol,
+       metformin, glimepiride]
     # Proof the service was actually delivered, not just listed. A capability
     # claimed with no evidence behind it is the stale-registry failure (A13)
     # waiting to happen, and a confidently wrong "yes, we run that" is worse
@@ -99,7 +100,8 @@ sites:
       - {item: ecg, working: false, last_checked: "2026-08-15"}
     labs_available: [k, egfr, creatinine, hba1c]
     stocked_molecules:
-      [amlodipine, captopril, hydrochlorothiazide, furosemide, nifedipine]
+      [amlodipine, captopril, hydrochlorothiazide, furosemide, nifedipine,
+       metformin, glimepiride]
     evidence_ref:
       - {service: k,          last_performed: "2026-08-17", volume_30d: 168, source: lab_ledger}
       - {service: egfr,       last_performed: "2026-08-17", volume_30d: 155, source: lab_ledger}
@@ -124,6 +126,6 @@ sites:
     # No potassium assay on site. This is why gate check 9 exists: a plan that
     # requires a lab this site cannot run is a referral, not a recommendation.
     labs_available: [creatinine]
-    stocked_molecules: [amlodipine, captopril, hydrochlorothiazide]
+    stocked_molecules: [amlodipine, captopril, hydrochlorothiazide, metformin]
     evidence_ref:
       - {service: creatinine, last_performed: "2026-08-09", volume_30d: 31, source: lab_ledger}

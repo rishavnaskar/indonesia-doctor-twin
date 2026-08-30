@@ -44,15 +44,15 @@ def proposal_schema(rules=None) -> dict[str, Any]:
             "assessment": {"type": "string", "enum": _values(Assessment)},
             "recommendation": {"type": "string", "enum": _values(Recommendation)},
             "bp_trend_summary": {"type": "string"},
+            # Threshold keys are `<code>_lt` and depend on the pathway, so this
+            # object stays open where the rest of the schema is closed. The
+            # parser reads whatever `_lt` keys arrive and gate check 2 compares
+            # them against the target the pack actually resolved, so an invented
+            # threshold is caught there rather than admitted here.
             "target_used": {
                 "type": "object",
-                "properties": {
-                    "sbp_lt": {"type": "number"},
-                    "dbp_lt": {"type": "number"},
-                    "citation": {"type": "string"},
-                },
-                "required": ["sbp_lt", "dbp_lt", "citation"],
-                "additionalProperties": False,
+                "properties": {"citation": {"type": "string"}},
+                "required": ["citation"],
             },
             "medication_changes": {
                 "type": "array",

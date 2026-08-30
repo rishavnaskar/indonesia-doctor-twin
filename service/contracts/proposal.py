@@ -90,9 +90,14 @@ class Assertion:
 
 @dataclass(frozen=True)
 class Target:
-    sbp_lt: float
-    dbp_lt: float
+    """The target the drafter says it used. Keyed by measurement code, because
+    a target is not always a blood pressure."""
+
+    thresholds: dict[str, float]
     citation: str
+
+    def below(self, code: str) -> float | None:
+        return self.thresholds.get(code)
 
 
 @dataclass

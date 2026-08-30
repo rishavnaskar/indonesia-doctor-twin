@@ -141,6 +141,7 @@ outcomes:
 
 # Steps in the encounter, in order.
 path_steps:
+  ROUTE:     "Chose which clinical pathway this visit belongs to, before anything else."
   ELIGIBLE:  "Checked that this patient belongs in this pathway at all."
   INTAKE:    "Collected the patient's answers through a fixed set of questions."
   RECONCILE: "Compared what the patient said against what the record holds."

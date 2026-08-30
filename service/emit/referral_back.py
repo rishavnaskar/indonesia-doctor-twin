@@ -89,13 +89,19 @@ def _target(rules, state):
 
 
 def _at_target_streak(state, target) -> int:
-    """Consecutive most-recent visits at target, newest first."""
+    """Consecutive most-recent visits at target, newest first.
+
+    Reads the codes off the target rather than assuming a blood pressure, so a
+    pathway measured by a single HbA1c gets the same answer from the same code.
+    A visit missing any targeted measurement breaks the streak: absence is not
+    evidence of control.
+    """
+    codes = tuple(target.thresholds)
     streak = 0
-    readings = list(reversed(state.bp_series(limit=12)))
-    for _, sbp, dbp in readings:
-        if sbp is None or dbp is None:
+    for _, values in reversed(state.series(codes, limit=12)):
+        if any(code not in values for code in codes):
             break
-        if sbp < target.sbp_lt and dbp < target.dbp_lt:
+        if all(values[code] < target.thresholds[code] for code in codes):
             streak += 1
         else:
             break

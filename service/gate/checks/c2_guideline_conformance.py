@@ -20,10 +20,14 @@ NAME = "guideline_conformance"
 # surface that displays it, so the two cannot drift apart.
 TITLE = 'Guideline conformance'
 DESCRIPTION = (
-    'Does the plan match the guideline the system is allowed to act on, and is there a blood-pressure target it is entitled to use for this patient?'
+    'Does the plan match the guideline the system is allowed to act on, and is there a target it is entitled to use for this patient?'
 )
 
 _TOLERANCE = 0.001
+
+
+def _describe(thresholds: dict) -> str:
+    return ", ".join(f"{code} < {value:g}" for code, value in sorted(thresholds.items()))
 
 
 def run(ctx: GateContext) -> list[Finding]:
@@ -38,7 +42,7 @@ def run(ctx: GateContext) -> list[Finding]:
                 check_name=NAME,
                 severity=Severity.BLOCK,
                 message=(
-                    f"No blood-pressure target is defined for this patient group "
+                    f"No target is defined for this patient group "
                     f"({group}). {resolution.reason} The system abstains rather "
                     "than applying the general adult target."
                 ),
@@ -62,9 +66,9 @@ def run(ctx: GateContext) -> list[Finding]:
         )
         return findings
 
-    if (
-        abs(used.sbp_lt - target.sbp_lt) > _TOLERANCE
-        or abs(used.dbp_lt - target.dbp_lt) > _TOLERANCE
+    if set(used.thresholds) != set(target.thresholds) or any(
+        abs(used.thresholds[code] - value) > _TOLERANCE
+        for code, value in target.thresholds.items()
     ):
         findings.append(
             Finding(
@@ -72,8 +76,8 @@ def run(ctx: GateContext) -> list[Finding]:
                 check_name=NAME,
                 severity=Severity.BLOCK,
                 message=(
-                    f"The proposal used a target of {used.sbp_lt:.0f}/{used.dbp_lt:.0f}; "
-                    f"the guideline gives {target.sbp_lt:.0f}/{target.dbp_lt:.0f} for "
+                    f"The proposal used a target of {_describe(used.thresholds)}; "
+                    f"the guideline gives {_describe(target.thresholds)} for "
                     f"group '{target.group}'."
                 ),
                 rule_id="target_mismatch",

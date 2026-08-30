@@ -47,7 +47,7 @@ def test_an_excluded_patient_never_reaches_the_model(rules):
     result, audit = _run(rules, make_patient(202, profile="excluded_pregnancy"))
     assert result.outcome is Outcome.HANDOFF
     assert result.proposal is None, "an excluded encounter must cost zero tokens"
-    assert result.trail == ["ELIGIBLE", "HANDOFF"]
+    assert result.trail == ["ROUTE", "ELIGIBLE", "HANDOFF"]
     assert not audit.records
 
 

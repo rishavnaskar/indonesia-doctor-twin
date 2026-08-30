@@ -69,3 +69,23 @@ rules:
       ACE inhibitor with an MRA carries hyperkalaemia risk. Permitted only with
       current potassium, which X2 already requires.
     citation: "id-interactions-2026-08#X6"
+
+  - id: X7
+    type: requires_recent_labs
+    applies_to_classes: [biguanide]
+    codes: [egfr]
+    within_days: 180
+    severity: block
+    message: >
+      Kidney function within 6 months is required before starting or increasing
+      metformin.
+    citation: "id-interactions-2026-08#X7"
+
+  - id: X8
+    type: class_combination
+    classes: [sulfonylurea, insulin]
+    severity: block
+    message: >
+      A sulfonylurea alongside insulin raises hypoglycaemia risk. Not drafted by
+      this pathway.
+    citation: "id-interactions-2026-08#X8"

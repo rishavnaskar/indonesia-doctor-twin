@@ -46,7 +46,13 @@ class RuleSet:
     # of `molecules`, never of this.
     recognised: dict[str, str] = field(default_factory=dict)  # molecule -> class
     interactions: list[dict[str, Any]] = field(default_factory=list)
+    # The pathway currently in force. Every check, the prompt and the reference
+    # reasoner read this and only this, so selecting a pathway is one field
+    # swap and twelve modules stay untouched.
     guideline: dict[str, Any] = field(default_factory=dict)
+    # Every pathway the pack defines, by name.
+    pathways: dict[str, dict[str, Any]] = field(default_factory=dict)
+    pathway_order: list[str] = field(default_factory=list)
     sites: dict[str, dict[str, Any]] = field(default_factory=dict)
     # Closed vocabulary for the proposal's `investigations` field. Gate check 9
     # tests membership of a site's list; this is the set of codes that are
@@ -111,7 +117,15 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
 
     formulary = _read(base / components["formulary"])
     interactions = _read(base / components["interactions"])
-    guideline = _read(base / components["guideline"])
+    pathway_files = manifest.get("pathways") or {}
+    if not pathway_files and "guideline" in components:
+        # A pack written before pathways existed still loads.
+        pathway_files = {"default": components["guideline"]}
+    pathways = {name: _read(base / path) for name, path in pathway_files.items()}
+    order = list(manifest.get("pathway_order") or pathways.keys())
+    if not pathways:
+        raise PackError("pack defines no pathways")
+    guideline = pathways[order[0]]
     capability = _read(base / components["capability"])
     payer = _read(base / components["payer"])
     interop = _read(base / components["interop"]) if "interop" in components else {}
@@ -143,7 +157,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
             raise PackError(f"recognised_molecules row missing {exc} in {row!r}") from exc
 
     citations: set[str] = set()
-    for blob in (formulary, interactions, guideline):
+    for blob in (formulary, interactions, *pathways.values()):
         _collect_citations(blob, citations)
 
     rs = RuleSet(
@@ -154,6 +168,8 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
         recognised=recognised,
         interactions=list(interactions.get("rules") or []),
         guideline=guideline,
+        pathways=pathways,
+        pathway_order=order,
         sites={s["site_id"]: s for s in capability.get("sites", [])},
         investigations={
             row["code"]: row.get("label", row["code"])
@@ -174,10 +190,36 @@ def _validate(rs: RuleSet) -> None:
     """Cheap structural checks. A broken pack should fail at load, not at a bedside."""
     if not rs.molecules:
         raise PackError("formulary is empty")
-    if not rs.guideline.get("red_flags"):
-        raise PackError("guideline defines no red flags")
-    if not rs.guideline.get("targets"):
-        raise PackError("guideline defines no targets")
+    for name, pathway in rs.pathways.items():
+        if not pathway.get("red_flags"):
+            raise PackError(f"pathway {name!r} defines no red flags")
+        if not pathway.get("targets"):
+            raise PackError(f"pathway {name!r} defines no targets")
+    for name in rs.pathway_order:
+        if name not in rs.pathways:
+            raise PackError(f"pathway_order names unknown pathway {name!r}")
+
+    # A ladder step missing a field used to surface as a TypeError inside the
+    # reasoner, three layers from the cause and only for the patients unlucky
+    # enough to reach that rung. Found by adding a second pathway and getting
+    # the step shape wrong. A broken pack fails at load or it fails at a
+    # bedside.
+    for name, pathway in rs.pathways.items():
+        for index, step in enumerate((pathway.get("escalation_ladder") or {}).get("steps") or []):
+            missing = [
+                key for key in ("drug_class", "preferred_molecule", "start_mg", "doses_per_day")
+                if step.get(key) is None
+            ]
+            if missing:
+                raise PackError(
+                    f"pathway {name!r} ladder step {index + 1} is missing {missing}"
+                )
+            molecule = step["preferred_molecule"]
+            if molecule not in rs.molecules:
+                raise PackError(
+                    f"pathway {name!r} ladder step {index + 1} names {molecule!r}, "
+                    "which is not a prescribable molecule"
+                )
     if not rs.investigations:
         raise PackError("capability defines no investigation_catalogue")
 

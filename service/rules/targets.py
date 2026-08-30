@@ -20,10 +20,28 @@ from service.rules.predicates import Context, evaluate
 
 @dataclass(frozen=True)
 class ResolvedTarget:
+    """What this patient's numbers must be below, whatever those numbers are.
+
+    Was two floats named sbp_lt and dbp_lt. That shape survived exactly as long
+    as there was one pathway: adding a second, whose target is a single HbA1c,
+    made it obvious that the engine had a blood pressure baked into its idea of
+    a target. Thresholds are now read from any `<code>_lt` key in the pack, so a
+    pathway declares what it measures and the engine does not need to know.
+    """
+
     group: str
-    sbp_lt: float
-    dbp_lt: float
+    thresholds: dict[str, float]
     citation: str
+
+    def below(self, code: str) -> float | None:
+        return self.thresholds.get(code)
+
+    def describe(self, units: dict[str, str] | None = None) -> str:
+        units = units or {}
+        return ", ".join(
+            f"{code} below {value:g}{(' ' + units[code]) if code in units else ''}"
+            for code, value in sorted(self.thresholds.items())
+        )
 
 
 @dataclass(frozen=True)
@@ -35,6 +53,22 @@ class TargetResolution:
     @property
     def defined(self) -> bool:
         return self.target is not None
+
+
+def thresholds(row: dict[str, Any]) -> dict[str, float]:
+    """Every `<code>_lt` key in a target row, as {code: value}.
+
+    A naming convention rather than a schema, deliberately: a pathway adds a
+    measurement by naming it, with no change here.
+    """
+    found = {
+        key[:-3]: float(value)
+        for key, value in row.items()
+        if key.endswith("_lt") and isinstance(value, (int, float))
+    }
+    if not found:
+        raise ValueError(f"target {row.get('group')!r} declares no <code>_lt threshold")
+    return found
 
 
 def resolve_target(guideline: dict[str, Any], ctx: Context) -> TargetResolution:
@@ -52,8 +86,7 @@ def resolve_target(guideline: dict[str, Any], ctx: Context) -> TargetResolution:
             return TargetResolution(
                 target=ResolvedTarget(
                     group=row["group"],
-                    sbp_lt=float(row["sbp_lt"]),
-                    dbp_lt=float(row["dbp_lt"]),
+                    thresholds=thresholds(row),
                     citation=row["citation"],
                 )
             )
