@@ -166,6 +166,18 @@ class PatientState:
         for obs in self.observations:
             if obs.code != code:
                 continue
+            # A reading dated after this encounter was not available at this
+            # encounter. `as_of` is what the system saw at this moment, so a
+            # future-dated observation is excluded rather than used.
+            #
+            # This is a safety property, not tidiness. Age is measured as
+            # as_of - taken_at, so a future date produces a negative age and
+            # satisfies *every* freshness rule in the pack — "potassium within
+            # 90 days" would pass on a lab that does not exist yet. One clock
+            # skew or mistyped year and the sufficiency check silently stops
+            # asking for the test it exists to demand.
+            if obs.taken_at > self.as_of:
+                continue
             if best is None or obs.taken_at >= best.taken_at:
                 best = obs
         return best
@@ -208,7 +220,7 @@ class PatientState:
         """
         by_date: dict[date, dict[str, float]] = {}
         for observation in self.observations:
-            if observation.code in codes:
+            if observation.code in codes and observation.taken_at <= self.as_of:
                 by_date.setdefault(observation.taken_at, {})[observation.code] = (
                     observation.value
                 )

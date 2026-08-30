@@ -243,6 +243,14 @@ def main() -> int:
     parser.add_argument("--no-open", action="store_true")
     args = parser.parse_args()
 
+    from service.packs.loader import PackError, load_pack
+
+    try:
+        load_pack(args.pack)
+    except PackError as exc:
+        print(f"\n  Could not load the rule pack {args.pack!r}: {exc}\n")
+        return 2
+
     if args.export:
         router = None
         if args.live:

@@ -110,6 +110,14 @@ class AnthropicBackend:
         try:
             response = client.messages.create(**request)
         except Exception as exc:  # noqa: BLE001 - surfaced with context, never swallowed
+            text = str(exc)
+            if "authentication" in text.lower() or "api_key" in text:
+                # The SDK names three constructor parameters and no next step.
+                raise BackendError(
+                    "No Anthropic credentials found. Set ANTHROPIC_API_KEY in .env, "
+                    "or run with --provider openrouter, which has free models and is "
+                    "the default."
+                ) from exc
             raise BackendError(f"{type(exc).__name__}: {exc}") from exc
 
         if getattr(response, "stop_reason", None) == "refusal":

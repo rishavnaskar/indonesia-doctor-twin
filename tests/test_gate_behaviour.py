@@ -11,6 +11,7 @@ from datagen.proposer import REFERENCE_PROVENANCE, propose
 from datagen.synthetic import TODAY, make_patient, with_documented_acei_intolerance
 from service.contracts.proposal import ChangeAction, MedicationChange, Target
 from service.gate import GateContext, run_gate
+from service.gate.types import Severity
 from service.packs.loader import load_pack
 from service.rules.eligibility import check_eligibility
 from service.rules.predicates import Context
@@ -285,3 +286,65 @@ def test_the_dose_hidden_by_a_duplicate_cannot_slip_through(rules):
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )
     assert findings, "90 mg/day must not survive by being overwritten"
+
+
+def test_a_future_dated_reading_is_not_a_reading(rules):
+    """Age is measured as as_of minus taken_at, so a future date produces a
+    negative age and satisfies *every* freshness rule in the pack — "potassium
+    within 90 days" would pass on a lab that does not exist yet. One clock skew
+    or mistyped year and the sufficiency check silently stops asking for the
+    test it exists to demand."""
+    from datetime import timedelta
+
+    from datagen.synthetic import TODAY
+    from service.state.models import Observation, Source
+
+    state = make_patient(1)
+    state.observations = [o for o in state.observations if o.code != "k"]
+    state.observations.append(
+        Observation("k", 4.2, "mmol/L", TODAY + timedelta(days=500), Source.EMR))
+
+    assert state.latest("k") is None, "a reading from the future was not available"
+    assert state.observation_age_days("k") is None
+    assert all(taken <= state.as_of for taken, _ in state.series(("sbp",), limit=12))
+
+
+def test_a_drug_we_do_not_recognise_is_declared_unchecked(rules):
+    """The formulary check tests what we propose. Nothing tested what the
+    patient is already taking, so an unlisted drug got a plan with no comment —
+    and every interaction rule silently skipped it, because drug_class_of
+    returns None and a class-pair rule cannot match a class it does not have."""
+    from service.gate.checks import c3_drug_safety
+    from service.state.models import Medication, Source
+
+    state = make_patient(1, controlled=False)
+    proposal = propose(state, rules)
+
+    state.medications = state.medications + [
+        Medication("unobtainium", 5.0, 1, Source.PATIENT_REPORTED)
+    ]
+    findings = c3_drug_safety.run(
+        GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
+    )
+    unchecked = [f for f in findings if f.rule_id == "unrecognised_current_drug"]
+    assert len(unchecked) == 1
+    # A warning, not a block: we do not know there is a problem, we know we
+    # cannot check for one, and those are different statements.
+    assert unchecked[0].severity is not Severity.BLOCK
+
+
+def test_a_recognised_but_unprescribable_drug_stays_silent(rules):
+    """recognised_molecules exists so a drug we never prescribe can still be
+    reasoned about. Warning on those would make the signal worthless."""
+    from service.gate.checks import c3_drug_safety
+    from service.state.models import Medication, Source
+
+    state = make_patient(1, controlled=False)
+    proposal = propose(state, rules)
+    state.medications = state.medications + [
+        Medication("ibuprofen", 400.0, 3, Source.PATIENT_REPORTED)
+    ]
+    findings = c3_drug_safety.run(
+        GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
+    )
+    assert not [f for f in findings if f.rule_id == "unrecognised_current_drug"]

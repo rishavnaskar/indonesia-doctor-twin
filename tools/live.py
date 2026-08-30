@@ -30,7 +30,7 @@ from datagen.synthetic import make_patient
 from service.emit.queue import OutboundQueue
 from service.graph.runtime import InMemoryRuntime
 from service.graph.workflow import Outcome, run_encounter
-from service.packs.loader import load_pack
+from service.packs.loader import PackError, load_pack
 from service.reason.parse import ProposalParseError
 from service.router.router import router_with_model
 from service.signing import AuditLog, Signer
@@ -77,6 +77,7 @@ def main() -> int:
                         help="draft this many times and use the agreement between "
                              "them as the confidence, instead of the model's own "
                              "opinion of itself (costs one call per sample)")
+    parser.add_argument("--pack", default="id")
     parser.add_argument("--site", default="SITE-A")
     parser.add_argument("--show-prompt", action="store_true")
     args = parser.parse_args()
@@ -95,7 +96,16 @@ def main() -> int:
         print("  Use with: python -m tools.live --n 5 --model <id>\n")
         return 0
 
-    rules = load_pack("id")
+    try:
+        rules = load_pack(args.pack if hasattr(args, "pack") else "id")
+    except PackError as exc:
+        print(f"\n  Could not load the rule pack: {exc}\n")
+        return 2
+
+    if args.site not in rules.sites:
+        print(f"\n  No such site: {args.site}")
+        print(f"  Known sites: {', '.join(sorted(rules.sites))}\n")
+        return 2
     site = rules.sites[args.site]
     kwargs = {}
     if args.provider == "anthropic" and args.no_thinking:
@@ -113,11 +123,15 @@ def main() -> int:
     queue = OutboundQueue()
     now = datetime(2026, 8, 29, 10, 0)
 
-    print(f"\n{RULE}\n  Live run — {backend.version()} — {args.n} encounters at {args.site}")
-    chain = getattr(backend, "fallbacks", ())
-    if chain:
-        print(f"  Falling back through: {', '.join(chain)}")
-    print(f"  Synthetic patients only. The residency guard enforces it.\n{RULE}")
+    if not args.show_prompt:
+        print(f"\n{RULE}\n  Live run — {backend.version()} — {args.n} encounters at {args.site}")
+        chain = getattr(backend, "fallbacks", ())
+        if chain:
+            print(f"  Falling back through: {', '.join(chain)}")
+        print(f"  Synthetic patients only. The residency guard enforces it.\n{RULE}")
+    else:
+        print(f"\n{RULE}\n  The exact prompt, for {args.site}. No request is made and no key "
+              f"is needed.\n{RULE}")
 
     if args.show_prompt:
         # Inspecting the prompt costs nothing and needs no credentials.

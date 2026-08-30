@@ -58,6 +58,40 @@ DESCRIPTION = (
 )
 
 
+def _unrecognised_current_drugs(ctx: GateContext) -> list[Finding]:
+    """Drugs on the patient's list that this pack has never heard of.
+
+    The formulary check tests what we *propose*. Nothing tested what the patient
+    is already taking, so a patient on an unlisted drug got a plan with no
+    comment — and every interaction rule silently skipped them, because
+    `drug_class_of` returns None and a class-pair rule cannot match a class it
+    does not have.
+
+    A warning, not a block. We do not know there is a problem; we know we cannot
+    check for one, and those are different statements. The pack's
+    recognised_molecules list exists precisely so a drug we never prescribe can
+    still be reasoned about — anything outside it is a genuine blind spot and
+    the clinician is the one who can resolve it.
+    """
+    findings = []
+    for medication in ctx.state.medications:
+        if ctx.rules.drug_class_of(medication.molecule) is None:
+            findings.append(
+                Finding(
+                    check=NUMBER,
+                    check_name=NAME,
+                    severity=Severity.WARN,
+                    message=(
+                        f"{medication.molecule} is on this patient's list but is not in "
+                        "the rule pack, so no interaction rule can see it. Interactions "
+                        "with it have not been checked."
+                    ),
+                    rule_id="unrecognised_current_drug",
+                )
+            )
+    return findings
+
+
 def run(ctx: GateContext) -> list[Finding]:
     findings = _duplicate_entries(ctx)
     if findings:
@@ -66,8 +100,8 @@ def run(ctx: GateContext) -> list[Finding]:
         # itself — evaluating one of the two readings would be picking a winner.
         return findings
 
+    findings += _unrecognised_current_drugs(ctx)
 
-    findings: list[Finding] = []
     rules, state, proposal = ctx.rules, ctx.state, ctx.proposal
     regimen = resulting_regimen(state, proposal)
     by_class = classes_in(regimen, rules)
