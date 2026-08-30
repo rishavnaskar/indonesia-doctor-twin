@@ -18,6 +18,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 8
 NAME = "uncertainty"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Uncertainty'
+DESCRIPTION = (
+    'Is the system confident enough to draft anything? Below the floor it abstains rather than guessing.'
+)
+
 
 def run(ctx: GateContext) -> list[Finding]:
     abstention = ctx.rules.guideline.get("abstention") or {}

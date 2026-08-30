@@ -25,6 +25,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 9
 NAME = "executable_here"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Executable here'
+DESCRIPTION = (
+    'Can this hospital actually carry out this plan today — is the drug in stock and the test available on site?'
+)
+
 _DISPENSING_ACTIONS = (
     ChangeAction.START,
     ChangeAction.INCREASE,

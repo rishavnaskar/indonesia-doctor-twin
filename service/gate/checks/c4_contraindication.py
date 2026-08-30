@@ -13,6 +13,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 4
 NAME = "contraindication"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Contraindications'
+DESCRIPTION = (
+    'Is any proposed drug one this specific patient must not receive, given their allergies, intolerances and conditions?'
+)
+
 
 def run(ctx: GateContext) -> list[Finding]:
     findings: list[Finding] = []

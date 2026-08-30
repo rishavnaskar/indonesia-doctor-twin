@@ -17,6 +17,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 5
 NAME = "formulary"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Formulary'
+DESCRIPTION = (
+    'Is every drug real, prescribable here, and on the approved list? A drug the system invented dies here.'
+)
+
 _PRESCRIBING_ACTIONS = (
     ChangeAction.START,
     ChangeAction.INCREASE,

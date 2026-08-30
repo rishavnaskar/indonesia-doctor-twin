@@ -20,6 +20,7 @@ components:
   interop: interop/fhir.yaml
   language: language/intake.yaml
   payer: payer/coding.yaml
+  glossary: glossary.yaml
 
 # SPEC-V1 §2, clinical governance gate.
 # No rule in this pack is active in a live setting until the clinical lead

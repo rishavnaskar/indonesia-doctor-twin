@@ -17,6 +17,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 7
 NAME = "sufficiency"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Sufficiency'
+DESCRIPTION = (
+    'Is there enough information to advise at all, or is a required measurement missing or too old?'
+)
+
 
 def run(ctx: GateContext) -> list[Finding]:
     findings: list[Finding] = []

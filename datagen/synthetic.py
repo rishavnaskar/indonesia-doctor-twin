@@ -150,6 +150,11 @@ def make_patient(
             encounter_date=TODAY - timedelta(days=90 * n),
             sbp=float(sbp + rng.randint(-6, 6)),
             dbp=float(dbp + rng.randint(-4, 4)),
+            # What was done last time is part of the picture, not decoration: a
+            # patient still above target after two visits of "continue" is a
+            # different case from one whose dose was raised last month.
+            decision="continue" if controlled else rng.choice(["continue", "titrate_up"]),
+            signed_by=f"PRAC-A-00{rng.randint(1, 2)}",
         )
         for n in range(1, 4)
     ]

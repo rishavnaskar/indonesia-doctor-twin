@@ -30,4 +30,21 @@ ALL_CHECKS = (
     c9_executable,
 )
 
-__all__ = ["ALL_CHECKS"]
+def catalogue() -> list[dict]:
+    """The nine checks, described. For any surface that has to explain itself.
+
+    Built from the check modules so a renamed or reworded check cannot leave a
+    stale description behind on a screen someone is reading.
+    """
+    return [
+        {
+            "number": check.NUMBER,
+            "name": check.NAME,
+            "title": check.TITLE,
+            "description": check.DESCRIPTION,
+        }
+        for check in ALL_CHECKS
+    ]
+
+
+__all__ = ["ALL_CHECKS", "catalogue"]

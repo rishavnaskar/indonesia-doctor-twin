@@ -15,6 +15,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 3
 NAME = "drug_safety"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Drug safety'
+DESCRIPTION = (
+    'Is every dose within its limit, and does any drug pairing or missing blood test make this unsafe?'
+)
+
 
 def run(ctx: GateContext) -> list[Finding]:
     findings: list[Finding] = []

@@ -278,6 +278,16 @@ sufficiency:
 # In the pack because language is national, and because a clinician should be
 # able to change the wording without a release.
 
+# English glosses for review only. The patient is never shown these; a reviewer
+# who does not read the deployment language cannot otherwise check what was said.
+patient_instructions_gloss:
+  controlled: >-
+    Your blood pressure is controlled. Keep taking your medicine as usual and do
+    not stop it on your own. Come back for your scheduled check-up.
+  uncontrolled: >-
+    Your blood pressure is still above target. Take your medicine every day at
+    the same time, cut down on salt, and come back for a re-check in 4 weeks.
+
 patient_instructions:
   controlled: >-
     Tekanan darah Anda terkontrol. Lanjutkan obat seperti biasa, jangan

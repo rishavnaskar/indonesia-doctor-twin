@@ -16,6 +16,13 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 6
 NAME = "citations"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Citations and provenance'
+DESCRIPTION = (
+    'Does every clinical claim point at a source the system can actually resolve, and is the proposal pinned to a model, a prompt and a rule version?'
+)
+
 
 def run(ctx: GateContext) -> list[Finding]:
     findings: list[Finding] = []

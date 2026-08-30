@@ -1,0 +1,155 @@
+# Plain-English meanings for every code and term a human reads on screen.
+#
+# In the pack rather than in the surface for the usual reason: a diagnosis code
+# system, a lab code and a drug class are national and clinical vocabulary, and
+# /service may not name any of them. A second country ships its own glossary.
+#
+# This is display text only. Nothing here is a rule and nothing here is read by
+# the gate — the meanings are for the human, not the machine. If a value here is
+# wrong, a reader is misled; no decision changes. That is why it is safe for this
+# file to be broader than the rules it explains.
+
+version: "id-glossary-2026-08-30"
+
+# ICD-10, as used by the national scheme.
+diagnoses:
+  I10:    "High blood pressure with no identified underlying cause. The common kind."
+  I11:    "High blood pressure that has begun to affect the heart."
+  I12:    "High blood pressure that has begun to affect the kidneys."
+  I13:    "High blood pressure affecting both the heart and the kidneys."
+  E11:    "Type 2 diabetes."
+  E11.9:  "Type 2 diabetes, with no complication recorded."
+  N18:    "Long-term kidney disease, graded by stage."
+  E78:    "High cholesterol or blood fats."
+  O10:    "High blood pressure in pregnancy."
+  I50:    "Heart failure — the heart is not pumping strongly enough."
+
+# What each measurement is, and why this pathway looks at it.
+observations:
+  sbp:
+    label: "Systolic blood pressure"
+    plain: "The top number. Pressure in the arteries when the heart beats."
+    unit: "mmHg"
+  dbp:
+    label: "Diastolic blood pressure"
+    plain: "The bottom number. Pressure between beats, when the heart rests."
+    unit: "mmHg"
+  k:
+    label: "Potassium"
+    plain: >-
+      A blood salt. Some blood-pressure drugs push it up, and too much can
+      disturb the heart rhythm — which is why this pathway checks it before
+      starting or increasing those drugs.
+    unit: "mmol/L"
+  egfr:
+    label: "Estimated GFR"
+    plain: >-
+      How well the kidneys are filtering. Lower means worse. Several
+      blood-pressure drugs are cleared by the kidneys, so the dose depends on it.
+    unit: "mL/min/1.73m²"
+  creatinine:
+    label: "Creatinine"
+    plain: "A waste product the kidneys clear. Used to calculate eGFR."
+    unit: "mg/dL"
+  hba1c:
+    label: "HbA1c"
+    plain: "Average blood sugar over roughly three months."
+    unit: "%"
+  lipids:
+    label: "Lipid panel"
+    plain: "Cholesterol and blood fats."
+    unit: ""
+  urine_protein:
+    label: "Urine protein"
+    plain: "Protein leaking into the urine — an early sign of kidney damage."
+    unit: ""
+
+# The bounded interview's symptom set. Which of these are red flags is decided
+# by the guideline's rules, not here.
+symptoms:
+  chest_pain:                 "Chest pain"
+  dyspnoea:                   "Shortness of breath"
+  severe_headache:            "Severe headache"
+  visual_disturbance:         "Change or blurring of vision"
+  focal_neurological_deficit: "Weakness or numbness on one side of the body"
+  syncope:                    "Fainting or passing out"
+  cough:                      "Dry cough — a known side effect of one drug class here"
+  dizziness:                  "Dizziness"
+  swelling:                   "Swollen ankles or feet"
+
+# Situational facts held about a patient, in plain words.
+flags:
+  on_antihypertensive_treatment: "Already taking blood-pressure medication"
+  has_dm:                        "Has diabetes"
+  has_ckd:                       "Has long-term kidney disease"
+  has_lv_dysfunction:            "The heart's main pumping chamber is weakened"
+  pregnancy_positive:            "Currently pregnant"
+  is_first_presentation:         "First visit for this problem — not a follow-up"
+  on_dialysis:                   "On dialysis"
+
+drug_classes:
+  ccb_dihydropyridine:
+    label: "Calcium channel blocker"
+    plain: "Relaxes and widens blood vessels so blood flows with less pressure."
+  acei:
+    label: "ACE inhibitor"
+    plain: >-
+      Blocks a hormone that tightens blood vessels. Protects the kidneys, and
+      can cause a persistent dry cough in some people.
+  arb:
+    label: "Angiotensin receptor blocker"
+    plain: >-
+      Works on the same hormone pathway as an ACE inhibitor, without the cough.
+      Reserved here for people who cannot tolerate an ACE inhibitor.
+  thiazide:
+    label: "Thiazide diuretic"
+    plain: "A water tablet. Removes salt and fluid, lowering the volume the heart pushes."
+  loop_diuretic:
+    label: "Loop diuretic"
+    plain: "A stronger water tablet, used when fluid is building up."
+  beta_blocker:
+    label: "Beta blocker"
+    plain: "Slows the heart and reduces its force. Used here only for specific conditions."
+  nsaid:
+    label: "Anti-inflammatory painkiller"
+    plain: >-
+      Common pain and swelling relief. Raises blood pressure and strains the
+      kidneys, so it matters even though this pathway never prescribes one.
+
+# What the system is proposing to do, in plain words.
+recommendations:
+  continue:     "Keep the current medication exactly as it is."
+  titrate_up:   "Increase the dose of a drug the patient already takes."
+  titrate_down: "Reduce a dose."
+  add_agent:    "Add a second drug alongside the current one."
+  switch_agent: "Stop one drug and start a different one."
+  refer:        "Send the patient to someone or somewhere better equipped."
+
+assessments:
+  controlled:    "Blood pressure is at or below the target for this patient."
+  uncontrolled:  "Blood pressure is above the target for this patient."
+  over_treated:  "Blood pressure is lower than intended — the treatment may be too strong."
+
+# How the encounter ended. Four of these are successes, not failures.
+outcomes:
+  committed:    "A draft was produced, checked, signed by a licensed doctor and coded."
+  abstain:      "The safety gate refused the draft. The clinician was not shown it."
+  escalate:     "A red flag was found. The encounter leaves this pathway and the doctor is alerted."
+  handoff:      "This patient is not in scope for this pathway."
+  request_info: "Not enough information to advise. The system asks rather than guesses."
+  presented:    "A draft is waiting for a doctor's signature."
+
+# Steps in the encounter, in order.
+path_steps:
+  ELIGIBLE:  "Checked that this patient belongs in this pathway at all."
+  INTAKE:    "Collected the patient's answers through a fixed set of questions."
+  RECONCILE: "Compared what the patient said against what the record holds."
+  PROPOSE:   "Drafted a plan."
+  GATE:      "Ran the nine safety checks over that draft."
+  PRESENT:   "Decided what, if anything, the doctor is shown."
+  SIGNED:    "A licensed doctor signed it."
+  COMMIT:    "Wrote the encounter and its codes."
+  FOLLOW-UP: "Scheduled the next visit."
+  ABSTAIN:   "Withheld the draft."
+  ESCALATE:  "Alerted the doctor and left the pathway."
+  HANDOFF:   "Routed the patient out of this pathway."

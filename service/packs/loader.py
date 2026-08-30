@@ -56,6 +56,10 @@ class RuleSet:
     payer: dict[str, Any] = field(default_factory=dict)
     interop: dict[str, Any] = field(default_factory=dict)
     language: dict[str, Any] = field(default_factory=dict)
+    # Display text only: what each code and term means in plain words. No rule
+    # reads this, and none should — a wrong value here misleads a reader without
+    # changing a decision.
+    glossary: dict[str, Any] = field(default_factory=dict)
 
     # Every citation string any rule may legitimately point at. Gate check 6
     # tests membership against exactly this set: no source, no answer.
@@ -109,6 +113,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
     payer = _read(base / components["payer"])
     interop = _read(base / components["interop"]) if "interop" in components else {}
     language = _read(base / components["language"]) if "language" in components else {}
+    glossary = _read(base / components["glossary"]) if "glossary" in components else {}
 
     molecules: dict[str, Molecule] = {}
     for row in formulary.get("molecules", []):
@@ -154,6 +159,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
         payer=payer,
         interop=interop,
         language=language,
+        glossary=glossary,
         citations=citations,
     )
     _validate(rs)

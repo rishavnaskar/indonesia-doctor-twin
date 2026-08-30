@@ -55,6 +55,8 @@ def test_page_is_self_contained():
 
 def test_page_embeds_valid_json_and_escapes_it():
     html = render(collect())
-    payload = html.split("const DATA = ", 1)[1].split(";\nlet current", 1)[0]
+    # Take the DATA assignment's own line, so this does not break every time the
+    # line after it is edited.
+    payload = html.split("const DATA = ", 1)[1].split("\n", 1)[0].rstrip(";")
     data = json.loads(payload.replace("<\\/", "</"))
     assert data["total"] == 6

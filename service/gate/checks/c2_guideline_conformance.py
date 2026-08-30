@@ -16,6 +16,13 @@ from service.rules.targets import resolve_target
 NUMBER = 2
 NAME = "guideline_conformance"
 
+# One line a clinician can read. Lives with the check rather than in the
+# surface that displays it, so the two cannot drift apart.
+TITLE = 'Guideline conformance'
+DESCRIPTION = (
+    'Does the plan match the guideline the system is allowed to act on, and is there a blood-pressure target it is entitled to use for this patient?'
+)
+
 _TOLERANCE = 0.001
 
 
