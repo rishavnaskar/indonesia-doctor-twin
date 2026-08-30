@@ -162,6 +162,51 @@ practising from it. **A deployed clinic flips it:** a doctor should not read
 past a second language to reach the sentence that matters. There is a test for
 both directions.
 
+## What the model decides, and what the rules decide
+
+Worth stating plainly, because the division is the whole design and it is easy
+to read the wrong way round.
+
+**The model decides what to do.** Assessment, recommendation, which drug at what
+dose and schedule, which investigations, the follow-up interval, the patient's
+instructions, and its own confidence. That is the clinical plan, not prose.
+
+**The rules decide whether that is allowed.** The nine checks, the exclusions,
+the red flags. They never choose a plan; they refuse one.
+
+**Escalation is deterministic on purpose.** Red-flag recall is the one number
+where a miss can kill someone, and "systolic ≥ 180 with chest pain → alert" is a
+lookup with perfect recall on the pattern it names. A model doing that job at
+ninety-nine percent is strictly worse, and there is nothing to gain by making a
+lookup probabilistic.
+
+**But a rule only catches what somebody enumerated.** Seven red flags is seven
+patterns. A patient whose problem is not one of them gets no flag from the
+rules — while the model, having read the whole record, may well have noticed.
+`concerns` is the channel for that:
+
+```
+[mention] eGFR has declined steadily from 88 to 64 over the past ~9 months
+```
+
+R5 fires on a 30% fall between two readings. Four steps of roughly ten percent
+each never trip it, and the rule is not wrong — it is a threshold, and that is
+what thresholds do. The model saw the shape.
+
+**A concern can only add.** It raises the band — mention to amber, escalate to
+red — and can never lower one, clear an acknowledgement the rules demanded, turn
+a refusal into a draft, or mark a patient as fine. That asymmetry is what makes
+it safe to let a model speak here at all: the worst a wrong concern costs is a
+clinician's attention. There are tests for each direction.
+
+Making that work needed a fix that mattered more than the feature. The model was
+being sent one reading per measurement and then asked to summarise a trend and
+notice what the rules do not check for — both impossible from a single point.
+This system describes itself as a longitudinal patient model rather than a
+conversation, and the longitudinal part was the part the model never saw. It now
+receives the recent series per measurement and the prior visits with their
+decisions.
+
 ## Making the drafter better
 
 Three levers, all off by default, all composing through the router as reasoners

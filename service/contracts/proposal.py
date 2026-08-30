@@ -88,6 +88,42 @@ class Assertion:
     citation: str
 
 
+class Urgency(str, Enum):
+    """How loudly a model-raised concern is carried.
+
+    Never quieter than the rules decided. See `Concern`.
+    """
+
+    MENTION = "mention"      # worth a line the clinician can read past
+    ESCALATE = "escalate"    # the clinician should look at this now
+
+
+@dataclass(frozen=True)
+class Concern:
+    """Something the drafter thinks a clinician should see.
+
+    The deterministic red flags are the floor and they are not negotiable: a
+    rule with a defined threshold has perfect recall on the pattern it names,
+    and a model doing that job at ninety-nine percent is strictly worse.
+
+    But a rule only catches what somebody enumerated. Seven red flags is seven
+    patterns, and a patient whose problem is not one of them gets no flag from
+    the rules — while the model, having read the whole record, may well have
+    noticed. This is the channel for that, and it exists because the alternative
+    is a system that can only ever see what was anticipated.
+
+    **A concern can only add.** It can raise what the clinician sees and can
+    never lower it, suppress a rule-driven escalation, or mark anything as fine.
+    That asymmetry is what makes it safe to let a model speak here at all: the
+    worst a wrong concern costs is a clinician's attention, and the worst a
+    missing one costs is nothing that was not already missing.
+    """
+
+    text: str
+    urgency: Urgency = Urgency.MENTION
+    citation: str | None = None
+
+
 @dataclass(frozen=True)
 class Target:
     """The target the drafter says it used. Keyed by measurement code, because
@@ -127,6 +163,10 @@ class Proposal:
     # RAAS-acting drug without ever requesting a potassium result has told us
     # something no inspection of its output would reveal.
     tools_requested: list[str] = field(default_factory=list)
+
+    # Things the drafter wants a clinician to see that no rule asked about.
+    # Additive only — see `Concern`.
+    concerns: list[Concern] = field(default_factory=list)
 
     def citations(self) -> set[str]:
         found = {a.citation for a in self.assertions}

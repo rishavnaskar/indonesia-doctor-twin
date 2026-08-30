@@ -187,6 +187,10 @@ def _proposal(proposal, rules) -> dict | None:
         "assessment_plain": (glossary.get("assessments") or {}).get(
             _plain(proposal.assessment), ""),
         "patient_instructions_gloss": gloss,
+        "concerns": [
+            {"text": c.text, "urgency": c.urgency.value, "citation": c.citation}
+            for c in proposal.concerns
+        ],
         "assessment": _plain(proposal.assessment),
         "recommendation": _plain(proposal.recommendation),
         "bp_trend_summary": proposal.bp_trend_summary,
@@ -368,6 +372,7 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
         decision=result.decision,
         questions=tuple(result.questions_for_clinician),
         discrepancies=tuple(result.reconciliation.discrepancies),
+        concerns=tuple(getattr(result.proposal, "concerns", ()) or ()),
     )
 
     signature = None

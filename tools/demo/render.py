@@ -425,6 +425,15 @@ function auditView(e){
       ${findings}
     </div>
     ${discrepancyBlock(e)}
+    ${e.proposal && e.proposal.concerns && e.proposal.concerns.length ? `<div class="card">
+      <h2>Raised by the drafter, not by a rule</h2>
+      <div class="note" style="margin:0 0 10px">The deterministic red flags are the
+        floor and catch what somebody enumerated. This is the channel for something
+        those rules were never written to look for. It can only add to what the
+        clinician sees — it cannot quieten an alert or mark a patient as fine.</div>
+      ${e.proposal.concerns.map(c=>`<div class="finding ${c.urgency==="escalate"?"":"warn"}">
+        <div class="src">${c.urgency === "escalate" ? "Escalate" : "Mention"}</div>
+        <div class="m">${esc(c.text)}</div></div>`).join("")}</div>` : ""}
     ${e.exclusions && e.exclusions.length ? `<div class="card">
       <h2>Why this patient is out of scope</h2>
       ${e.exclusions.map(x=>`<div class="finding">

@@ -256,6 +256,9 @@ function verdict(p){
         <div class="src">Exclusion ${esc(x.id)}</div><b>${esc(x.label)}</b>
         <div class="plain">${esc(x.reason)}</div></div>`).join("")}` : ""}
     ${findings ? `<div class="sec">Why the gate stopped it</div>${findings}` : ""}
+    ${(r.proposal && r.proposal.concerns || []).length ? `<div class="sec">Raised by the drafter, not by a rule</div>
+      ${r.proposal.concerns.map(c=>`<div class="find ${c.urgency==="escalate"?"":"warn"}">
+        <div class="src">${c.urgency==="escalate"?"Escalate":"Mention"}</div>${esc(c.text)}</div>`).join("")}` : ""}
     ${(r.discrepancies||[]).length ? `<div class="sec">Record vs what the patient says</div>
       ${r.discrepancies.map(d=>`<div class="find ${d.material?"":"warn"}">${esc(d.text)}
         ${d.record_says||d.patient_says?`<div class="src">Record: ${esc(d.record_says||"—")}

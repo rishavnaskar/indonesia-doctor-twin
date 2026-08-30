@@ -25,7 +25,7 @@ drug. Swapping the pack swaps what the clinician reads.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
 
@@ -166,6 +166,42 @@ def _lines(findings: list[Finding], english_first: bool = True) -> tuple[Line, .
     return tuple(lines)
 
 
+_BAND_ORDER = {Band.GREEN: 0, Band.AMBER: 1, Band.RED: 2}
+
+
+def _raise_for_concerns(view: "Presentation", concerns: tuple, labels: Labels) -> "Presentation":
+    """Let the drafter add to what the clinician sees. Never subtract.
+
+    The deterministic red flags decide the floor. A concern can push the band
+    up — mention to amber, escalate to red — and cannot push it down, cannot
+    clear an acknowledgement the rules demanded, and cannot turn a refusal into
+    a draft. That asymmetry is the whole reason a model is allowed to speak
+    here: the worst a wrong concern costs is a clinician's attention.
+    """
+    if not concerns:
+        return view
+
+    wanted = Band.RED if any(
+        getattr(c, "urgency", None) and c.urgency.value == "escalate" for c in concerns
+    ) else Band.AMBER
+    band = view.band if _BAND_ORDER[view.band] >= _BAND_ORDER[wanted] else wanted
+
+    lines = view.lines + tuple(
+        Line(text=c.text, citation=getattr(c, "citation", None)) for c in concerns
+    )
+    return replace(
+        view,
+        band=band,
+        # A green visit that gains a concern needs a headline, since silence is
+        # exactly what the concern is objecting to.
+        headline=view.headline if view.band is not Band.GREEN else labels.primary("warnings"),
+        gloss=view.gloss if view.band is not Band.GREEN else labels.secondary("warnings"),
+        lines=lines,
+        requires_acknowledgement=view.requires_acknowledgement or band is Band.RED,
+        audit=view.audit + tuple(Line(text=c.text) for c in concerns),
+    )
+
+
 def present(
     outcome: str,
     labels: Labels,
@@ -173,6 +209,7 @@ def present(
     decision: GateDecision | None = None,
     questions: tuple[str, ...] = (),
     discrepancies: tuple = (),
+    concerns: tuple = (),
 ) -> Presentation:
     """Decide what the clinician sees. Pure, and deterministic.
 
@@ -180,6 +217,7 @@ def present(
     so this module never imports the orchestration layer — presentation depends
     on what was concluded, not on what ran it.
     """
+    concerns = tuple(concerns)
     findings = list(decision.findings) if decision else []
     blocking = [f for f in findings if f.severity is Severity.BLOCK]
     warnings = [f for f in findings if f.severity is Severity.WARN]
@@ -204,7 +242,7 @@ def present(
     # A red flag is not a suggestion and is not suppressible. It is the one
     # case where the system interrupts a clinician who has not asked.
     if outcome == _ESCALATE:
-        return Presentation(
+        return _raise_for_concerns(Presentation(
             band=Band.RED,
             headline=labels.primary(_ESCALATE),
             gloss=labels.secondary(_ESCALATE),
@@ -212,13 +250,13 @@ def present(
             requires_acknowledgement=True,
             shows_draft=False,
             audit=audit,
-        )
+        ), concerns, labels)
 
     # A plan that cannot be delivered at this site is not a bad plan. It is a
     # referral, and the clinician has to see it, because the alternative is a
     # patient sent home waiting for a test that will never be run here.
     if decision is not None and decision.referral:
-        return Presentation(
+        return _raise_for_concerns(Presentation(
             band=Band.RED,
             headline=labels.primary("referral"),
             gloss=labels.secondary("referral"),
@@ -226,27 +264,27 @@ def present(
             requires_acknowledgement=True,
             shows_draft=False,
             audit=audit,
-        )
+        ), concerns, labels)
 
     if outcome == _HANDOFF:
-        return Presentation(
+        return _raise_for_concerns(Presentation(
             band=Band.AMBER,
             headline=labels.primary(_HANDOFF),
             gloss=labels.secondary(_HANDOFF),
             lines=_lines(blocking, labels.english_first),
             shows_draft=False,
             audit=audit,
-        )
+        ), concerns, labels)
 
     if outcome == _REQUEST_INFO:
-        return Presentation(
+        return _raise_for_concerns(Presentation(
             band=Band.AMBER,
             headline=labels.primary(_REQUEST_INFO),
             gloss=labels.secondary(_REQUEST_INFO),
             lines=tuple(Line(text=q) for q in questions) or _lines(blocking, labels.english_first),
             shows_draft=False,
             audit=audit,
-        )
+        ), concerns, labels)
 
     if outcome == _ABSTAIN or blocking:
         # The gate refused and there is nothing here the clinician must act on.
@@ -258,30 +296,30 @@ def present(
         # This is the direction to fail in. A system that cannot produce a safe
         # draft has nothing useful to say, and saying it anyway trains people to
         # skim.
-        return Presentation(
+        return _raise_for_concerns(Presentation(
             band=Band.GREEN,
             headline=labels.primary(_ABSTAIN),
             gloss=labels.secondary(_ABSTAIN),
             lines=(),
             shows_draft=False,
             audit=audit,
-        )
+        ), concerns, labels)
 
     if warnings or material:
-        return Presentation(
+        return _raise_for_concerns(Presentation(
             band=Band.AMBER,
             headline=labels.primary("warnings"),
             gloss=labels.secondary("warnings"),
             lines=_lines(warnings, labels.english_first) + material,
             shows_draft=True,
             audit=audit,
-        )
+        ), concerns, labels)
 
-    return Presentation(
+    return _raise_for_concerns(Presentation(
         band=Band.GREEN,
         headline=labels.primary("clean"),
             gloss=labels.secondary("clean"),
         lines=(),
         shows_draft=True,
         audit=audit,
-    )
+    ), concerns, labels)

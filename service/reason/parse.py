@@ -23,8 +23,10 @@ from service.contracts.proposal import (
     MedicationChange,
     Proposal,
     Provenance,
+    Concern,
     Recommendation,
     Target,
+    Urgency,
 )
 
 
@@ -131,6 +133,25 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
         except (KeyError, ValueError) as exc:
             raise ProposalParseError(f"bad medication change {row!r}: {exc}") from exc
 
+    concerns: list[Concern] = []
+    for row in raw.get("concerns") or []:
+        if isinstance(row, str):
+            # A bare string is a concern at the quieter level. Promoting it
+            # would let sloppy output shout.
+            concerns.append(Concern(text=row, urgency=Urgency.MENTION))
+            continue
+        if not isinstance(row, dict) or not str(row.get("text", "")).strip():
+            raise ProposalParseError(f"concern is not readable: {row!r}")
+        try:
+            urgency = Urgency(row.get("urgency", "mention"))
+        except ValueError as exc:
+            raise ProposalParseError(
+                f"concern urgency {row.get('urgency')!r} is not one of: "
+                + ", ".join(u.value for u in Urgency)
+            ) from exc
+        concerns.append(Concern(text=str(row["text"]).strip(), urgency=urgency,
+                                citation=row.get("citation")))
+
     assertions = [
         Assertion(text=str(a.get("text", "")), citation=str(a.get("citation", "")))
         for a in raw.get("assertions") or []
@@ -156,6 +177,7 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
         patient_instructions=str(raw.get("patient_instructions", "")),
         follow_up_interval_days=_integer(raw.get("follow_up_interval_days")),
         uncertainty_notes=str(raw.get("uncertainty_notes", "")),
+        concerns=concerns,
     )
 
 

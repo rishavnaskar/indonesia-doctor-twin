@@ -87,6 +87,20 @@ def proposal_schema(rules=None) -> dict[str, Any]:
             "follow_up_interval_days": {"type": "integer"},
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "uncertainty_notes": {"type": "string"},
+            # The channel for something a rule did not ask about. Additive
+            # only: it can raise what a clinician sees and never lower it.
+            "concerns": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "urgency": {"type": "string", "enum": ["mention", "escalate"]},
+                    },
+                    "required": ["text", "urgency"],
+                    "additionalProperties": False,
+                },
+            },
         },
         # Deliberately short. Over-constraining `required` pushes a model into
         # inventing a value rather than omitting one, which is exactly the
