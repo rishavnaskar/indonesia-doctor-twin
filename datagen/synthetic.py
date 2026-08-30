@@ -242,6 +242,7 @@ def make_patient(
             flags[flag] = True
 
     # ---- profile adjustments ---------------------------------------------
+    forced_max_first_line = False
     if profile == "no_target":
         which = rng.choice(["dm", "ckd", "elderly"])
         if which == "dm":
@@ -255,6 +256,14 @@ def make_patient(
 
     elif profile == "stale_labs":
         lab_age = rng.randint(120, 500)
+        # Above target and already at the top of the first rung, so the ladder
+        # wants an ACE inhibitor — which is what makes stale potassium and eGFR
+        # matter. On a controlled patient the correct plan is "continue", which
+        # needs no labs and would make this entry look broken.
+        controlled = False
+        sbp, dbp = rng.randint(146, 172), rng.randint(92, 106)
+        rungs = 1
+        forced_max_first_line = True
 
     elif profile == "red_flag":
         sbp, dbp = rng.randint(182, 215), rng.randint(118, 132)
@@ -326,6 +335,13 @@ def make_patient(
                                  lab_age, unit="mg/dL"))
 
     medications = _regimen(rng, rungs)
+    if forced_max_first_line and medications:
+        first = medications[0]
+        medications[0] = Medication(
+            molecule="amlodipine", mg_per_dose=10.0, doses_per_day=1,
+            source=first.source, since=first.since,
+            adherence_signal=first.adherence_signal,
+        )
 
     encounters = [
         PriorEncounter(

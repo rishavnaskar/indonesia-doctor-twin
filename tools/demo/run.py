@@ -8,6 +8,7 @@ exactly the audience that will ask.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from typing import Any
@@ -23,6 +24,10 @@ from service.signing import AuditLog, Signer
 from tools import scenarios as scenario_module
 
 NOW = datetime(2026, 8, 29, 10, 0)
+
+# Free tiers are shared pools, so this stays small: the point is to overlap the
+# waiting, not to win a race against everyone else on the internet.
+MAX_CONCURRENT_ENCOUNTERS = 3
 
 
 def _plain(value: Any) -> Any:
@@ -234,6 +239,43 @@ class _Tampered:
         return proposal
 
 
+def _unreadable(wire: dict, index: int, rules, site, exc: Exception) -> dict:
+    """A record that could not be read at all. Named, not silently dropped."""
+    identifier = str(wire.get("patient_id") or f"record {index}")
+    return {
+        "key": identifier,
+        "title": identifier,
+        "note": "This record could not be read.",
+        "watch_for": "",
+        "patient": {
+            "patient_id": identifier, "age": None, "sex": "", "as_of": "",
+            "sbp": None, "dbp": None, "medications": [], "diagnoses": [],
+            "symptoms": [], "symptoms_denied": [], "flags": [], "allergies": [],
+            "intolerances": [], "observations": [], "history": [],
+            "site_id": site.get("site_id", ""), "site_label": site.get("label", ""),
+            "site_tier": site.get("tier", ""), "site_as_of": site.get("as_of", ""),
+            "labs_available": [], "stocked": [], "evidence": [],
+        },
+        "outcome": "unreadable",
+        "outcome_plain": (
+            "The record itself could not be read, so nothing ran. This is a "
+            "problem with the input, not with the patient or the system."
+        ),
+        "committed": False,
+        "error": f"{type(exc).__name__}: {exc}",
+        "message": "", "exclusions": [], "discrepancies": [],
+        "trail": [],
+        "presentation": {
+            "band": "green", "band_label": "", "headline": "", "gloss": "",
+            "silent": True, "shows_draft": False, "requires_acknowledgement": False,
+            "lines": [], "audit": [],
+        },
+        "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
+        "findings": [], "proposal": None, "claim": None, "signature": None,
+        "questions": [],
+    }
+
+
 def _failed(scenario, rules, exc: Exception) -> dict:
     """An encounter the drafter could not complete. Not a clinical outcome."""
     return {
@@ -423,23 +465,47 @@ def run_patients(
         raise KeyError(f"unknown site {site_id!r}. Known: {sorted(rules.sites)}")
     site = rules.sites[site_id]
 
-    encounters = []
-    for index, wire in enumerate(wire_patients, start=1):
-        state = from_wire(wire)
+    def one(item: tuple[int, dict]) -> dict:
+        index, wire = item
         step = (lambda name, i=index: on_step(i, name)) if on_step else None
-        scenario = Scenario(
-            key=state.patient_id,
-            title=f"{state.patient_id} — {state.age}, {state.sex}",
-            note=f"Built in the browser, run at {site_id}.",
-            state=state,
-            site=site,
-            watch_for="",
-        )
-        encounter = _encounter(scenario, rules, labels, router, on_step=step)
-        encounters.append(encounter)
+        try:
+            state = from_wire(wire)
+        except Exception as exc:  # noqa: BLE001
+            # Contained to one visit. Rejecting a whole cohort because one
+            # pasted record has a bad age is the same failure already fixed for
+            # drafters, and it is worse here: the reader cannot tell which
+            # record was the problem.
+            encounter = _unreadable(wire, index, rules, site, exc)
+        else:
+            scenario = Scenario(
+                key=state.patient_id,
+                title=f"{state.patient_id} — {state.age}, {state.sex}",
+                note=f"Built in the browser, run at {site_id}.",
+                state=state,
+                site=site,
+                watch_for="",
+            )
+            encounter = _encounter(scenario, rules, labels, router, on_step=step)
         if on_progress:
-            on_progress(index, len(wire_patients), scenario.title,
+            on_progress(index, len(wire_patients),
+                        encounter.get("title") or str(index),
                         encounter.get("error") or encounter["outcome"])
+        return encounter
+
+    # Encounters are independent — separate patients, separate state, no shared
+    # mutable anything since the tampering router stopped monkeypatching. Run
+    # them together.
+    #
+    # This is a demo-latency fix and nothing more: measured at up to two minutes
+    # per patient against a free reasoning model, three patients sequentially is
+    # six minutes of a silent screen. Concurrency is modest because the free
+    # tiers are shared pools and hammering one earns a 429 for everybody.
+    workers = 1 if router is None else min(MAX_CONCURRENT_ENCOUNTERS, len(wire_patients))
+    if workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            encounters = list(pool.map(one, enumerate(wire_patients, start=1)))
+    else:
+        encounters = [one(item) for item in enumerate(wire_patients, start=1)]
 
     reasoner = "rule-following reference reasoner (no AI model)"
     is_model = False
@@ -454,8 +520,48 @@ def run_patients(
         "reasoner": reasoner,
         "is_model": is_model,
         "declined": sum(1 for e in encounters if not e["committed"] and not e.get("error")),
-        "drafter_failures": sum(1 for e in encounters if e.get("error")),
+        "drafter_failures": sum(
+            1 for e in encounters if e.get("error") and e["outcome"] != "unreadable"
+        ),
+        "unreadable": sum(1 for e in encounters if e["outcome"] == "unreadable"),
         "total": len(encounters),
+    }
+
+
+def compare_sites(wire_patients: list[dict], pack_id: str = "id", router=None) -> dict:
+    """The same patients at every hospital, side by side.
+
+    The single clearest thing this system does is give two different right
+    answers to the same patient depending on where they are standing — ask for
+    the test where it can be run, refer where it cannot. Reaching that through a
+    dropdown, twice, means most people never see it.
+    """
+    rules = load_pack(pack_id)
+    by_site = {}
+    for site_id in rules.sites:
+        result = run_patients(wire_patients, site_id=site_id, pack_id=pack_id, router=router)
+        by_site[site_id] = {
+            e["key"]: {
+                "outcome": e["outcome"],
+                "band": e["presentation"]["band"],
+                "reasons": [f["message"] for f in e["findings"] if f["severity"] == "block"],
+                "recommendation": (e["proposal"] or {}).get("recommendation"),
+            }
+            for e in result["encounters"]
+        }
+    keys = [e for e in by_site[next(iter(by_site))]]
+    return {
+        "sites": [
+            {"site_id": s["site_id"], "label": s.get("label", ""), "tier": s.get("tier", "")}
+            for s in rules.sites.values()
+        ],
+        "patients": keys,
+        "by_site": by_site,
+        # The rows worth looking at: same patient, different answer.
+        "divergent": [
+            key for key in keys
+            if len({by_site[s][key]["outcome"] for s in by_site}) > 1
+        ],
     }
 
 

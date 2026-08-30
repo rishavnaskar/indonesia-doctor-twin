@@ -94,6 +94,18 @@ border-radius:50%;animation:sp .7s linear infinite}
 textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .warnbox{background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;
 padding:11px 15px;margin-bottom:12px;font-size:12.5px}
+.cmp{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+padding:16px 18px;margin-bottom:16px}
+.cmp h3{margin:0 0 4px;font-size:14px}
+.cmp table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px}
+.cmp th,.cmp td{text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid var(--line)}
+.cmp th{color:var(--faint);font-weight:500;font-size:11.5px}
+.cmp tr.diff td{background:var(--soft)}
+.cmp .o{font-weight:600}
+.cmp .o.committed{color:var(--green)}
+.cmp .o.abstain,.cmp .o.handoff{color:var(--muted)}
+.cmp .o.escalate{color:var(--red)}
+.cmp .o.request_info{color:var(--amber)}
 </style></head><body>
 <header>
 <h1>Build a patient, then run the clinician</h1>
@@ -112,6 +124,7 @@ hospital without a potassium assay, and the verdict moves with it.</div>
   <div style="flex:1"></div>
   <div class="tog"><input type="checkbox" id="live"><label for="live">Draft with a real AI model</label></div>
   <div><button id="run" disabled>Run the AI clinician</button></div>
+  <div><button class="ghost" id="compare" disabled title="Run these patients at every hospital">Compare hospitals</button></div>
 </div>
 <div id="msg"></div>
 <div class="grid" id="grid"></div>
@@ -214,8 +227,8 @@ function verdict(p){
     <div class="plain" style="margin-top:6px"><span class="mono">${esc(r.error)}</span></div></div>`;
   const findings = r.findings.map(f=>`<div class="find ${f.severity}">
       <div class="src">Check ${f.check} · ${esc(f.rule_id||"")}</div>
-      ${esc(f.message_local || f.message)}
-      ${f.message_local?`<div class="src" style="font-style:italic">${esc(f.message)}</div>`:""}</div>`).join("");
+      ${esc(f.message)}
+      ${f.message_local?`<div class="src" style="font-style:italic">${esc(f.message_local)}</div>`:""}</div>`).join("");
   const d = r.proposal;
   return `<div class="verdict">
     <span class="pill ${r.presentation.band}">${esc(r.outcome.replace(/_/g," "))}</span>
@@ -278,17 +291,19 @@ function setBusy(on){
   document.body.classList.toggle("busy", on);
   // Belt and braces: the class blocks pointer events, and this stops anything
   // reaching a control by keyboard or autofill while the run is in flight.
-  ["n","profile","site","gen","add","live","load","paste"].forEach(id=>{
+  ["n","profile","site","gen","add","live","load","paste","compare"].forEach(id=>{
     const el = $(id); if (el) el.disabled = on;
   });
   $("run").textContent = on ? "Running…" : "Run the AI clinician";
   $("run").disabled = on || patients.length === 0;
+  $("compare").disabled = on || patients.length === 0;
 }
 
 function draw(){
   patients.forEach((p,i)=>p._i=i);
   $("grid").innerHTML = patients.map(card).join("");
   $("run").disabled = running || patients.length === 0;
+  $("compare").disabled = running || patients.length === 0;
 }
 
 document.addEventListener("input", e=>{
@@ -405,6 +420,34 @@ $("run").onclick = async ()=>{
   }
   setBusy(false);
   draw();
+};
+
+$("compare").onclick = async ()=>{
+  setBusy(true);
+  $("msg").innerHTML = `<div class="stat">Running these patients at every hospital…</div>`;
+  const j = await (await fetch("/api/compare", {method:"POST", body: JSON.stringify(
+    {patients, live:$("live").checked})})).json();
+  setBusy(false);
+  if (j.error){ $("msg").innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
+
+  const head = j.sites.map(s=>`<th>${esc(s.site_id)}<div class="plain">${esc(s.label)}</div></th>`).join("");
+  const rows = j.patients.map(k=>{
+    const cells = j.sites.map(s=>{
+      const cell = j.by_site[s.site_id][k];
+      return `<td><span class="o ${esc(cell.outcome)}">${esc(cell.outcome.replace(/_/g," "))}</span>
+        ${cell.reasons.length?`<div class="plain">${esc(cell.reasons[0].slice(0,90))}</div>`:""}</td>`;
+    }).join("");
+    return `<tr class="${j.divergent.includes(k)?"diff":""}"><td class="mono">${esc(k)}</td>${cells}</tr>`;
+  }).join("");
+
+  $("msg").innerHTML = `<div class="cmp">
+    <h3>The same patients, at every hospital</h3>
+    <div class="plain">${j.divergent.length} of ${j.patients.length} get a different answer
+      depending on where they are standing. That is not inconsistency — a plan is only a plan
+      if the hospital in front of the patient can carry it out, so the right answer genuinely
+      differs. Highlighted rows are the ones that diverge.</div>
+    <table><tr><th>Patient</th>${head}</tr>${rows}</table>
+  </div>`;
 };
 
 boot();

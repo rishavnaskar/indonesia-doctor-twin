@@ -54,6 +54,38 @@ def system_prompt() -> str:
     return _SYSTEM
 
 
+def _relevant_codes(rules, target) -> list[str]:
+    """Which measurements this pathway needs the model to see.
+
+    Was the literal tuple ("sbp", "dbp", "k", "egfr"). That is one pathway's
+    measurements hard-coded into the engine — the same leak as naming a drug,
+    and invisible to the CI vocabulary check because those are not words any
+    pack banned.
+
+    It was not only untidy. A diabetes patient's HbA1c was never shown to the
+    model at all, so it was asked to judge whether their diabetes was controlled
+    without the one number that defines control. It answered at confidence 0.40
+    and the abstention floor caught it, which is the gate covering for a bug
+    rather than doing its job.
+
+    The codes come from what the pathway actually reads: the target's own
+    thresholds, and every measurement its sufficiency rules require.
+    """
+    codes: list[str] = []
+
+    def add(code: str) -> None:
+        if code and code not in codes:
+            codes.append(code)
+
+    for code in (target.thresholds if target else {}):
+        add(code)
+    for requirement_set in (rules.guideline.get("sufficiency") or {}).values():
+        for row in requirement_set or []:
+            if isinstance(row, dict):
+                add(row.get("code"))
+    return codes
+
+
 def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
     """Assemble the clinical context. All content comes from the pack."""
     language = (rules.language or {}).get("output_language", "the local language")
@@ -108,7 +140,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
                     "age_days": state.observation_age_days(code),
                     "source": obs.source.value,
                 }
-                for code in ("sbp", "dbp", "k", "egfr")
+                for code in _relevant_codes(rules, target)
                 if (obs := state.latest(code)) is not None
             ],
             "reported_symptoms": sorted(k for k, v in state.symptoms.items() if v),

@@ -240,3 +240,48 @@ def test_derived_flags_never_clear_an_upstream_flag(rules):
     state.flags["has_ckd"] = True          # known upstream, no code recorded
     derive_flags(state, rules)
     assert state.flags["has_ckd"] is True
+
+
+def test_a_plan_naming_one_drug_twice_is_rejected(rules):
+    """Found live. A model proposed "increase metformin 1000 mg x3" and
+    "continue metformin 1000 mg x2" in the same plan. The resulting regimen is
+    a dict keyed by molecule, so the second entry overwrote the first — and the
+    discarded one, 3000 mg/day against a 2000 mg ceiling, was never dose-checked.
+
+    Rejected rather than reconciled: choosing which of two contradictory
+    instructions the model meant is the guess this system refuses to make about
+    a medication list, and a splittable dose is a way around check 3 for
+    anything that learns to split it."""
+    from service.gate.checks import c3_drug_safety
+
+    state = make_patient(1, controlled=False)
+    proposal = propose(state, rules)
+    change = proposal.medication_changes[0]
+    proposal.medication_changes = [
+        change,
+        MedicationChange(ChangeAction.CONTINUE, change.molecule,
+                         change.mg_per_dose, change.doses_per_day, "", change.citation),
+    ]
+    findings = c3_drug_safety.run(
+        GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
+    )
+    assert [f.rule_id for f in findings] == ["duplicate_medication_entry"]
+    assert findings[0].severity.value == "block"
+
+
+def test_the_dose_hidden_by_a_duplicate_cannot_slip_through(rules):
+    """The specific hole: split a dangerous daily dose across two entries and
+    the survivor passes."""
+    from service.gate.checks import c3_drug_safety
+
+    state = make_patient(1, controlled=False)
+    proposal = propose(state, rules)
+    cite = proposal.medication_changes[0].citation
+    proposal.medication_changes = [
+        MedicationChange(ChangeAction.INCREASE, "amlodipine", 10.0, 9, "", cite),
+        MedicationChange(ChangeAction.CONTINUE, "amlodipine", 5.0, 1, "", cite),
+    ]
+    findings = c3_drug_safety.run(
+        GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
+    )
+    assert findings, "90 mg/day must not survive by being overwritten"

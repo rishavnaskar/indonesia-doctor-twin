@@ -54,6 +54,8 @@ class Line:
     they will eventually stop reading.
     """
 
+    # `text` leads and `gloss` sits beneath it. Which language fills which is
+    # Labels.english_first — a display choice, not a change to what is stored.
     text: str
     gloss: str = ""
     rule_id: str | None = None
@@ -84,10 +86,22 @@ class Presentation:
 
 @dataclass(frozen=True)
 class Labels:
-    """Display text, read from the pack. Never written in this file."""
+    """Display text, read from the pack. Never written in this file.
+
+    `english_first` decides which of the two languages leads. It is a display
+    choice and nothing else: both strings are always carried, the pack is
+    unchanged, and no rule reads either of them.
+
+    It defaults to English because the people reading this build are reviewing
+    it, not practising from it. **A deployed clinic flips it** — a doctor in the
+    deployment country should not have to read past a second language to reach
+    the sentence that matters, and the same rule that keeps a drug name out of
+    the engine says the local text is the real text. One flag, no pack change.
+    """
 
     bands: dict[str, str] = field(default_factory=dict)
     headlines: dict[str, str] = field(default_factory=dict)
+    english_first: bool = True
     # English glosses of the headlines. For reviewers and auditors who do not
     # read the deployment language — never shown to the clinician, who does.
     glosses: dict[str, str] = field(default_factory=dict)
@@ -103,6 +117,21 @@ class Labels:
 
     def gloss(self, key: str) -> str:
         return self.glosses.get(key, "")
+
+    def primary(self, key: str) -> str:
+        """What leads."""
+        if self.english_first:
+            return self.glosses.get(key) or self.headline(key)
+        return self.headline(key)
+
+    def secondary(self, key: str) -> str:
+        """What sits beneath it, when the two differ."""
+        first, other = (
+            (self.glosses.get(key), self.headlines.get(key))
+            if self.english_first
+            else (self.headlines.get(key), self.glosses.get(key))
+        )
+        return other or "" if first else ""
 
     def headline(self, key: str) -> str:
         # A missing label is a pack defect, and it surfaces as a visible marker
@@ -122,17 +151,19 @@ _REQUEST_INFO = "request_info"
 _ABSTAIN = "abstain"
 
 
-def _lines(findings: list[Finding]) -> tuple[Line, ...]:
-    return tuple(
-        Line(
-            text=f.message_local or f.message,
-            gloss=f.message if f.message_local else "",
-            rule_id=f.rule_id,
-            citation=f.citation,
-            check=f.check,
-        )
-        for f in findings
-    )
+def _lines(findings: list[Finding], english_first: bool = True) -> tuple[Line, ...]:
+    def pair(finding: Finding) -> tuple[str, str]:
+        if english_first:
+            return finding.message, finding.message_local
+        return (finding.message_local or finding.message,
+                finding.message if finding.message_local else "")
+
+    lines = []
+    for finding in findings:
+        text, gloss = pair(finding)
+        lines.append(Line(text=text, gloss=gloss, rule_id=finding.rule_id,
+                          citation=finding.citation, check=finding.check))
+    return tuple(lines)
 
 
 def present(
@@ -152,28 +183,32 @@ def present(
     findings = list(decision.findings) if decision else []
     blocking = [f for f in findings if f.severity is Severity.BLOCK]
     warnings = [f for f in findings if f.severity is Severity.WARN]
-    audit = _lines(findings)
+    audit = _lines(findings, labels.english_first)
 
     # A material reconciliation discrepancy is not a gate finding — nothing is
     # wrong with the draft. It is a disagreement about what the patient is
     # actually taking, and it is amber for the same reason a warning is: the
     # clinician can act on it, and nobody else in the room can.
+    def _discrepancy_line(d) -> Line:
+        suffix = f" Interacts with {', '.join(d.interacts_with)}." if d.interacts_with else ""
+        lead, under = (d.gloss or d.text, d.text if d.gloss else "") if labels.english_first \
+            else (d.text, d.gloss)
+        return Line(text=lead + suffix, gloss=under)
+
     material = tuple(
-        Line(text=d.text + (
-            f" Interacts with {', '.join(d.interacts_with)}." if d.interacts_with else ""
-        ))
-        for d in discrepancies if getattr(d, "material", False)
+        _discrepancy_line(d) for d in discrepancies if getattr(d, "material", False)
     )
-    audit = audit + tuple(Line(text=d.text) for d in discrepancies)
+    audit = audit + tuple(Line(text=d.gloss or d.text, gloss=d.text if d.gloss else "")
+                          for d in discrepancies)
 
     # A red flag is not a suggestion and is not suppressible. It is the one
     # case where the system interrupts a clinician who has not asked.
     if outcome == _ESCALATE:
         return Presentation(
             band=Band.RED,
-            headline=labels.headline(_ESCALATE),
-            gloss=labels.gloss(_ESCALATE),
-            lines=_lines(blocking) or audit,
+            headline=labels.primary(_ESCALATE),
+            gloss=labels.secondary(_ESCALATE),
+            lines=_lines(blocking, labels.english_first) or audit,
             requires_acknowledgement=True,
             shows_draft=False,
             audit=audit,
@@ -185,9 +220,9 @@ def present(
     if decision is not None and decision.referral:
         return Presentation(
             band=Band.RED,
-            headline=labels.headline("referral"),
-            gloss=labels.gloss("referral"),
-            lines=_lines([f for f in blocking if f.converts_to_referral]),
+            headline=labels.primary("referral"),
+            gloss=labels.secondary("referral"),
+            lines=_lines([f for f in blocking if f.converts_to_referral], labels.english_first),
             requires_acknowledgement=True,
             shows_draft=False,
             audit=audit,
@@ -196,9 +231,9 @@ def present(
     if outcome == _HANDOFF:
         return Presentation(
             band=Band.AMBER,
-            headline=labels.headline(_HANDOFF),
-            gloss=labels.gloss(_HANDOFF),
-            lines=_lines(blocking),
+            headline=labels.primary(_HANDOFF),
+            gloss=labels.secondary(_HANDOFF),
+            lines=_lines(blocking, labels.english_first),
             shows_draft=False,
             audit=audit,
         )
@@ -206,9 +241,9 @@ def present(
     if outcome == _REQUEST_INFO:
         return Presentation(
             band=Band.AMBER,
-            headline=labels.headline(_REQUEST_INFO),
-            gloss=labels.gloss(_REQUEST_INFO),
-            lines=tuple(Line(text=q) for q in questions) or _lines(blocking),
+            headline=labels.primary(_REQUEST_INFO),
+            gloss=labels.secondary(_REQUEST_INFO),
+            lines=tuple(Line(text=q) for q in questions) or _lines(blocking, labels.english_first),
             shows_draft=False,
             audit=audit,
         )
@@ -225,8 +260,8 @@ def present(
         # skim.
         return Presentation(
             band=Band.GREEN,
-            headline=labels.headline(_ABSTAIN),
-            gloss=labels.gloss(_ABSTAIN),
+            headline=labels.primary(_ABSTAIN),
+            gloss=labels.secondary(_ABSTAIN),
             lines=(),
             shows_draft=False,
             audit=audit,
@@ -235,17 +270,17 @@ def present(
     if warnings or material:
         return Presentation(
             band=Band.AMBER,
-            headline=labels.headline("warnings"),
-            gloss=labels.gloss("warnings"),
-            lines=_lines(warnings) + material,
+            headline=labels.primary("warnings"),
+            gloss=labels.secondary("warnings"),
+            lines=_lines(warnings, labels.english_first) + material,
             shows_draft=True,
             audit=audit,
         )
 
     return Presentation(
         band=Band.GREEN,
-        headline=labels.headline("clean"),
-            gloss=labels.gloss("clean"),
+        headline=labels.primary("clean"),
+            gloss=labels.secondary("clean"),
         lines=(),
         shows_draft=True,
         audit=audit,

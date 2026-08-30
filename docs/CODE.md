@@ -146,14 +146,21 @@ and identical every run, so a change in behaviour is a real change rather than
 the model having a different day. `make surface-live` drafts with an actual
 model through the same interface, and nothing downstream moves.
 
-Findings now render in the deployment language with the English beneath, and
-none of that text lives under `/service` — the same rule that keeps a drug name
+Findings render in English with the deployment language beneath, and none of
+that text lives under `/service` — the same rule that keeps a drug name
 out of the engine, applied to the words a doctor reads. Pack-authored messages
 carry a translation directly; messages the engine composes from numbers it
 worked out use a pack template with placeholders. Every red flag on both
 pathways is translated. A rule with no template shows the engine's English and
-an empty gloss, which is a visible gap rather than a silent fallback nobody
-notices for a year.
+an empty second line, which is a visible gap rather than a silent fallback
+nobody notices for a year.
+
+Which language leads is one flag, `Labels.english_first`, and it is a display
+choice — both strings are always carried and no rule reads either. It defaults
+to English because the people reading this build are reviewing it, not
+practising from it. **A deployed clinic flips it:** a doctor should not read
+past a second language to reach the sentence that matters. There is a test for
+both directions.
 
 ## Making the drafter better
 
@@ -270,6 +277,7 @@ The deterministic core, end to end, on synthetic patients:
 | Medication reconciliation (SPEC §5.3) | Deterministic half working; free-text drug matching still needs a model |
 | Clinician presentation layer — the traffic light (SPEC §5.8) | Working |
 | Demo surface — clinician view and audit view, from a real run | Working |
+| Interactive surface — build/edit patients, 19 profiles, compare across hospitals | Working |
 | Between-visit loop (SPEC §5.11) | Schema, provenance and escalation working; patient-facing channel is V1.5 by design |
 | Plan-concordance metric (SPEC §8.2) | Working — reported, not gated; needs Set C to mean anything |
 | Capability evidence — proof each service was actually delivered | Working |

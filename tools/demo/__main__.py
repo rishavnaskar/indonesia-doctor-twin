@@ -29,7 +29,7 @@ from pathlib import Path
 
 from tools.demo.clinic import CLINIC_HTML
 from tools.demo.render import render
-from tools.demo.run import collect, run_patients, vocabulary
+from tools.demo.run import collect, compare_sites, run_patients, vocabulary
 from tools.live import load_env
 
 
@@ -307,6 +307,17 @@ def main() -> int:
                         seed=int(body.get("seed", 0)),
                         profile=str(body.get("profile", "clean")),
                     )})
+                    return
+
+                if path == "/api/compare":
+                    patients = body.get("patients") or []
+                    if not patients:
+                        self._json({"error": "no patients to compare"}, 400)
+                        return
+                    self._json(compare_sites(
+                        patients, pack_id=args.pack,
+                        router=self._router(bool(body.get("live"))),
+                    ))
                     return
 
                 if path == "/api/run":

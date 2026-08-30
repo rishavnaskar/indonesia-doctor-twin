@@ -65,19 +65,34 @@ def test_no_deployment_language_text_lives_under_service():
     assert not offenders, offenders
 
 
-def test_the_clinician_reads_their_own_language_with_english_beneath(rules):
+def _decision():
     from service.gate.types import Finding, GateDecision, Severity
 
-    labels = Labels.from_pack(rules.language)
-    decision = GateDecision(findings=[
+    return GateDecision(findings=[
         Finding(check=1, check_name="red_flags", severity=Severity.BLOCK,
                 message="Hypertensive emergency.", rule_id="R1",
                 message_local="Kondisi darurat hipertensi."),
     ])
-    view = present("escalate", labels, decision=decision)
-    line = view.lines[0]
-    assert line.text == "Kondisi darurat hipertensi."
-    assert line.gloss == "Hypertensive emergency."
+
+
+def test_english_leads_by_default_with_the_local_text_beneath(rules):
+    """The people reading this build are reviewing it, not practising from it."""
+    view = present("escalate", Labels.from_pack(rules.language), decision=_decision())
+    assert view.lines[0].text == "Hypertensive emergency."
+    assert view.lines[0].gloss == "Kondisi darurat hipertensi."
+
+
+def test_a_deployed_clinic_flips_it_with_one_flag(rules):
+    """A doctor in the deployment country should not read past a second
+    language to reach the sentence that matters. Both strings are always
+    carried; which leads is display, not storage."""
+    from dataclasses import replace
+
+    labels = replace(Labels.from_pack(rules.language), english_first=False)
+    view = present("escalate", labels, decision=_decision())
+    assert view.lines[0].text == "Kondisi darurat hipertensi."
+    assert view.lines[0].gloss == "Hypertensive emergency."
+    assert view.headline and view.headline != view.gloss
 
 
 def test_an_untranslated_finding_is_visibly_untranslated(rules):

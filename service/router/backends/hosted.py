@@ -31,7 +31,7 @@ MODELS_URL = "https://openrouter.ai/api/v1/models"
 # bill. Free models are weaker and rate-limited; that is a feature for this
 # demo rather than a problem, because it exercises the strict parser and the
 # gate rather than flattering them.
-DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+DEFAULT_MODEL = "minimax/minimax-m3:free"
 
 # Free tiers are shared pools. A model is not "broken" when it returns 429 —
 # it is busy, and the pool is shared with everyone else on the internet. A
@@ -44,7 +44,7 @@ DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 # because availability moves and a stale slug fails at demo time with a
 # confusing 404.
 DEFAULT_FALLBACKS: tuple[str, ...] = (
-    "minimax/minimax-m3:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
     "dots-studio/dots-3-note-preview:free",
     "google/gemma-4-31b-it:free",
     "openrouter/free",
@@ -174,6 +174,7 @@ class HostedChatBackend:
         for model in self.chain:
             try:
                 body = self._call_model(model, system, user, api_key, schema)
+                self._raise_if_error_body(body, model)
             except (RateLimited, TransientTransport):
                 busy.append(model)
                 continue
@@ -216,6 +217,7 @@ class HostedChatBackend:
 
         for _ in range(max_calls):
             body = self._post_messages(messages, api_key, tools=tools)
+            self._raise_if_error_body(body, self.model)
             message = body["choices"][0]["message"]
             calls = message.get("tool_calls") or []
             if not calls:
@@ -306,6 +308,34 @@ class HostedChatBackend:
                     raise
                 time.sleep(getattr(exc, "retry_after", None) or BACKOFF_S * (attempt + 1))
         raise AssertionError("unreachable")
+
+    @staticmethod
+    def _raise_if_error_body(body: dict, model: str) -> None:
+        """An error arriving with HTTP 200.
+
+        This provider returns rate limits and upstream failures as a 200 with an
+        `error` object in the body at least as often as it returns a 4xx. Only
+        the status code was being checked, so those fell through to the content
+        reader and surfaced as "unexpected response shape" — which is both
+        useless to read and, worse, silent: the fallback chain never fired,
+        because nothing had raised RateLimited.
+        """
+        error = body.get("error")
+        if not isinstance(error, dict):
+            return
+        message = str(error.get("message") or error)
+        code = error.get("code")
+        metadata = error.get("metadata") or {}
+        raw = str(metadata.get("raw") or "")
+        # Hyphens and spacing vary between providers and between messages from
+        # the same provider: "rate limit", "rate-limited", "ratelimit". Match
+        # the word, not the punctuation — the first version of this missed
+        # "temporarily rate-limited upstream" and silently stopped the chain
+        # falling through, which is the exact failure it was written to fix.
+        haystack = f"{message} {raw}".lower().replace("-", " ").replace("_", " ")
+        if code == 429 or "rate limit" in haystack or "quota" in haystack:
+            raise RateLimited(f"{model}: {(raw or message)[:150]}")
+        raise BackendError(f"{model}: {message[:200]}")
 
     def _content(self, body: dict) -> str:
         """Pull the assistant text out, and refuse an empty one.

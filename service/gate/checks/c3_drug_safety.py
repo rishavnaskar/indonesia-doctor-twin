@@ -15,6 +15,41 @@ from service.gate.types import Finding, GateContext, Severity
 NUMBER = 3
 NAME = "drug_safety"
 
+
+def _duplicate_entries(ctx: GateContext) -> list[Finding]:
+    """A proposal naming the same molecule twice is incoherent, and dangerous.
+
+    The resulting regimen is a dict keyed by molecule, so a second entry
+    overwrote the first and the discarded one was never dose-checked. Observed
+    live: a model proposed "increase metformin 1000 mg x3" and "continue
+    metformin 1000 mg x2" in the same plan. The first is 3000 mg/day against a
+    2000 mg ceiling; it vanished, and the survivor passed.
+
+    Rejected rather than reconciled. Choosing which of two contradictory
+    instructions the model meant is exactly the guess this system refuses to
+    make about a medication list, and a splittable dose is a way around check 3
+    for anything that learns to split it.
+    """
+    seen: dict[str, int] = {}
+    for change in ctx.proposal.medication_changes:
+        seen[change.molecule] = seen.get(change.molecule, 0) + 1
+
+    return [
+        Finding(
+            check=NUMBER,
+            check_name=NAME,
+            severity=Severity.BLOCK,
+            message=(
+                f"The plan names {molecule} {count} times. A proposal that "
+                "contradicts itself about one drug has no single resulting "
+                "regimen to check."
+            ),
+            rule_id="duplicate_medication_entry",
+        )
+        for molecule, count in seen.items()
+        if count > 1
+    ]
+
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
 TITLE = 'Drug safety'
@@ -24,6 +59,14 @@ DESCRIPTION = (
 
 
 def run(ctx: GateContext) -> list[Finding]:
+    findings = _duplicate_entries(ctx)
+    if findings:
+        # Stop here. Every question below is about the resulting regimen, and
+        # there is no single resulting regimen while the proposal contradicts
+        # itself — evaluating one of the two readings would be picking a winner.
+        return findings
+
+
     findings: list[Finding] = []
     rules, state, proposal = ctx.rules, ctx.state, ctx.proposal
     regimen = resulting_regimen(state, proposal)

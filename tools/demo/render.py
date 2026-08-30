@@ -302,8 +302,9 @@ function draftCard(e){
       ${row("Confidence", `${(d.confidence*100).toFixed(0)}%`)}
     </table>
     ${d.patient_instructions?`<h3>What the patient is told</h3>
-      <div>${esc(d.patient_instructions)} <span class="tag">${esc(DATA.pack.language)}</span></div>
-      ${d.patient_instructions_gloss?`<div class="gloss">${esc(d.patient_instructions_gloss)}</div>`:""}`:""}
+      <div>${esc(d.patient_instructions_gloss || d.patient_instructions)}</div>
+      ${d.patient_instructions_gloss?`<div class="gloss">${esc(d.patient_instructions)}
+        <span class="tag">as sent, in ${esc(DATA.pack.language)}</span></div>`:""}`:""}
     ${e.signature?`<h3>Signature</h3><table>
       ${row("Signed by", `${esc(e.signature.practitioner_id)} — ${esc(e.signature.role)}`)}
       ${row("Licence valid until", esc(e.signature.licence_expires))}
@@ -391,8 +392,8 @@ function auditView(e){
       <div class="src">Check ${f.check} — ${esc(f.check_name.replace(/_/g," "))}
         &middot; rule <span class="mono">${esc(f.rule_id||"")}</span>
         ${f.converts_to_referral?" &middot; means: send the patient elsewhere":""}</div>
-      <div class="m">${esc(f.message_local || f.message)}</div>
-      ${f.message_local?`<div class="gloss">${esc(f.message)}</div>`:""}
+      <div class="m">${esc(f.message)}</div>
+      ${f.message_local?`<div class="gloss">${esc(f.message_local)}</div>`:""}
       ${f.citation?`<div class="src">Source: ${esc(f.citation)}</div>`:""}
     </div>`).join("") : `<div class="plain">No check raised anything.</div>`;
 

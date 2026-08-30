@@ -257,3 +257,70 @@ def test_the_schema_cannot_drift_from_the_enums():
     assert schema["properties"]["recommendation"]["enum"] == [r.value for r in Recommendation]
     action = schema["properties"]["medication_changes"]["items"]["properties"]["action"]
     assert action["enum"] == [a.value for a in ChangeAction]
+
+
+def test_an_error_arriving_with_http_200_is_still_an_error():
+    """This provider returns rate limits as a 200 with an `error` object at
+    least as often as it returns a 4xx. Only the status code was checked, so
+    those fell through to the content reader, surfaced as "unexpected response
+    shape", and — worse — never raised RateLimited, so the fallback chain
+    silently did not fall through."""
+    import pytest as _pytest
+
+    from service.router.backends.hosted import BackendError, HostedChatBackend, RateLimited
+
+    check = HostedChatBackend._raise_if_error_body
+
+    with _pytest.raises(RateLimited):
+        check({"error": {"code": 429, "message": "Rate limit exceeded"}}, "m")
+
+    # Punctuation varies between providers and between messages from the same
+    # provider. Match the word, not the hyphen.
+    with _pytest.raises(RateLimited):
+        check({"error": {"message": "Provider returned error",
+                         "metadata": {"raw": "temporarily rate-limited upstream"}}}, "m")
+
+    with _pytest.raises(BackendError):
+        check({"error": {"message": "model not found"}}, "m")
+
+    # A normal completion passes straight through.
+    check({"choices": [{"message": {"content": "{}"}}]}, "m")
+
+
+def test_the_prompt_shows_the_measurements_this_pathway_actually_reads(rules):
+    """The codes were the literal tuple ("sbp", "dbp", "k", "egfr") — one
+    pathway's measurements hard-coded into the engine, and invisible to the CI
+    vocabulary check because no pack bans those words.
+
+    The consequence was not cosmetic: a diabetic's HbA1c never reached the
+    model, so it judged whether their diabetes was controlled without the one
+    number that defines control."""
+    from service.rules import pathways
+    from service.rules.predicates import Context
+    from service.rules.targets import resolve_target
+    from service.reason.prompt import _relevant_codes
+    from datagen.synthetic import make_diabetic
+
+    htn = pathways.with_pathway(rules, "hypertension")
+    htn_codes = _relevant_codes(
+        htn, resolve_target(htn.guideline, Context(make_patient(1))).target)
+    assert {"sbp", "dbp"} <= set(htn_codes)
+    assert "hba1c" not in htn_codes
+
+    dm2 = pathways.with_pathway(rules, "diabetes")
+    dm_codes = _relevant_codes(
+        dm2, resolve_target(dm2.guideline, Context(make_diabetic(1))).target)
+    assert "hba1c" in dm_codes, "the measurement that defines control on this pathway"
+    assert "sbp" not in dm_codes
+
+
+def test_a_diabetic_patients_hba1c_reaches_the_model(rules):
+    from service.rules import pathways
+    from datagen.synthetic import make_diabetic
+
+    dm2 = pathways.with_pathway(rules, "diabetes")
+    backend = Fake(json.dumps(VALID))
+    state = make_diabetic(3, controlled=False)
+    ModelReasoner(backend).propose(state, dm2, dm2.sites["SITE-A"])
+    assert "hba1c" in backend.last_user_prompt
+    assert str(state.latest("hba1c").value) in backend.last_user_prompt
