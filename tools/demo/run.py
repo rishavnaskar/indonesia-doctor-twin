@@ -317,9 +317,11 @@ def collect(pack_id: str = "id", router=None) -> dict:
         for scenario in scenario_module.build(rules)
     ]
 
-    reasoner = "deterministic reference reasoner (no model)"
+    reasoner = "rule-following reference reasoner (no AI model)"
+    is_model = False
     try:
         reasoner = router.get(router.default).backend.version()
+        is_model = True
     except (KeyError, AttributeError):
         pass
 
@@ -335,6 +337,7 @@ def collect(pack_id: str = "id", router=None) -> dict:
             "language": rules.language.get("output_language", ""),
         },
         "reasoner": reasoner,
+        "is_model": is_model,
         "glossary": rules.glossary,
         "checks": check_catalogue(),
         "encounters": encounters,

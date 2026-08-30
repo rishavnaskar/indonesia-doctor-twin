@@ -1,4 +1,4 @@
-.PHONY: install test score checks pressure demo live free prompt surface page all e2e clean
+.PHONY: install test score checks pressure demo live free prompt surface surface-live page page-live all e2e clean
 
 PY := ./.venv/bin/python
 
@@ -46,9 +46,17 @@ demo:
 surface:
 	$(PY) -m tools.demo
 
+# The same surface, with a real model drafting instead of the reference
+# reasoner. Needs OPENROUTER_API_KEY in .env; free by default.
+surface-live:
+	$(PY) -m tools.demo --live
+
 # One self-contained file, for the people who will not clone a repository.
 page:
 	$(PY) -m tools.demo --export demo.html
+
+page-live:
+	$(PY) -m tools.demo --live --export demo.html
 
 live:
 	$(PY) -m tools.live --n 5

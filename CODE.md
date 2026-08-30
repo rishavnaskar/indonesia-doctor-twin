@@ -93,9 +93,15 @@ There is a test for that, and a test that it reaches nothing outside itself — 
 demo that phones out to a CDN while the document argues for data residency is an
 own goal in front of exactly the audience that will notice.
 
-`make surface` rebuilds on every reload, so editing a pack file and refreshing
-shows the verdict move. That is the fastest way to demonstrate that the rules
-are data rather than code.
+`make surface` re-reads the packs on every request, so editing a pack file and
+refreshing shows the verdict move — the fastest way to demonstrate that the rules
+are data rather than code. Python modules are imported once, so a change to
+`/service` or `/datagen` needs a restart.
+
+The surface defaults to the **reference reasoner, not a model**: free, instant,
+and identical every run, so a change in behaviour is a real change rather than
+the model having a different day. `make surface-live` drafts with an actual
+model through the same interface, and nothing downstream moves.
 
 **Known gap:** gate findings render in English while the clinician-facing
 headlines are in the deployment language. The band labels and headlines come

@@ -147,6 +147,7 @@ button.act[disabled]{ background:transparent; color:var(--muted); border-color:v
     sit between the draft and the doctor, and any one of them can stop it.
     Every figure below came from a real run of the system. Nothing is written by hand.</div>
   <div class="meta" id="meta"></div>
+  <div class="stat" id="drafter" style="background:var(--panel)"></div>
   <div class="stat" id="stat"></div>
 </header>
 <div class="wrap">
@@ -166,9 +167,18 @@ function meta(){
   document.getElementById("meta").innerHTML = [
     ["Rules pack", p.pack_id+" "+p.version], ["Clinical sign-off", p.review_status.replace(/_/g," ")],
     ["Drugs on the approved list", p.molecule_count], ["Hospitals modelled", p.site_count],
-    ["Patient-facing language", p.language], ["Drafted by", DATA.reasoner],
-    ["Run at", DATA.generated_at]
+    ["Patient-facing language", p.language], ["Run at", DATA.generated_at]
   ].map(([k,v])=>`${esc(k)}: <b>${esc(v)}</b>`).join("");
+  document.getElementById("drafter").innerHTML =
+    `<b>Drafts written by:</b> <span class="mono">${esc(DATA.reasoner)}</span>` +
+    (DATA.is_model
+      ? ` &mdash; a real AI model, swapped in behind the same interface. Everything after the
+          draft is unchanged: the same nine checks, the same signature rule, the same code.`
+      : ` &mdash; <b>not an AI model.</b> This is the rule-following reference version, and it is
+          the default on purpose: it is free, instant, and gives the identical answer every time,
+          so a change in behaviour is a real change rather than the model having a different day.
+          The AI model plugs into the same interface and nothing downstream moves.
+          Run <span class="mono">make surface-live</span> to see it drafted by an actual model.`);
   document.getElementById("stat").innerHTML =
     `<b>${DATA.declined} of the ${DATA.total} visits below ended with no recommendation reaching the doctor.</b>
      That is the system working, not failing. Every refusal names its own reason, and you can read
