@@ -260,7 +260,7 @@ The deterministic core, end to end, on synthetic patients:
 | FHIR R4 bundle construction | Working — builds, does not transmit |
 | Offline-first outbound queue, idempotent, file-backed | Working |
 | Referral-back draft — the payer's own 3B criteria | Working |
-| Synthetic patients, 19 planted-error mutations | Working |
+| Synthetic cohort — both pathways, 19 profiles, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
 | EMR adapter | Port defined. Writing one needs access to a real hospital system; the sequencing is BUILD.md Phase 0 |
 | Bounded intake interview, in Bahasa Indonesia | Working |

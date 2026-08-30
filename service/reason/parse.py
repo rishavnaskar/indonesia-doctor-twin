@@ -60,9 +60,34 @@ def extract_json(text: str) -> dict[str, Any]:
 def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
     try:
         assessment = Assessment(raw["assessment"])
+    except KeyError as exc:
+        # A bare KeyError repr — bad assessment/recommendation: 'assessment' —
+        # tells a reader nothing about which of the two was wrong or how. Name
+        # the field, say whether it was absent or unusable, and list what was
+        # allowed: this text is read by someone deciding whether a model is
+        # worth keeping.
+        raise ProposalParseError(
+            "the response has no `assessment` field. Expected one of: "
+            + ", ".join(a.value for a in Assessment)
+        ) from exc
+    except ValueError as exc:
+        raise ProposalParseError(
+            f"`assessment` was {raw.get('assessment')!r}, which is not one of: "
+            + ", ".join(a.value for a in Assessment)
+        ) from exc
+
+    try:
         recommendation = Recommendation(raw["recommendation"])
-    except (KeyError, ValueError) as exc:
-        raise ProposalParseError(f"bad assessment/recommendation: {exc}") from exc
+    except KeyError as exc:
+        raise ProposalParseError(
+            "the response has no `recommendation` field. Expected one of: "
+            + ", ".join(r.value for r in Recommendation)
+        ) from exc
+    except ValueError as exc:
+        raise ProposalParseError(
+            f"`recommendation` was {raw.get('recommendation')!r}, which is not one of: "
+            + ", ".join(r.value for r in Recommendation)
+        ) from exc
 
     target_raw = raw.get("target_used")
     target = None

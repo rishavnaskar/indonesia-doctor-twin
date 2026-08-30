@@ -41,11 +41,21 @@ def test_secondary_codes_come_only_from_the_recorded_problem_list(rules):
     state = make_patient(301, controlled=True)
     claim = build_claim(state, rules)
     assert claim.primary.code == "I10"
-    assert claim.secondary == []          # nothing invented
+    # Not "there are none" — generated patients now carry real comorbidities.
+    # The invariant is that every secondary code points at something already in
+    # the record. A code without a supporting entry is upcoding.
+    recorded = {d.code for d in state.diagnoses}
+    for secondary in claim.secondary:
+        assert secondary.code in recorded
+        assert secondary.evidence_ref == f"problem-list:{secondary.code}"
 
+    before = {d.code for d in claim.secondary}
     state.diagnoses.append(Diagnosis(code="N18.3"))
     claim = build_claim(state, rules)
-    assert [d.code for d in claim.secondary] == ["N18.3"]
+    after = {d.code for d in claim.secondary}
+    # Adding one condition adds exactly one code, and disturbs none of the rest.
+    assert after - before == {"N18.3"}
+    assert before <= after
 
 
 # -------------------------------------------------------------------- fhir

@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from datagen.synthetic import TODAY, make_patient
+from datagen.synthetic import TODAY, make_diabetic, make_patient
 from service.state.models import (
     Allergy,
     Diagnosis,
@@ -181,13 +181,22 @@ def from_wire(raw: dict[str, Any]) -> PatientState:
 
 
 def generate(n: int, seed: int = 0, profile: str = "clean") -> list[dict[str, Any]]:
-    """A fresh cohort, marked synthetic because it is."""
+    """A fresh cohort, marked synthetic because it is.
+
+    A `dm:` prefix selects the diabetes generator. The two pathways exclude on
+    different rules and measure different things, so they have separate
+    generators rather than one function with a flag.
+    """
     if n < 1 or n > MAX_PATIENTS:
         raise PatientFormatError(f"ask for between 1 and {MAX_PATIENTS} patients")
+
+    diabetic = profile.startswith("dm:")
+    build = make_diabetic if diabetic else make_patient
+    profile = profile.split(":", 1)[1] if diabetic else profile
+
     out = []
     for index in range(n):
-        state = make_patient(seed + index, profile=profile)
+        state = build(seed + index, profile=profile)
         state.is_synthetic = True
-        state.patient_id = f"SYN-{seed + index:05d}"
         out.append(to_wire(state))
     return out
