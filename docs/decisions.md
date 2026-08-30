@@ -99,3 +99,138 @@ gate check reads it. Injected instructions can influence what the model
 *proposes*; they cannot reach the rules that decide whether the proposal
 renders. There is a test asserting that a hostile intake produces findings
 identical to a clean one.
+
+---
+
+### D9 — Provenance is built after the model answers, not before
+
+**Why.** It used to be assembled before the call, which recorded what we
+intended to ask rather than what answered. That is wrong whenever the backend
+falls through to a different model or an alias resolves to a snapshot — exactly
+the cases where an audit trail matters. The pin is `model@served_by`, because
+the same weights on two serving stacks can differ in quantisation and sampling
+defaults.
+
+**Overturned if:** a provider guarantees the served model matches the requested
+one and exposes that guarantee. Nobody does.
+
+---
+
+### D10 — A pathway is chosen before eligibility, and the engine only ever sees one
+
+**Why.** "Is this the right pathway" comes before "is this patient suitable for
+it". Selection swaps a single field, `rules.guideline`, and twelve modules carry
+on unmodified — which is the same trick that makes the country swappable,
+applied one level down. Order between pathways is a clinical judgement about
+which problem leads, so it lives in the pack.
+
+**Overturned if:** two pathways must run on one encounter. That is combined
+cardiometabolic management, explicitly V3, and it needs a different design than
+picking a winner.
+
+---
+
+### D11 — A target is `{code: threshold}`, not two blood pressures
+
+**Why.** `ResolvedTarget` was `sbp_lt` and `dbp_lt`. That shape survived exactly
+as long as there was one pathway; a target that is a single HbA1c made it
+obvious the engine had one disease's measurement baked into its idea of a
+target. Thresholds are read from any `<code>_lt` key, so a pathway declares what
+it measures.
+
+**Overturned if:** a pathway needs a target that is not "below a number" — a
+range, or a trend. Then this becomes a predicate rather than a threshold, and
+gate check 2 changes with it.
+
+---
+
+### D12 — Refusal routing reads check numbers, never rule ids
+
+**Why.** It used to match `R<digit>` to detect a red flag. A second pack
+numbered its red flags `D1..D4`, so hypoglycaemia was correctly caught by check
+1 and then reported as a quiet abstention instead of alerting anyone. The engine
+had learned a pack's naming convention and called it a rule. Check numbers are
+engine vocabulary and stable across packs.
+
+**Overturned if:** never. A rule id is whatever the pack author typed.
+
+---
+
+### D13 — Reconciliation surfaces discrepancies and resolves none
+
+**Why.** Both sources are routinely wrong in different ways — a record goes
+stale the moment a patient buys something at a pharmacy, and a patient
+misremembers a dose. A system that picks a winner is guessing about what someone
+is currently swallowing. Neither side is edited; the clinician gets a line.
+
+**Overturned if:** a source becomes authoritative enough to overwrite the other.
+Dispensing data might one day be, for the drugs it covers.
+
+---
+
+### D14 — Self-consistency takes the minimum of stated and observed, and stays off by default
+
+**Why.** Neither signal may rescue the other: samples agreeing on an answer the
+model calls uncertain does not make it certain, and a model asserting 0.95 while
+its samples scatter is not to be believed. Off by default because the evidence
+for it — two runs, 58 drafts, every error in the unstable group, p = 0.0043 —
+was measured against labels our own rule engine produced. It shows instability
+predicts divergence from us, which is not the same claim as predicting clinical
+error, and it triples the API calls.
+
+**Overturned if:** Set C shows the same split. Then it becomes a default.
+
+---
+
+### D15 — The critic may only lower confidence
+
+**Why.** A second model catches what rules cannot — a rationale that does not
+follow, a plan that ignores the history. It returns a score and the proposal
+keeps the minimum. A critic that could *raise* confidence would hold a veto over
+the abstention floor, which is the one authority nothing here may have. When it
+fails the draft continues and is marked unreviewed, because an advisory
+component being down is not a reason to deny care, and because treating the two
+as equivalent would make the safeguard unfalsifiable.
+
+**Overturned if:** never, while the gate is the thing that decides.
+
+---
+
+### D16 — Shadow mode exists because the experiment could not answer its own question
+
+**Why.** The first measurement said self-consistency cost abstentions and bought
+nothing. It had been measured through the mechanism being evaluated: agreement
+feeds confidence, low agreement falls below the abstention floor, check 8
+deletes it, and the comparison is left with no unstable drafts to attribute
+errors to. Shadow mode records agreement without applying it.
+
+**Overturned if:** never. Any future "does this lever help" question needs the
+same treatment, and this is the shape of it.
+
+---
+
+### D17 — A self-reported outlier asks for a repeat before it alerts anyone
+
+**Why.** Home readings carry noise a clinic reading does not — wrong cuff, wrong
+arm, no rest, a frightened patient. Firing a red flag on one unconfirmed value
+would train a clinic to ignore the channel within a month, and a channel nobody
+reads is worse than none because it looks like coverage. A device reading is
+trusted immediately. Corroboration means a second reading that would cross the
+line *on its own*: an earlier version accepted any recent reading of the same
+measurement, so a normal clinic value was confirming an alarming home one when
+it contradicts it.
+
+**Overturned if:** the clinic asks for every reading to alert. That is their call
+to make, and it is a pack value, not a code change.
+
+---
+
+### D18 — `is_synthetic` is never inferred, and defaults to False
+
+**Why.** It decides whether a record may cross the residency boundary. A record
+typed into a form or pasted as JSON is not synthetic because it arrived through
+a form. Real-until-proven-otherwise is the only safe direction for this
+particular flag, and the interactive surface shows the refusal rather than
+smoothing it away.
+
+**Overturned if:** never.

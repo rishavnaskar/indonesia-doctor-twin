@@ -27,6 +27,14 @@ source, so the safety net can live in the form rather than on a second screen.
 Item 3 is the one that matters. One engineer, two days, per the assumption
 register.
 
+## What the port now expects
+
+The interface in `adapters/base.py` gained `fetch_between_visit_readings` when
+SPEC §5.11 was built. Dispensing records are the part of that worth reaching for
+first: chronic medication is collected monthly, which is twelve touchpoints a
+year against four visits, and it needs no patient-facing app to exist. Home
+readings need a channel that does not exist yet and are V1.5.
+
 ## Deliberately not done yet
 
 - No schema is committed here. Copying a guessed schema into the repo would
@@ -37,6 +45,13 @@ register.
 ## Next step
 
 Pull the upstream repository, stand up the database from its own migrations,
-and replace `adapter.py` with a real mapping. Until then the adapter raises
+and replace `adapter.py` with a real mapping. Until then every method raises
 rather than returning a plausible-looking empty state — a fake read is worse
-than a failed one.
+than a failed one, because the rest of the system would run against silence and
+look healthy while doing it.
+
+Nothing in the repository depends on this adapter. It is the one place where a
+vendor may be named, and it is deliberately the last thing built: the pathway
+that matters is the one where the assumption register is wrong, and A1 is the
+assumption that decides whether the panel can live inside the consultation form
+at all.

@@ -1,9 +1,12 @@
 """Run real encounters through a real model.
 
     python -m tools.live --n 5
-    python -m tools.live --n 5 --model anthropic/claude-sonnet-5
+    python -m tools.live --n 5 --samples 3 --shadow
+    python -m tools.live --n 5 --provider anthropic --model claude-opus-5
 
-Every run costs money, so the default is small and the count is explicit.
+Free by default: the hosted backend picks a free model and falls through a
+chain when one is rate-limited. The count is still explicit, because a paid
+provider is one flag away and a default that quietly spends is a bad default.
 Synthetic patients only — the residency guard refuses anything else, and it
 refuses before the request is built rather than after.
 

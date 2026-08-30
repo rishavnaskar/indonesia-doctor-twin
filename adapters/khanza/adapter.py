@@ -27,5 +27,11 @@ class KhanzaAdapter:
     def render_panel(self, encounter_id: str, payload: dict) -> None:
         raise NotImplementedError("Phase 0: panel injection not implemented.")
 
+    def fetch_between_visit_readings(self, patient_id: str) -> list:
+        raise NotImplementedError(
+            "Phase 0: no between-visit channel mapped yet. Dispensing data is "
+            "the one source that exists without a patient-facing app."
+        )
+
     def queue_write(self, encounter_id: str, payload: dict) -> None:
         raise NotImplementedError("Phase 0: outbound queue not implemented.")

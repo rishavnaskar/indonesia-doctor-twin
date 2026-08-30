@@ -4,12 +4,20 @@ The code that implements [SPEC-V1.md](SPEC-V1.md). Start here if you are
 building; start at [README.md](README.md) if you are deciding.
 
 ```bash
-make install    # venv + two dependencies
-make all        # checks, tests, scorecard, pressure suite — what CI runs
-make demo       # six scripted encounters, plus the network dropping
-make pressure   # the Bahasa Indonesian pressure suite
-make prompt     # print the exact prompt sent to a model (no key needed, no spend)
-make live       # 5 encounters through a real model (needs a key, costs money)
+make install       # venv + two dependencies
+make all           # checks, tests, scorecard, pressure suite — what CI runs
+make e2e           # all of the above, then the walkthrough and live encounters
+
+make demo          # the scripted encounters in the terminal, plus the network dropping
+make surface       # the clinician surface in a browser; /clinic is the interactive one
+make page          # one self-contained HTML file you can send to someone
+
+make pressure      # the Bahasa Indonesian pressure suite
+make concordance   # plan concordance (SPEC §8.2) — reported, never gated
+make prompt        # print the exact prompt sent to a model (no key, no spend)
+make free          # which models cost nothing right now
+make live          # encounters through a real model (needs a key; free by default)
+make surface-live  # the surface, drafted by a real model
 ```
 
 ### Running against a real model

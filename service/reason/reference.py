@@ -3,9 +3,16 @@
 This is the "deliberately stupid model" the build plan calls for: it produces a
 well-formed Proposal so the rest of the spine can be exercised, and it reads
 every clinical value — the escalation ladder, the doses, the target — from the
-pack rather than from code. That constraint is what makes it a legitimate
-placeholder rather than a prototype-shaped lie: when a real model lands behind
-the router it implements this same interface, and nothing downstream changes.
+pack rather than from code. That constraint is what made it a legitimate
+placeholder rather than a prototype-shaped lie, and the prediction has since
+been tested: a real model now sits behind the same router, implementing this
+same three-argument signature, and nothing downstream changed. It also survived
+a second pathway, which it drafts for without a line of disease-specific code.
+
+It is still the default, and not as a stepping stone. CI and the scorecard run
+against it because a suite that costs money per run and varies between runs is
+neither a test suite nor a suite, and because a deterministic baseline is the
+only way to tell a model regression from a plumbing one.
 
 What this proves and does not prove is worth restating where the code is,
 because a score is easier to quote than a caveat. It follows the same guideline

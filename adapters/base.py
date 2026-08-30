@@ -39,6 +39,22 @@ class EMRAdapter(Protocol):
         """
         ...
 
+    def fetch_between_visit_readings(self, patient_id: str) -> list:
+        """Readings that arrived since the last encounter, with their sources.
+
+        Home measurements, device uploads and dispensing events (SPEC §5.11).
+        Each carries the provenance it arrived with — `patient_reported`,
+        `device` or `derived` — and stamping that here rather than downstream is
+        the whole reason this method exists on the port instead of being folded
+        into `fetch_patient_state`. A home reading and a clinic reading are not
+        interchangeable, and the between-visit loop decides differently for each.
+
+        An adapter with no such channel returns an empty list. That is a
+        different thing from a patient with no readings, and neither is a
+        reason to invent one.
+        """
+        ...
+
     def queue_write(self, encounter_id: str, payload: dict) -> None:
         """Queue an outbound write.
 
