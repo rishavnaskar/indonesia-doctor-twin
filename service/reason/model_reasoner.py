@@ -21,6 +21,7 @@ from typing import Any
 from service.contracts.proposal import Provenance
 from service.reason import prompt as prompt_module
 from service.reason.parse import ProposalParseError, extract_json, to_proposal
+from service.reason.schema import proposal_schema
 from service.rules.predicates import Context
 from service.rules.targets import resolve_target
 
@@ -40,7 +41,11 @@ class ModelReasoner:
         user = prompt_module.build_user_prompt(state, rules, site, resolution.target)
 
         # The guard: only generated patients may cross the boundary.
-        raw = self.backend.complete(system, user, allow_egress=bool(state.is_synthetic))
+        raw = self.backend.complete(
+            system, user,
+            allow_egress=bool(state.is_synthetic),
+            schema=proposal_schema(rules),
+        )
 
         # Provenance is built *after* the answer, never before. A backend may
         # fall back to a different model when one is rate-limited, and an alias

@@ -155,7 +155,8 @@ class HostedChatBackend:
                 seen.append(name)
         return seen
 
-    def complete(self, system: str, user: str, *, allow_egress: bool) -> str:
+    def complete(self, system: str, user: str, *, allow_egress: bool,
+                 schema: dict | None = None) -> str:
         if not allow_egress:
             raise ResidencyError(
                 "Refusing to send patient data to a hosted endpoint. Only "
@@ -172,7 +173,7 @@ class HostedChatBackend:
         busy: list[str] = []
         for model in self.chain:
             try:
-                body = self._call_model(model, system, user, api_key)
+                body = self._call_model(model, system, user, api_key, schema)
             except (RateLimited, TransientTransport):
                 busy.append(model)
                 continue
@@ -187,10 +188,18 @@ class HostedChatBackend:
             "now and pass --model, or retry in a minute."
         )
 
-    def _call_model(self, model: str, system: str, user: str, api_key: str) -> dict:
+    def _call_model(self, model: str, system: str, user: str, api_key: str,
+                    schema: dict | None = None) -> dict:
+        # Strongest enforcement first, degrading on refusal. A schema the
+        # provider enforces removes a whole class of failure — a live run
+        # produced `titraate_up`, correctly rejected by the parser at the cost
+        # of a wasted call — but support is uneven, and a 400 for asking is not
+        # a reason to give up on the model.
+        mode = "schema" if (schema and self.json_mode) else (
+            "object" if self.json_mode else "off")
         for attempt in range(RETRIES_PER_MODEL):
             try:
-                return self._post(model, system, user, api_key, json_mode=self.json_mode)
+                return self._post(model, system, user, api_key, mode=mode, schema=schema)
             except (RateLimited, TransientTransport) as exc:
                 if attempt + 1 >= RETRIES_PER_MODEL:
                     raise
@@ -237,7 +246,8 @@ class HostedChatBackend:
         )
 
     def _post(
-        self, model: str, system: str, user: str, api_key: str, *, json_mode: bool
+        self, model: str, system: str, user: str, api_key: str, *,
+        mode: str = "object", schema: dict | None = None,
     ) -> dict:
         payload = {
             "model": model,
@@ -248,7 +258,12 @@ class HostedChatBackend:
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
-        if json_mode:
+        if mode == "schema" and schema:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "proposal", "strict": True, "schema": schema},
+            }
+        elif mode == "object":
             payload["response_format"] = {"type": "json_object"}
 
         request = urllib.request.Request(

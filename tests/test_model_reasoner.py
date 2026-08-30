@@ -49,11 +49,12 @@ class Fake:
     def version(self):
         return "fake/model@1"
 
-    def complete(self, system, user, *, allow_egress):
+    def complete(self, system, user, *, allow_egress, schema=None):
         if not allow_egress:
             raise ResidencyError("blocked")
         self.calls += 1
         self.last_user_prompt = user
+        self.last_schema = schema
         return self.response
 
 
@@ -226,3 +227,33 @@ def test_a_target_with_junk_numbers_is_still_a_parse_error():
             },
             Provenance(model="m@1", prompt_template="p@1", corpus="c@1"),
         )
+
+
+def test_the_backend_is_offered_a_schema_built_from_the_pack(rules):
+    """Enforcement at the API level removes a whole class of failure. A live run
+    produced `titraate_up` — a typo the parser correctly rejected, at the cost
+    of a wasted call and a visit with no draft."""
+    backend = Fake(json.dumps(VALID))
+    ModelReasoner(backend).propose(
+        make_patient(3, controlled=False), rules, rules.sites["SITE-A"]
+    )
+
+    schema = backend.last_schema
+    assert schema is not None
+    assert "titrate_up" in schema["properties"]["recommendation"]["enum"]
+    assert "titraate_up" not in schema["properties"]["recommendation"]["enum"]
+    # Investigation codes are national vocabulary and come from the pack.
+    assert schema["properties"]["investigations"]["items"]["enum"] == sorted(rules.investigations)
+
+
+def test_the_schema_cannot_drift_from_the_enums():
+    """Built from the enums rather than written out beside them. A
+    hand-maintained copy drifts the moment someone adds a value, and the
+    failure is silent — the model is simply never told it exists."""
+    from service.contracts.proposal import ChangeAction, Recommendation
+    from service.reason.schema import proposal_schema
+
+    schema = proposal_schema()
+    assert schema["properties"]["recommendation"]["enum"] == [r.value for r in Recommendation]
+    action = schema["properties"]["medication_changes"]["items"]["properties"]["action"]
+    assert action["enum"] == [a.value for a in ChangeAction]

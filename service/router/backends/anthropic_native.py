@@ -18,6 +18,8 @@ either.
 
 from __future__ import annotations
 
+from service.reason.schema import proposal_schema
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -45,68 +47,7 @@ class ModelRefusal(BackendError):
 # `required`: the strict parser handles absent fields, and over-constraining
 # pushes a model into inventing a value rather than omitting one — which is
 # exactly the failure mode this system exists to avoid.
-PROPOSAL_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "assessment": {"type": "string", "enum": ["controlled", "uncontrolled", "over_treated"]},
-        "recommendation": {
-            "type": "string",
-            "enum": [
-                "continue", "titrate_up", "titrate_down",
-                "add_agent", "switch_agent", "refer",
-            ],
-        },
-        "bp_trend_summary": {"type": "string"},
-        "target_used": {
-            "type": "object",
-            "properties": {
-                "sbp_lt": {"type": "number"},
-                "dbp_lt": {"type": "number"},
-                "citation": {"type": "string"},
-            },
-            "required": ["sbp_lt", "dbp_lt", "citation"],
-            "additionalProperties": False,
-        },
-        "medication_changes": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["start", "stop", "increase", "decrease", "continue"],
-                    },
-                    "molecule": {"type": "string"},
-                    "mg_per_dose": {"type": "number"},
-                    "doses_per_day": {"type": "integer"},
-                    "rationale": {"type": "string"},
-                    "citation": {"type": "string"},
-                },
-                "required": ["action", "molecule", "rationale", "citation"],
-                "additionalProperties": False,
-            },
-        },
-        "investigations": {"type": "array", "items": {"type": "string"}},
-        "assertions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string"},
-                    "citation": {"type": "string"},
-                },
-                "required": ["text", "citation"],
-                "additionalProperties": False,
-            },
-        },
-        "patient_instructions": {"type": "string"},
-        "follow_up_interval_days": {"type": "integer"},
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "uncertainty_notes": {"type": "string"},
-    },
-    "required": ["assessment", "recommendation", "confidence"],
-    "additionalProperties": False,
-}
+PROPOSAL_SCHEMA: dict[str, Any] = proposal_schema()
 
 
 @dataclass
@@ -142,7 +83,8 @@ class AnthropicBackend:
         self._client = anthropic.Anthropic(timeout=self.timeout_s)
         return self._client
 
-    def complete(self, system: str, user: str, *, allow_egress: bool) -> str:
+    def complete(self, system: str, user: str, *, allow_egress: bool,
+                 schema: dict[str, Any] | None = None) -> str:
         if not allow_egress:
             raise ResidencyError(
                 "Refusing to send patient data to a hosted endpoint. Only "
@@ -157,7 +99,7 @@ class AnthropicBackend:
             "system": system,
             "messages": [{"role": "user", "content": user}],
             "output_config": {
-                "format": {"type": "json_schema", "schema": PROPOSAL_SCHEMA}
+                "format": {"type": "json_schema", "schema": schema or PROPOSAL_SCHEMA}
             },
         }
         if self.thinking:
