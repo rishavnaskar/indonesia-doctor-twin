@@ -64,7 +64,7 @@ class RunJob:
                 from service.router.router import router_with_model
 
                 router = router_with_model(self.args.model, provider=self.args.provider,
-                                           samples=self.args.samples)
+                                           samples=self.args.samples, critic=self.args.critic)
 
             def on_step(index, name):
                 with self.lock:
@@ -151,7 +151,7 @@ class Build:
                 from service.router.router import router_with_model
 
                 router = router_with_model(self.args.model, provider=self.args.provider,
-                                           samples=self.args.samples)
+                                           samples=self.args.samples, critic=self.args.critic)
             data = collect(self.args.pack, router=router, on_progress=self._note)
             page = render(data)
         except Exception as exc:  # noqa: BLE001 - a broken pack must be visible
@@ -226,6 +226,9 @@ def main() -> int:
                         help="drive the scenarios with a real model instead of the "
                              "deterministic reasoner")
     parser.add_argument("--model", default=None)
+    parser.add_argument("--critic", action="store_true",
+                        help="have a second model review each draft; it may only "
+                             "lower the confidence, never raise it")
     parser.add_argument("--samples", type=int, default=1,
                         help="draft this many times and use the agreement between "
                              "them as the confidence, instead of the model's own "
@@ -241,7 +244,7 @@ def main() -> int:
             from service.router.router import router_with_model
 
             router = router_with_model(args.model, provider=args.provider,
-                                       samples=args.samples)
+                                       samples=args.samples, critic=args.critic)
 
         def note(done, total, title, outcome):
             print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
@@ -278,7 +281,7 @@ def main() -> int:
             from service.router.router import router_with_model
 
             return router_with_model(args.model, provider=args.provider,
-                                     samples=args.samples)
+                                     samples=args.samples, critic=args.critic)
 
         def do_POST(self):  # noqa: N802 - stdlib naming
             path = self.path.split("?", 1)[0]

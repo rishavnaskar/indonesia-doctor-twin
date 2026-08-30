@@ -143,6 +143,42 @@ headlines are in the deployment language. The band labels and headlines come
 from the pack; the individual rule messages do not yet. For a review audience
 that is convenient, and for a real clinic it is wrong.
 
+## Making the drafter better
+
+Three levers, all off by default, all composing through the router as reasoners
+wrapping reasoners. Nothing downstream — the gate least of all — knows they are
+there.
+
+```bash
+python -m tools.live --samples 3     # draft it k times, use the agreement
+python -m tools.live --critic        # a second model reviews each draft
+```
+
+**Self-consistency** (`--samples k`) replaces the model's opinion of itself with
+a measurement of its behaviour. Agreement is on the plan, not the prose — two
+samples that both say titrate up to different doses have not agreed about
+anything a patient would notice. Confidence becomes the minimum of stated and
+observed, never a blend, so neither signal can rescue the other.
+
+**The critic** (`--critic`) catches what rules cannot: a draft that breaks no
+rule and is still poor. It may only *lower* confidence. A critic that could
+raise it would hold a veto over the abstention floor, which is the one authority
+nothing here may have. If it fails, the draft continues and is marked
+unreviewed — an advisory component being down is not a reason to deny care, but
+an unreviewed draft must never look like a reviewed one.
+
+**Schema enforcement** is on by default and steps down cleanly where a provider
+will not take it. It is worth having and it is not a defence: asked for a strict
+schema, one free model accepted the request and returned a structure of its own
+invention. The strict parser remains the thing that actually holds.
+
+**Whether these help is a question, not an assumption.** `make concordance`
+splits its result by whether the samples agreed, so if unstable drafts are no
+likelier to be wrong than stable ones the report says so and recommends dropping
+the technique. First measurement was uncomfortable: at n=12, self-consistency
+abstained on four cases single-shot got right, and instability did not predict
+error. A larger run is still owed.
+
 ## What exists today
 
 The deterministic core, end to end, on synthetic patients:

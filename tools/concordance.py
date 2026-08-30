@@ -45,6 +45,9 @@ def main() -> int:
     parser.add_argument("--n", type=int, default=120)
     parser.add_argument("--live", action="store_true", help="draft with a real model")
     parser.add_argument("--model", default=None)
+    parser.add_argument("--critic", action="store_true",
+                        help="have a second model review each draft; it may only "
+                             "lower the confidence, never raise it")
     parser.add_argument("--samples", type=int, default=1,
                         help="draft this many times and use the agreement between "
                              "them as the confidence, instead of the model's own "
@@ -61,7 +64,7 @@ def main() -> int:
 
         load_env()
         router = router_with_model(args.model, provider=args.provider,
-                                   samples=args.samples)
+                                   samples=args.samples, critic=args.critic)
 
     if args.cases:
         path = Path(args.cases)
