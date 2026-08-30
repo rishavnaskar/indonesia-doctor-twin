@@ -15,9 +15,20 @@ make live       # 5 encounters through a real model (needs a key, costs money)
 ### Running against a real model
 
 ```bash
-echo 'OPENROUTER_API_KEY=sk-or-...' >> .env   # .env is gitignored
+pip install -r requirements-model.txt          # optional extra, not core
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env    # .env is gitignored
 make live
 ```
+
+Two backends exist, and that is the point rather than indecision — a router
+with one implementation is a claim, not an architecture:
+
+| Provider | Flag | Notes |
+|---|---|---|
+| Anthropic (default) | `--provider anthropic` | Official SDK. Constrains the response to a JSON schema at the API level, so a malformed proposal is close to impossible rather than merely caught afterwards. Adaptive thinking on by default; `--no-thinking` is cheaper and faster. |
+| OpenRouter | `--provider openrouter` | OpenAI-compatible, stdlib only. Useful for comparing models across vendors. |
+
+Everything downstream is identical across them. Swapping is a flag.
 
 The deterministic reasoner stays the default, and CI never calls a model — a
 test suite that costs money per run and varies between runs is neither.

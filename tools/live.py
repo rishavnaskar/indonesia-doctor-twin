@@ -51,6 +51,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run encounters through a real model.")
     parser.add_argument("--n", type=int, default=5, help="encounters (each one API call)")
     parser.add_argument("--model", default=None, help="model slug")
+    parser.add_argument("--provider", default="anthropic",
+                        choices=["anthropic", "openrouter"],
+                        help="which backend (default: anthropic)")
+    parser.add_argument("--no-thinking", action="store_true",
+                        help="disable adaptive thinking (cheaper, faster)")
     parser.add_argument("--site", default="SITE-A")
     parser.add_argument("--show-prompt", action="store_true")
     args = parser.parse_args()
@@ -59,7 +64,10 @@ def main() -> int:
 
     rules = load_pack("id")
     site = rules.sites[args.site]
-    router = router_with_model(args.model)
+    kwargs = {}
+    if args.provider == "anthropic" and args.no_thinking:
+        kwargs["thinking"] = False
+    router = router_with_model(args.model, provider=args.provider, **kwargs)
     backend = router.get("model").backend
     queue = OutboundQueue()
     now = datetime(2026, 8, 29, 10, 0)
@@ -80,11 +88,13 @@ def main() -> int:
         print(prompt_module.build_user_prompt(state, rules, site, target)[:1500] + "\n...")
         return 0
 
-    if not os.environ.get("OPENROUTER_API_KEY"):
+    required = "ANTHROPIC_API_KEY" if args.provider == "anthropic" else "OPENROUTER_API_KEY"
+    example = "sk-ant-..." if args.provider == "anthropic" else "sk-or-..."
+    if not os.environ.get(required) and not os.environ.get("ANTHROPIC_AUTH_TOKEN"):
         print(
-            "\n  OPENROUTER_API_KEY is not set.\n"
+            f"\n  {required} is not set.\n"
             "  Put it in .env (already gitignored):\n\n"
-            "      OPENROUTER_API_KEY=sk-or-...\n"
+            f"      {required}={example}\n"
         )
         return 2
 
@@ -108,7 +118,15 @@ def main() -> int:
             print(f"      {exc}")
             continue
         except Exception as exc:  # noqa: BLE001
-            print(f"\n  [{index}] {label:12s} -> ERROR {type(exc).__name__}: {exc}")
+            name = type(exc).__name__
+            if name == "ModelRefusal":
+                # Not a crash. The model declined, which routes exactly where
+                # our own refusals route: the clinician sees nothing.
+                tally["model_refusal"] = tally.get("model_refusal", 0) + 1
+                print(f"\n  [{index}] {label:12s} -> MODEL REFUSAL (treated as abstain)")
+                print(f"      {exc}")
+                continue
+            print(f"\n  [{index}] {label:12s} -> ERROR {name}: {exc}")
             tally["error"] = tally.get("error", 0) + 1
             continue
 

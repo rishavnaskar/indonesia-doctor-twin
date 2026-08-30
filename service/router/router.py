@@ -55,18 +55,36 @@ def default_router() -> Router:
     return router
 
 
-def router_with_model(model: str | None = None, **backend_kwargs) -> Router:
-    """A router whose default backend is a hosted model.
+def build_backend(provider: str = "anthropic", model: str | None = None, **kwargs):
+    """Pick a backend by name.
 
-    Deliberately not the default. The deterministic reasoner is what CI and the
-    scorecard run against, because a test suite that costs money per run and
-    varies between runs is neither a test suite nor a suite.
+    The only place a provider is chosen. Two implementations exist so that the
+    swappability claim is demonstrated rather than asserted — everything
+    downstream is identical across them.
+    """
+    if provider == "anthropic":
+        from service.router.backends.anthropic_native import AnthropicBackend
+
+        return AnthropicBackend(model=model or AnthropicBackend.model, **kwargs)
+    if provider in ("openrouter", "hosted"):
+        from service.router.backends.hosted import HostedChatBackend
+
+        return HostedChatBackend(model=model or HostedChatBackend.model, **kwargs)
+    raise ValueError(f"unknown provider {provider!r}. Known: anthropic, openrouter")
+
+
+def router_with_model(
+    model: str | None = None, provider: str = "anthropic", **backend_kwargs
+) -> Router:
+    """A router whose default backend is a real model.
+
+    Deliberately not the process default. The deterministic reasoner is what CI
+    and the scorecard run against, because a test suite that costs money per run
+    and varies between runs is neither a test suite nor a suite.
     """
     from service.reason.model_reasoner import register
-    from service.router.backends.hosted import HostedChatBackend
 
     router = default_router()
-    backend = HostedChatBackend(model=model or HostedChatBackend.model, **backend_kwargs)
-    register(router, backend)
+    register(router, build_backend(provider, model, **backend_kwargs))
     router.default = "model"
     return router

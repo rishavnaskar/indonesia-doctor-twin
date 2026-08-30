@@ -1,0 +1,4 @@
+# Optional: only needed to run a real model behind the router.
+# The core system (packs, gate, workflow, scorecard) needs none of this and CI
+# never installs it — a test suite that costs money per run is not a test suite.
+anthropic>=1.0
