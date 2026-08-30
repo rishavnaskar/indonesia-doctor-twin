@@ -88,13 +88,25 @@ def main() -> int:
         print(prompt_module.build_user_prompt(state, rules, site, target)[:1500] + "\n...")
         return 0
 
-    required = "ANTHROPIC_API_KEY" if args.provider == "anthropic" else "OPENROUTER_API_KEY"
-    example = "sk-ant-..." if args.provider == "anthropic" else "sk-or-..."
-    if not os.environ.get(required) and not os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+    # Credential handling differs by provider, and the difference matters.
+    #
+    # The Anthropic SDK resolves credentials itself, in order: ANTHROPIC_API_KEY,
+    # then ANTHROPIC_AUTH_TOKEN, then an `ant auth login` profile on disk. So a
+    # missing environment variable is NOT proof there are no credentials, and
+    # hard-failing here would block a perfectly good CLI login. Warn, then let
+    # the SDK speak for itself.
+    #
+    # The OpenAI-compatible backend reads the variable directly, so there the
+    # check is real.
+    if args.provider == "anthropic":
+        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+            print("  No ANTHROPIC_API_KEY in the environment — trying the SDK's own")
+            print("  credential chain (an `ant auth login` profile also works).\n")
+    elif not os.environ.get("OPENROUTER_API_KEY"):
         print(
-            f"\n  {required} is not set.\n"
+            "\n  OPENROUTER_API_KEY is not set.\n"
             "  Put it in .env (already gitignored):\n\n"
-            f"      {required}={example}\n"
+            "      OPENROUTER_API_KEY=sk-or-...\n"
         )
         return 2
 
