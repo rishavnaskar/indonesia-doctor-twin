@@ -171,6 +171,25 @@ to read the wrong way round.
 dose and schedule, which investigations, the follow-up interval, the patient's
 instructions, and its own confidence. That is the clinical plan, not prose.
 
+**And on this pathway the rule engine gets most of it right too.** Measured over
+six patients, the reference reasoner and a real model chose the same
+recommendation four times. That is not a failure of the model; it is why adult
+hypertension follow-up was chosen as V1 — it is protocol-dense, and the
+escalation ladder *is* the algorithm. The gap shows in what a lookup cannot
+produce: on the same six patients the model wrote eight supporting assertions
+where the rule engine wrote one, gave a reason a clinician can argue with
+("already at the maximum dihydropyridine dose per formulary, further titration
+in this class is not permitted") rather than a template, and raised seven
+concerns to the rule engine's zero. On the two where they diverged, one was the
+model proposing `titrate_down` where the ladder said `continue`.
+
+Say that plainly rather than overclaiming: **for a protocol-dense follow-up
+pathway, a rule engine is a serious competitor for the decision, and the model
+earns its place on the parts that are not a lookup** — the reasoning, the
+patient's own words, and noticing what nobody enumerated. A pathway with
+diagnostic entropy is where that balance changes, and this system does not have
+one yet.
+
 **The rules decide whether that is allowed.** The nine checks, the exclusions,
 the red flags. They never choose a plan; they refuse one.
 
@@ -315,7 +334,7 @@ The deterministic core, end to end, on synthetic patients:
 | Eligibility routing — the 7 hard exclusions | Working |
 | The nine-check gate | Working |
 | Signature line — roster and licence enforced | Working |
-| Durable runtime interface — interrupt / resume / replay | Reference implementation |
+| Durable runtime — interrupt / resume / replay | Contract defined and exercised; in-memory implementation, no orchestration library. Conformance suite in `tests/test_runtime_contract.py` |
 | Encounter workflow — the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
