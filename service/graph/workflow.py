@@ -76,16 +76,35 @@ def run_encounter(
     now: datetime | None = None,
     queue=None,
     intake=None,
+    on_step=None,
 ) -> EncounterResult:
+    """Run one encounter.
+
+    `on_step(name)` fires as each phase *begins*, and is purely observational —
+    nothing downstream reads it and a callback that raises is not caught, so it
+    must not do work. It exists because the slow phase is the model call, and a
+    caller that cannot say which phase it is in can only report "working".
+
+    Note the difference from `trail`, which records phases that *completed*.
+    One says what is happening; the other says what happened. Conflating them
+    would make a crashed encounter look like a finished one.
+    """
     trail: list[str] = []
     now = now or datetime(2026, 8, 29, 10, 0)
+
+    def at(name: str) -> None:
+        if on_step is not None:
+            on_step(name)
+
     runtime.start(thread_id, state)
 
     # ---- ELIGIBLE: structured checks only, no model, zero tokens ----------
+    at("ELIGIBLE")
     derive_flags(state, rules)
     eligibility = check_eligibility(rules.guideline, Context(state))
     trail.append("ELIGIBLE")
     if not eligibility.eligible:
+        at("HANDOFF")
         return EncounterResult(
             outcome=Outcome.HANDOFF,
             message=eligibility.handoff_message(),
@@ -100,6 +119,7 @@ def run_encounter(
     #
     # Note what is NOT merged: the questions the patient asked. Those go to the
     # clinician verbatim and are never answered by anything in between.
+    at("INTAKE")
     if intake is not None:
         state.symptoms.update(intake.symptoms())
         for field_name in ("adherence", "outside_medication"):
@@ -111,10 +131,12 @@ def run_encounter(
     # Still a placeholder: matching free-text drug mentions to molecules needs a
     # model. The state exists so nothing downstream changes when it is filled
     # in, and discrepancies must be surfaced rather than silently resolved.
+    at("RECONCILE")
     trail.append("RECONCILE")
     runtime.checkpoint(thread_id, "reconciled", state)
 
     # ---- PROPOSE -----------------------------------------------------------
+    at("PROPOSE")
     proposal = router.propose(state, rules, site)
     trail.append("PROPOSE")
     runtime.checkpoint(thread_id, "proposed", state)
@@ -122,11 +144,13 @@ def run_encounter(
     # ---- GATE --------------------------------------------------------------
     # Red flags, sufficiency and every other deterministic control live here.
     # The workflow does not second-guess the gate; it routes on what it says.
+    at("GATE")
     gate_decision = run_gate(GateContext(state=state, proposal=proposal, rules=rules, site=site))
     trail.append("GATE")
 
     if not gate_decision.rendered:
         outcome, message = _route_refusal(gate_decision)
+        at(outcome.value.upper())
         return EncounterResult(
             outcome=outcome,
             message=message,
@@ -137,6 +161,7 @@ def run_encounter(
         )
 
     # ---- PRESENT -----------------------------------------------------------
+    at("PRESENT")
     trail.append("PRESENT")
     if signer is None:
         return EncounterResult(
@@ -154,6 +179,7 @@ def run_encounter(
         runtime.interrupt(thread_id, proposal)
     except Interrupted:
         pass  # the pause is the point; a real caller resumes on a signature
+    at("SIGNED")
     runtime.resume(thread_id, decision)
     sign(site, signer, proposal, decision, now, audit or AuditLog())
     trail.append("SIGNED")
@@ -168,6 +194,7 @@ def run_encounter(
         )
 
     # ---- COMMIT ------------------------------------------------------------
+    at("COMMIT")
     claim = build_claim(state, rules)
     referral = assess_referral_back(state, rules)
 

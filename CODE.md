@@ -95,6 +95,22 @@ therapy with no recent potassium, run it at SITE-A, then run the same patient at
 SITE-C. SITE-A asks for the test. SITE-C refers, because it cannot run one. Same
 patient, same gap, two right answers — that is gate check 9 earning its place.
 
+While a run is in flight the whole form is locked — really disabled, not just
+pointer-events, since CSS stops a mouse but not a keystroke or an autofill. A
+result must describe exactly what was submitted, and a page that lets you edit
+a patient mid-run is quietly lying about which patient produced the verdict.
+
+Each patient shows the phase it is actually in, reported by the workflow's own
+`on_step` callback rather than animated: ELIGIBLE, INTAKE, RECONCILE, PROPOSE —
+which is where a live run spends its time — then GATE, PRESENT, SIGNED, COMMIT.
+`on_step` says what is starting; `trail` says what finished, and the two are
+deliberately not merged, because conflating them would make a crashed encounter
+look like a completed one.
+
+Every result carries its own audit panel — the nine checks with ticks, the path
+taken, what the hospital can do, the three provenance pins and the signature —
+so "how do I know it actually checked?" is answerable without leaving the page.
+
 **The residency guard is visible there too.** A record is not synthetic unless it
 says so, so pasting one in and asking a hosted model to draft it is refused
 before any request is built. That refusal appears as a failed visit with its own

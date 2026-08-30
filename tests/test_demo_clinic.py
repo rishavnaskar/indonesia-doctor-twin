@@ -137,3 +137,64 @@ def test_wire_roundtrip_preserves_what_the_gate_reads():
     assert again.is_synthetic == original.is_synthetic
     assert len(again.medications) == len(original.medications)
     assert again.latest("sbp").value == original.latest("sbp").value
+
+
+def test_the_workflow_reports_the_phase_it_is_entering():
+    """The slow phase is the model call, so a caller that cannot say which
+    phase it is in can only report 'working' — which is what a hung process
+    reports too."""
+    from datetime import datetime
+
+    from datagen.synthetic import make_patient
+    from service.graph.runtime import InMemoryRuntime
+    from service.graph.workflow import run_encounter
+    from service.packs.loader import load_pack
+    from service.router.router import default_router
+    from service.signing import AuditLog, Signer
+
+    rules = load_pack("id")
+    seen: list[str] = []
+    result = run_encounter(
+        make_patient(101, controlled=True), rules, rules.sites["SITE-A"],
+        default_router(), InMemoryRuntime(), thread_id="T",
+        signer=Signer("PRAC-A-001", True), audit=AuditLog(),
+        now=datetime(2026, 8, 29, 10, 0), on_step=seen.append,
+    )
+    assert seen[:5] == ["ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE", "GATE"]
+    # `on_step` says what is starting; `trail` says what finished. Conflating
+    # them would make a crashed encounter look like a completed one.
+    assert "FOLLOW-UP" in result.trail
+    assert "FOLLOW-UP" not in seen
+
+
+def test_a_step_signal_fires_for_an_encounter_that_leaves_the_pathway():
+    from datetime import datetime
+
+    from datagen.synthetic import make_patient
+    from service.graph.runtime import InMemoryRuntime
+    from service.graph.workflow import run_encounter
+    from service.packs.loader import load_pack
+    from service.router.router import default_router
+
+    rules = load_pack("id")
+    minor = make_patient(1, controlled=True)
+    minor.age = 14
+    seen: list[str] = []
+    run_encounter(minor, rules, rules.sites["SITE-A"], default_router(),
+                  InMemoryRuntime(), thread_id="T2",
+                  now=datetime(2026, 8, 29, 10, 0), on_step=seen.append)
+    assert seen[-1] == "HANDOFF"
+
+
+def test_each_result_carries_what_the_audit_panel_needs():
+    """'How do I know it actually checked?' has to be answerable per patient,
+    without leaving the page."""
+    result = run_patients(generate(1, seed=11), site_id="SITE-A")
+    encounter = result["encounters"][0]
+    assert len(encounter["checks"]) == 9
+    assert all("title" in c and "description" in c for c in encounter["checks"])
+    assert encounter["trail"]
+    assert encounter["patient"]["labs_available"]
+    assert encounter["patient"]["stocked"]
+    provenance = encounter["proposal"]["provenance"]
+    assert all("@" in pin for pin in provenance)

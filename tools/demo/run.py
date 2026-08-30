@@ -259,7 +259,7 @@ def _failed(scenario, rules, exc: Exception) -> dict:
     }
 
 
-def _encounter(scenario, rules, labels, router) -> dict:
+def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
     audit_log = AuditLog()
     practitioner = scenario.site["practitioners"][0]["practitioner_id"]
 
@@ -274,7 +274,7 @@ def _encounter(scenario, rules, labels, router) -> dict:
             scenario.state, rules, scenario.site, effective, InMemoryRuntime(),
             thread_id=f"DEMO-{scenario.key}",
             signer=Signer(practitioner, True),
-            audit=audit_log, now=NOW,
+            audit=audit_log, now=NOW, on_step=on_step,
         )
     except Exception as exc:  # noqa: BLE001
         # A model that returns unparseable output, refuses, gets rate-limited or
@@ -369,6 +369,7 @@ def run_patients(
     pack_id: str = "id",
     router=None,
     on_progress=None,
+    on_step=None,
 ) -> dict:
     """Run patients the user built or uploaded, through the identical pipeline.
 
@@ -390,6 +391,7 @@ def run_patients(
     encounters = []
     for index, wire in enumerate(wire_patients, start=1):
         state = from_wire(wire)
+        step = (lambda name, i=index: on_step(i, name)) if on_step else None
         scenario = Scenario(
             key=state.patient_id,
             title=f"{state.patient_id} — {state.age}, {state.sex}",
@@ -398,7 +400,7 @@ def run_patients(
             site=site,
             watch_for="",
         )
-        encounter = _encounter(scenario, rules, labels, router)
+        encounter = _encounter(scenario, rules, labels, router, on_step=step)
         encounters.append(encounter)
         if on_progress:
             on_progress(index, len(wire_patients), scenario.title,

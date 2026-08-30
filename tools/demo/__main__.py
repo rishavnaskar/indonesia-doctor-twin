@@ -33,6 +33,73 @@ from tools.demo.run import collect, run_patients, vocabulary
 from tools.live import load_env
 
 
+class RunJob:
+    """One interactive run, watched while it happens.
+
+    The model call is the slow phase, so a caller that cannot say which phase
+    it is in can only report "working" — which is what a hung process reports
+    too. This records the real step each patient is on, from the workflow's own
+    callback, so the page shows what is actually happening rather than an
+    animation of what usually happens.
+    """
+
+    def __init__(self, patients, site_id, live, args):
+        self.patients = patients
+        self.site_id = site_id
+        self.live = live
+        self.args = args
+        self.lock = threading.Lock()
+        self.steps: dict[int, str] = {}
+        self.done: dict[int, str] = {}
+        self.result: dict | None = None
+        self.error: str | None = None
+        self.started_at = time.time()
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self) -> None:
+        try:
+            router = None
+            if self.live:
+                load_env()
+                from service.router.router import router_with_model
+
+                router = router_with_model(self.args.model, provider=self.args.provider)
+
+            def on_step(index, name):
+                with self.lock:
+                    self.steps[index] = name
+
+            def on_progress(index, total, title, outcome):
+                with self.lock:
+                    self.done[index] = str(outcome)
+                    self.steps.pop(index, None)
+
+            result = run_patients(
+                self.patients, site_id=self.site_id, pack_id=self.args.pack,
+                router=router, on_progress=on_progress, on_step=on_step,
+            )
+            with self.lock:
+                self.result = result
+        except Exception as exc:  # noqa: BLE001
+            with self.lock:
+                self.error = f"{type(exc).__name__}: {exc}"
+
+    def status(self) -> dict:
+        with self.lock:
+            return {
+                "ready": self.result is not None,
+                "error": self.error,
+                "total": len(self.patients),
+                "steps": {str(k): v for k, v in self.steps.items()},
+                "finished": {str(k): v for k, v in self.done.items()},
+                "elapsed": round(time.time() - self.started_at),
+                "result": self.result,
+            }
+
+
+_JOBS: dict[str, RunJob] = {}
+
+
 class Build:
     """One run of the scenarios, built once and reused.
 
@@ -226,12 +293,16 @@ def main() -> int:
                     return
 
                 if path == "/api/run":
-                    self._json(run_patients(
-                        body.get("patients") or [],
-                        site_id=str(body.get("site_id", "SITE-A")),
-                        pack_id=args.pack,
-                        router=self._router(bool(body.get("live"))),
-                    ))
+                    patients = body.get("patients") or []
+                    if not patients:
+                        self._json({"error": "no patients to run"}, 400)
+                        return
+                    job_id = f"j{len(_JOBS) + 1}-{int(time.time() * 1000) % 100000}"
+                    _JOBS[job_id] = RunJob(
+                        patients, str(body.get("site_id", "SITE-A")),
+                        bool(body.get("live")), args,
+                    )
+                    self._json({"job_id": job_id})
                     return
             except Exception as exc:  # noqa: BLE001
                 # Including ResidencyError, which is the guard doing its job and
@@ -252,6 +323,18 @@ def main() -> int:
                 return
             if path == "/clinic":
                 self._send(CLINIC_HTML.encode("utf-8"), "text/html; charset=utf-8")
+                return
+            if path.startswith("/api/job"):
+                job_id = ""
+                if "?" in self.path:
+                    from urllib.parse import parse_qs
+
+                    job_id = (parse_qs(self.path.split("?", 1)[1]).get("id") or [""])[0]
+                job = _JOBS.get(job_id)
+                if job is None:
+                    self._json({"error": "unknown job"}, 404)
+                else:
+                    self._json(job.status())
                 return
             if path == "/api/vocabulary":
                 self._json(vocabulary(args.pack))
