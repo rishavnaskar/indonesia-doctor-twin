@@ -97,13 +97,38 @@ def _database_up() -> str:
         ["docker", "compose", "up", "-d", "--wait"],
         cwd=ROOT, capture_output=True, text=True,
     )
-    if started.returncode != 0:
-        return "files (docker compose could not start postgres)"
 
     from service.store import Store
 
+    if started.returncode != 0:
+        # Compose failing does not mean there is no database. A second checkout
+        # of this project on one machine brings up a container binding the same
+        # port, and the first one to get there wins — which is fine, because it
+        # is the same schema. Ask before assuming.
+        store = Store()
+        if store.backend == "postgres":
+            return (f"postgres at {store.summary()['location']}"
+                    " (already running — not started by this run)")
+        return f"files ({_compose_failure(started.stderr or started.stdout)})"
+
     store = Store()
     return f"{store.backend} at {store.summary()['location']}"
+
+
+def _compose_failure(output: str) -> str:
+    """The one line of compose's output worth putting on screen.
+
+    "docker compose could not start postgres" is true and useless. The actual
+    cause is usually a port already bound, and saying so is the difference
+    between a reader fixing it in ten seconds and shrugging at the fallback.
+    """
+    for line in (output or "").splitlines():
+        lowered = line.lower()
+        if "bind" in lowered or "address already in use" in lowered:
+            return "port 5544 is already in use — set CLINICIAN_DATABASE_URL"
+        if "permission denied" in lowered:
+            return "docker refused the request — check its permissions"
+    return "docker compose could not start postgres"
 
 
 # ----------------------------------------------------------------------- main

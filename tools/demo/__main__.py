@@ -420,7 +420,21 @@ def main() -> int:
         allow_reuse_address = True
         daemon_threads = True
 
-    with Server(("127.0.0.1", args.port), Handler) as httpd:
+    try:
+        server = Server(("127.0.0.1", args.port), Handler)
+    except OSError as exc:
+        # Almost always a previous run still serving, or a second checkout. A
+        # stack trace ending in "Address already in use" underneath a `make`
+        # that has just spent two minutes passing every gate reads as though
+        # something broke, which is the opposite of what happened.
+        print(f"\n  Port {args.port} is already in use.\n")
+        print("  Something is already serving there — usually a previous run of")
+        print("  this. Stop it, or pick another port:\n")
+        print(f"      make PORT={args.port + 1}\n")
+        print(f"  ({type(exc).__name__}: {exc})\n")
+        return 1
+
+    with server as httpd:
         url = f"http://127.0.0.1:{args.port}/"
         print(f"\n  Serving the clinician surface at {url}")
         print("  Bound to localhost only. The page answers straight away and shows")
