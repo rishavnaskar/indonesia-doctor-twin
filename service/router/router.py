@@ -78,6 +78,7 @@ def router_with_model(
     provider: str = "anthropic",
     samples: int = 1,
     critic: bool = False,
+    use_tools: bool = False,
     **backend_kwargs,
 ) -> Router:
     """A router whose default backend is a real model.
@@ -89,7 +90,8 @@ def router_with_model(
     from service.reason.model_reasoner import ModelReasoner
 
     router = default_router()
-    reasoner = ModelReasoner(build_backend(provider, model, **backend_kwargs))
+    reasoner = ModelReasoner(build_backend(provider, model, **backend_kwargs),
+                             use_tools=use_tools)
 
     if critic:
         # A second call, reviewing the first. It may only lower confidence, and

@@ -188,6 +188,107 @@ class HostedChatBackend:
             "now and pass --model, or retry in a minute."
         )
 
+    def complete_with_tools(self, system: str, user: str, *, allow_egress: bool,
+                            schema: dict | None = None, tools: list | None = None,
+                            dispatch=None, max_calls: int = 8) -> str:
+        """Let the model ask for what it needs before it drafts.
+
+        A bounded loop: every tool is read-only, the count is capped, and the
+        loop ends by producing text. There is no tool that changes anything, so
+        the worst a runaway loop can do is waste calls.
+        """
+        if not tools or dispatch is None:
+            return self.complete(system, user, allow_egress=allow_egress, schema=schema)
+
+        if not allow_egress:
+            raise ResidencyError(
+                "Refusing to send patient data to a hosted endpoint. Only "
+                "synthetic records may leave the residency boundary."
+            )
+        api_key = os.environ.get(self.api_key_env)
+        if not api_key:
+            raise BackendError(f"{self.api_key_env} is not set.")
+
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+
+        for _ in range(max_calls):
+            body = self._post_messages(messages, api_key, tools=tools)
+            message = body["choices"][0]["message"]
+            calls = message.get("tool_calls") or []
+            if not calls:
+                self._answered_by = (
+                    f"{body.get('model') or self.model}"
+                    f"@{body.get('provider') or 'unknown-provider'}"
+                )
+                return self._content(body)
+
+            messages.append({
+                "role": "assistant",
+                "content": message.get("content") or "",
+                "tool_calls": calls,
+            })
+            for call in calls:
+                function = call.get("function") or {}
+                try:
+                    arguments = json.loads(function.get("arguments") or "{}")
+                except json.JSONDecodeError:
+                    arguments = {}
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": call.get("id"),
+                    "content": dispatch(function.get("name", ""), arguments),
+                })
+
+        # Out of budget. Ask once more, without tools, so the loop ends in a
+        # draft rather than in silence.
+        messages.append({
+            "role": "user",
+            "content": "No more lookups. Answer now with the proposal JSON only.",
+        })
+        body = self._post_messages(messages, api_key, tools=None, schema=schema)
+        self._answered_by = (
+            f"{body.get('model') or self.model}@{body.get('provider') or 'unknown-provider'}"
+        )
+        return self._content(body)
+
+    def _post_messages(self, messages: list, api_key: str, *, tools=None,
+                       schema: dict | None = None) -> dict:
+        payload: dict = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        if tools:
+            payload["tools"] = tools
+        elif schema:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "proposal", "strict": True, "schema": schema},
+            }
+
+        request = urllib.request.Request(
+            self.base_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(
+                request, timeout=self.timeout_s, context=_ssl_context()
+            ) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:400]
+            if exc.code == 429:
+                raise RateLimited(f"{self.model}: {_reason(detail)}") from exc
+            raise BackendError(f"HTTP {exc.code} from {self.model}: {detail}") from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            raise TransientTransport(f"{type(exc).__name__}: {exc}") from exc
+
     def _call_model(self, model: str, system: str, user: str, api_key: str,
                     schema: dict | None = None) -> dict:
         # Strongest enforcement first, degrading on refusal. A schema the

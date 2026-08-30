@@ -64,7 +64,7 @@ class RunJob:
                 from service.router.router import router_with_model
 
                 router = router_with_model(self.args.model, provider=self.args.provider,
-                                           samples=self.args.samples, critic=self.args.critic)
+                                           samples=self.args.samples, critic=self.args.critic, use_tools=self.args.tools)
 
             def on_step(index, name):
                 with self.lock:
@@ -151,7 +151,7 @@ class Build:
                 from service.router.router import router_with_model
 
                 router = router_with_model(self.args.model, provider=self.args.provider,
-                                           samples=self.args.samples, critic=self.args.critic)
+                                           samples=self.args.samples, critic=self.args.critic, use_tools=self.args.tools)
             data = collect(self.args.pack, router=router, on_progress=self._note)
             page = render(data)
         except Exception as exc:  # noqa: BLE001 - a broken pack must be visible
@@ -226,6 +226,9 @@ def main() -> int:
                         help="drive the scenarios with a real model instead of the "
                              "deterministic reasoner")
     parser.add_argument("--model", default=None)
+    parser.add_argument("--tools", action="store_true",
+                        help="let the drafter request what it needs (read-only "
+                             "lookups) instead of being handed the whole pack")
     parser.add_argument("--critic", action="store_true",
                         help="have a second model review each draft; it may only "
                              "lower the confidence, never raise it")
@@ -244,7 +247,7 @@ def main() -> int:
             from service.router.router import router_with_model
 
             router = router_with_model(args.model, provider=args.provider,
-                                       samples=args.samples, critic=args.critic)
+                                       samples=args.samples, critic=args.critic, use_tools=args.tools)
 
         def note(done, total, title, outcome):
             print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
@@ -281,7 +284,7 @@ def main() -> int:
             from service.router.router import router_with_model
 
             return router_with_model(args.model, provider=args.provider,
-                                     samples=args.samples, critic=args.critic)
+                                     samples=args.samples, critic=args.critic, use_tools=args.tools)
 
         def do_POST(self):  # noqa: N802 - stdlib naming
             path = self.path.split("?", 1)[0]

@@ -117,6 +117,12 @@ class Proposal:
     # and the two must not be conflated by anything reading this.
     agreement: float | None = None
 
+    # Which read-only tools the drafter chose to call, in order. Recorded
+    # because what a model asks for is evidence: one that titrates a
+    # RAAS-acting drug without ever requesting a potassium result has told us
+    # something no inspection of its output would reveal.
+    tools_requested: list[str] = field(default_factory=list)
+
     def citations(self) -> set[str]:
         found = {a.citation for a in self.assertions}
         found |= {c.citation for c in self.medication_changes}

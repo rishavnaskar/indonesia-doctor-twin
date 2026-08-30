@@ -27,9 +27,12 @@ from service.rules.targets import resolve_target
 
 
 class ModelReasoner:
-    def __init__(self, backend, *, corpus_version: str | None = None):
+    def __init__(self, backend, *, corpus_version: str | None = None, use_tools: bool = False):
         self.backend = backend
         self._corpus_version = corpus_version
+        # When on, the drafter asks for what it needs instead of being handed
+        # the whole pack. Every tool is read-only.
+        self.use_tools = use_tools
 
     def __call__(self, state, rules, site: dict[str, Any] | None = None):
         return self.propose(state, rules, site)
@@ -41,11 +44,25 @@ class ModelReasoner:
         user = prompt_module.build_user_prompt(state, rules, site, resolution.target)
 
         # The guard: only generated patients may cross the boundary.
-        raw = self.backend.complete(
-            system, user,
-            allow_egress=bool(state.is_synthetic),
-            schema=proposal_schema(rules),
-        )
+        toolbox = None
+        if self.use_tools and hasattr(self.backend, "complete_with_tools"):
+            from service.reason.tools import MAX_CALLS, Toolbox, tool_specs
+
+            toolbox = Toolbox(state, rules, site)
+            raw = self.backend.complete_with_tools(
+                system, user,
+                allow_egress=bool(state.is_synthetic),
+                schema=proposal_schema(rules),
+                tools=tool_specs(rules),
+                dispatch=toolbox.dispatch,
+                max_calls=MAX_CALLS,
+            )
+        else:
+            raw = self.backend.complete(
+                system, user,
+                allow_egress=bool(state.is_synthetic),
+                schema=proposal_schema(rules),
+            )
 
         # Provenance is built *after* the answer, never before. A backend may
         # fall back to a different model when one is rate-limited, and an alias
@@ -58,7 +75,10 @@ class ModelReasoner:
         )
 
         parsed = extract_json(raw)
-        return to_proposal(parsed, provenance)
+        proposal = to_proposal(parsed, provenance)
+        if toolbox is not None:
+            proposal.tools_requested = list(toolbox.requested)
+        return proposal
 
 
 def register(router, backend, name: str = "model") -> None:
