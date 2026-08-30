@@ -79,6 +79,9 @@ class OutboundQueue:
     path: Path | None = None
     items: dict[str, QueueItem] = field(default_factory=dict)
     _order: list[str] = field(default_factory=list)
+    # Lines the log could not parse. Kept rather than discarded: a queue that
+    # quietly drops part of its own history is worse than one that says so.
+    damaged: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.path is not None and Path(self.path).exists():
@@ -155,11 +158,26 @@ class OutboundQueue:
             fh.write(item.to_json() + "\n")
 
     def _load(self) -> None:
-        """Replay the log. Later entries for a key win."""
+        """Replay the log. Later entries for a key win.
+
+        A line that will not parse is skipped and recorded, not raised. The log
+        is append-only and written a line at a time, so a power cut mid-write
+        leaves a truncated final line — and about one site in twelve lacks
+        24-hour power, which makes that the expected case rather than the exotic
+        one. Refusing to open the file would lose every encounter behind the
+        damaged line, which is the precise outcome this queue exists to prevent.
+
+        Skipped lines are counted in `damaged` so the loss is visible. Silently
+        dropping part of a clinical audit log would be worse than crashing.
+        """
         for line in Path(self.path).read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            item = QueueItem.from_json(line)
+            try:
+                item = QueueItem.from_json(line)
+            except (json.JSONDecodeError, KeyError, ValueError):
+                self.damaged.append(line[:200])
+                continue
             if item.idempotency_key not in self.items:
                 self._order.append(item.idempotency_key)
             self.items[item.idempotency_key] = item

@@ -168,3 +168,68 @@ def test_a_refused_encounter_enqueues_nothing(rules, tmp_path):
     )
     assert result.outcome is Outcome.ABSTAIN
     assert len(queue) == 0
+
+
+# ------------------------------------------------------- queue durability
+
+def test_a_truncated_final_line_does_not_lose_the_queue(tmp_path):
+    """The log is append-only and written a line at a time, so a power cut
+    mid-write leaves a truncated final line. About one site in twelve lacks
+    24-hour power, which makes that the expected case. Refusing to open the file
+    would lose every encounter behind the damaged line — the precise outcome
+    this queue exists to prevent."""
+    from datetime import datetime
+
+    from service.emit.queue import OutboundQueue
+
+    path = tmp_path / "q.jsonl"
+    queue = OutboundQueue(path)
+    for index in range(4):
+        queue.enqueue("encounter_bundle", {"n": index}, f"k{index}",
+                      datetime(2026, 8, 29, 10, 0))
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write('{"idempotency_key": "k4", "kind": "b", "pay')
+
+    reopened = OutboundQueue(path)
+    assert len(reopened) == 4
+    assert len(reopened.pending()) == 4
+    assert len(reopened.damaged) == 1, "the loss must be visible, not silent"
+    assert reopened.drain(lambda item: None)["sent"] == 4
+
+
+def test_a_line_missing_a_field_is_skipped_not_fatal(tmp_path):
+    from datetime import datetime
+
+    from service.emit.queue import OutboundQueue
+
+    path = tmp_path / "q.jsonl"
+    queue = OutboundQueue(path)
+    queue.enqueue("encounter_bundle", {"n": 1}, "k1", datetime(2026, 8, 29, 10, 0))
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write('{"idempotency_key": "k9"}\n{not json at all}\n')
+
+    reopened = OutboundQueue(path)
+    assert len(reopened) == 1
+    assert len(reopened.damaged) == 2
+
+
+def test_a_sent_encounter_stays_sent_across_a_restart(tmp_path):
+    """The duplicate this whole design exists to prevent."""
+    from datetime import datetime
+
+    from service.emit.queue import OutboundQueue
+
+    path = tmp_path / "q.jsonl"
+    now = datetime(2026, 8, 29, 10, 0)
+    queue = OutboundQueue(path)
+    for index in range(3):
+        queue.enqueue("encounter_bundle", {"n": index}, f"k{index}", now)
+    queue.drain(lambda item: None)
+
+    reopened = OutboundQueue(path)
+    assert reopened.pending() == []
+    # Replaying the identical encounters after recovery must add nothing.
+    for index in range(3):
+        reopened.enqueue("encounter_bundle", {"n": index}, f"k{index}", now)
+    assert reopened.pending() == []
+    assert len(reopened) == 3

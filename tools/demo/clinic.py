@@ -12,11 +12,11 @@ CLINIC_HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI clinician — build a patient</title>
 <style>
-:root{--bg:#f5f6f8;--panel:#fff;--ink:#14171a;--muted:#5f6871;--faint:#8a939c;--line:#dfe3e8;
---accent:#1c4fd8;--soft:#eef2fe;--green:#1a7f4b;--amber:#a86a00;--red:#b3261e;
+:root{--bg:#f5f6f8;--panel:#fff;--ink:#14171a;--muted:#5f6871;--faint:#66707c;--line:#dfe3e8;
+--accent:#1c4fd8;--on-accent:#fff;--soft:#eef2fe;--green:#1a7f4b;--amber:#8f5a00;--red:#b3261e;
 --green-bg:#eaf6ef;--amber-bg:#fdf3e2;--red-bg:#fceceb;--code:#eef1f4}
 @media (prefers-color-scheme:dark){:root{--bg:#131619;--panel:#1b1f23;--ink:#e8eaed;--muted:#9aa4ae;
---faint:#788089;--line:#2b3137;--accent:#7da2ff;--soft:#1d2536;--green:#6ed99b;--amber:#ecb75a;
+--faint:#98a1ab;--line:#2b3137;--accent:#7da2ff;--on-accent:#10141a;--soft:#1d2536;--green:#6ed99b;--amber:#ecb75a;
 --red:#f0857c;--green-bg:#16281f;--amber-bg:#2a2418;--red-bg:#2c1b1a;--code:#22272c}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -25,17 +25,31 @@ font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 header{padding:18px 26px;border-bottom:1px solid var(--line);background:var(--panel)}
 h1{margin:0 0 4px;font-size:18px}
 .lede{color:var(--muted);font-size:13.5px;max-width:88ch}
-a{color:var(--accent)}
+a,a:visited{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
 main{padding:20px 26px;max-width:1180px}
 .bar{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
 margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
+/* A select sizes to its longest option, and these options are sentences. On a
+   narrow screen that pushed the whole page sideways. */
+.bar > div{min-width:0}
+.bar select{max-width:100%}
+@media (max-width:560px){
+  .bar{flex-direction:column;align-items:stretch}
+  .bar > div{width:100%}
+  .bar button{width:100%}
+  select,input[type=number],input[type=text]{width:100%}
+  input[type=number]{width:100%}
+  main{padding:16px 14px}
+  .row > div{flex:1 1 40%}
+}
 label.f{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
 color:var(--faint);margin-bottom:4px;font-weight:600}
 select,input[type=number],input[type=text],textarea{font:inherit;font-size:13.5px;padding:6px 8px;
 border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 input[type=number]{width:78px}
 button{font:inherit;font-size:13.5px;font-weight:600;padding:8px 16px;border-radius:7px;
-border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer}
 button.ghost{background:transparent;color:var(--accent)}
 button[disabled]{opacity:.5;cursor:default}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}

@@ -36,15 +36,15 @@ _TEMPLATE = r"""<!doctype html>
 <title>__TITLE__</title>
 <style>
 :root {
-  --bg:#f5f6f8; --panel:#fff; --ink:#14171a; --muted:#5f6871; --faint:#8a939c;
-  --line:#dfe3e8; --accent:#1c4fd8; --soft:#eef2fe;
-  --green:#1a7f4b; --amber:#a86a00; --red:#b3261e;
+  --bg:#f5f6f8; --panel:#fff; --ink:#14171a; --muted:#5f6871; --faint:#66707c;
+  --line:#dfe3e8; --accent:#1c4fd8; --on-accent:#fff; --soft:#eef2fe;
+  --green:#1a7f4b; --amber:#8f5a00; --red:#b3261e;
   --green-bg:#eaf6ef; --amber-bg:#fdf3e2; --red-bg:#fceceb; --code:#eef1f4;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg:#131619; --panel:#1b1f23; --ink:#e8eaed; --muted:#9aa4ae; --faint:#788089;
-    --line:#2b3137; --accent:#7da2ff; --soft:#1d2536;
+    --bg:#131619; --panel:#1b1f23; --ink:#e8eaed; --muted:#9aa4ae; --faint:#98a1ab;
+    --line:#2b3137; --accent:#7da2ff; --on-accent:#10141a; --soft:#1d2536;
     --green:#6ed99b; --amber:#ecb75a; --red:#f0857c;
     --green-bg:#16281f; --amber-bg:#2a2418; --red-bg:#2c1b1a; --code:#22272c;
   }
@@ -53,6 +53,14 @@ _TEMPLATE = r"""<!doctype html>
 body { margin:0; background:var(--bg); color:var(--ink);
   font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
 .mono,code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; }
+/* The page styled no links at all, so they fell back to the user agent's
+   #0000EE — 1.93:1 against the dark background, where AA wants 4.5:1. The
+   visited rule matters as much as the base one: the default visited purple is
+   worse still, and it only appears after someone has clicked, which is exactly
+   when nobody is looking for it. */
+a, a:visited { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+a:hover { text-decoration-thickness: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 header { padding:20px 26px; border-bottom:1px solid var(--line); background:var(--panel); }
 h1 { margin:0 0 5px; font-size:19px; letter-spacing:-.01em; }
 .lede { color:var(--muted); font-size:13.5px; max-width:80ch; }
@@ -136,7 +144,7 @@ thead th { border-bottom:1px solid var(--line); width:auto; }
 .steps { font-size:12.5px; color:var(--muted); }
 .steps div { padding:3px 0; }
 button.act { font:inherit; font-size:13px; font-weight:650; padding:7px 15px; border-radius:7px;
-  border:1px solid var(--red); background:var(--red); color:#fff; cursor:pointer; margin-top:12px; }
+  border:1px solid var(--red); background:var(--red); color:var(--on-accent); cursor:pointer; margin-top:12px; }
 button.act[disabled]{ background:transparent; color:var(--muted); border-color:var(--line); font-weight:500; }
 .note { font-size:12.5px; color:var(--faint); margin-top:10px; }
 .bpnow { font-size:26px; font-weight:650; letter-spacing:-.02em; }
