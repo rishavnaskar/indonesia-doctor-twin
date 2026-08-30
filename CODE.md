@@ -29,6 +29,32 @@ feature than a problem: a weak model exercises the strict parser and the gate
 instead of flattering them, and the whole architectural claim is that the system
 stays safe when the model is not good.
 
+**Rate limits are load, not breakage.** Free tiers are shared pools, so any one
+model returns 429 at random times of day with no bearing on your key. The
+backend retries once, then falls through a chain of other free models, and the
+provenance pin records which one actually answered. Naming a model explicitly
+with `--model` turns fallback off, because substituting a different model would
+corrupt the experiment that naming one is usually for; `--no-fallback` does the
+same when you want the failure loud.
+
+**Provenance pins `model@served_by`, and is built after the answer, never
+before.** Both halves are load-bearing. Building it before the call would record
+what we intended to ask rather than what ran — wrong whenever the chain falls
+back or an alias resolves to a snapshot. And the upstream provider belongs in
+the pin because the same slug on two serving stacks can differ in quantisation
+and sampling defaults. Before any call `version()` returns a bare slug with no
+`@`, so the gate's provenance check rejects a proposal assembled without a real
+answer behind it rather than accepting a placeholder that looks like a pin.
+
+**Truncation is reported as ours, not the model's.** A reasoning model spends
+the output budget on thinking before it writes a word, and that spend counts
+against the same ceiling — measured here at ~1,900 tokens of reasoning on a
+routine follow-up. A budget of 2,000 left ~80 for the answer and truncated it
+mid-JSON, which reaches a strict parser looking exactly like a model that cannot
+follow the contract. It is now caught at the backend as `TruncatedResponse` and
+tallied separately. Misattributing our config bug to model quality is the class
+of wrong conclusion this prototype exists to prevent.
+
 Two backends exist, and that is the point rather than indecision — a router
 with one implementation is a claim, not an architecture:
 

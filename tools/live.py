@@ -58,6 +58,9 @@ def main() -> int:
                         help="list models that cost nothing right now, then exit")
     parser.add_argument("--no-thinking", action="store_true",
                         help="disable adaptive thinking (cheaper, faster)")
+    parser.add_argument("--no-fallback", action="store_true",
+                        help="do not fall back to another free model when one is "
+                             "rate-limited; fail loudly instead")
     parser.add_argument("--site", default="SITE-A")
     parser.add_argument("--show-prompt", action="store_true")
     args = parser.parse_args()
@@ -81,12 +84,22 @@ def main() -> int:
     kwargs = {}
     if args.provider == "anthropic" and args.no_thinking:
         kwargs["thinking"] = False
+    if args.provider in ("openrouter", "hosted"):
+        # An explicitly named model is a deliberate choice — usually an
+        # experiment about that model. Silently substituting another one would
+        # corrupt the experiment, so naming a model turns fallback off unless
+        # nothing was named.
+        if args.no_fallback or args.model:
+            kwargs["fallbacks"] = ()
     router = router_with_model(args.model, provider=args.provider, **kwargs)
     backend = router.get("model").backend
     queue = OutboundQueue()
     now = datetime(2026, 8, 29, 10, 0)
 
     print(f"\n{RULE}\n  Live run — {backend.version()} — {args.n} encounters at {args.site}")
+    chain = getattr(backend, "fallbacks", ())
+    if chain:
+        print(f"  Falling back through: {', '.join(chain)}")
     print(f"  Synthetic patients only. The residency guard enforces it.\n{RULE}")
 
     if args.show_prompt:
@@ -126,6 +139,7 @@ def main() -> int:
 
     tally: dict[str, int] = {}
     parse_failures = 0
+    requested = backend.version()
 
     for index in range(args.n):
         state = make_patient(900 + index, controlled=(index % 2 == 0))
@@ -145,6 +159,18 @@ def main() -> int:
             continue
         except Exception as exc:  # noqa: BLE001
             name = type(exc).__name__
+            if name == "TruncatedResponse":
+                # Ours, not the model's. Counted separately so a config bug can
+                # never be read off the scoreboard as poor model quality.
+                tally["truncated"] = tally.get("truncated", 0) + 1
+                print(f"\n  [{index}] {label:12s} -> TRUNCATED (our token budget)")
+                print(f"      {exc}")
+                continue
+            if name == "RateLimited":
+                tally["rate_limited"] = tally.get("rate_limited", 0) + 1
+                print(f"\n  [{index}] {label:12s} -> RATE LIMITED")
+                print(f"      {exc}")
+                continue
             if name == "ModelRefusal":
                 # Not a crash. The model declined, which routes exactly where
                 # our own refusals route: the clinician sees nothing.
@@ -157,7 +183,9 @@ def main() -> int:
             continue
 
         tally[result.outcome.value] = tally.get(result.outcome.value, 0) + 1
-        print(f"\n  [{index}] {label:12s} -> {result.outcome.value.upper()}")
+        answered_by = backend.version()
+        served = "" if answered_by == requested else f"  [served by {answered_by}]"
+        print(f"\n  [{index}] {label:12s} -> {result.outcome.value.upper()}{served}")
 
         if result.proposal is not None:
             proposal = result.proposal

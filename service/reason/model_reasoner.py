@@ -36,17 +36,21 @@ class ModelReasoner:
     def propose(self, state, rules, site: dict[str, Any] | None = None):
         resolution = resolve_target(rules.guideline, Context(state))
 
-        provenance = Provenance(
-            model=self.backend.version(),
-            prompt_template=prompt_module.VERSION,
-            corpus=f"{self._corpus_version or rules.guideline.get('version', 'unknown')}@1",
-        )
-
         system = prompt_module.system_prompt()
         user = prompt_module.build_user_prompt(state, rules, site, resolution.target)
 
         # The guard: only generated patients may cross the boundary.
         raw = self.backend.complete(system, user, allow_egress=bool(state.is_synthetic))
+
+        # Provenance is built *after* the answer, never before. A backend may
+        # fall back to a different model when one is rate-limited, and an alias
+        # resolves to a concrete snapshot only in the response. Pinning ahead of
+        # the call records what we intended to ask, which is not what happened.
+        provenance = Provenance(
+            model=self.backend.version(),
+            prompt_template=prompt_module.VERSION,
+            corpus=f"{self._corpus_version or rules.guideline.get('version', 'unknown')}@1",
+        )
 
         parsed = extract_json(raw)
         return to_proposal(parsed, provenance)

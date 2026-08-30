@@ -117,9 +117,15 @@ class AnthropicBackend:
     thinking: bool = True
     effort: str | None = None
     _client: Any = field(default=None, repr=False)
+    _answered_by: str | None = field(default=None, init=False, repr=False)
 
     def version(self) -> str:
-        return self.model
+        """The provenance pin: `model@served_by`. See HostedChatBackend.version.
+
+        Bare slug before the first call, so a proposal can never be assembled
+        with a placeholder pin — the gate's provenance check rejects it.
+        """
+        return self._answered_by or self.model
 
     def _get_client(self):
         if self._client is not None:
@@ -168,6 +174,11 @@ class AnthropicBackend:
             details = getattr(response, "stop_details", None)
             category = getattr(details, "category", None)
             raise ModelRefusal(f"the model declined this request (category: {category})")
+
+        # Pin to the model the API says answered. With an alias like
+        # `claude-opus-5` the response resolves it to the concrete snapshot,
+        # which is the thing worth recording.
+        self._answered_by = f"{getattr(response, 'model', None) or self.model}@anthropic"
 
         # With thinking enabled the response carries thinking blocks first, so
         # take the text block rather than the first block.

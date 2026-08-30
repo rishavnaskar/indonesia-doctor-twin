@@ -19,9 +19,10 @@ from __future__ import annotations
 import json
 import os
 import ssl
+import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -30,7 +31,30 @@ MODELS_URL = "https://openrouter.ai/api/v1/models"
 # bill. Free models are weaker and rate-limited; that is a feature for this
 # demo rather than a problem, because it exercises the strict parser and the
 # gate rather than flattering them.
-DEFAULT_MODEL = "google/gemma-4-31b-it:free"
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+
+# Free tiers are shared pools. A model is not "broken" when it returns 429 —
+# it is busy, and the pool is shared with everyone else on the internet. A
+# single hard-coded model therefore makes the whole prototype unrunnable at
+# random times of day, which is a property of our configuration and not of the
+# system under test. A chain degrades instead: try the next one, and record
+# which one actually answered.
+#
+# These are candidates, not commitments. `--list-free` still queries live,
+# because availability moves and a stale slug fails at demo time with a
+# confusing 404.
+DEFAULT_FALLBACKS: tuple[str, ...] = (
+    "minimax/minimax-m3:free",
+    "dots-studio/dots-3-note-preview:free",
+    "google/gemma-4-31b-it:free",
+    "openrouter/free",
+)
+
+# 429 from a shared pool usually clears in seconds. Two attempts, then move on;
+# sitting in a long backoff loop against a saturated provider is slower than
+# trying a different one.
+RETRIES_PER_MODEL = 2
+BACKOFF_S = 2.0
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -59,18 +83,64 @@ class BackendError(RuntimeError):
     pass
 
 
+class RateLimited(BackendError):
+    """The pool is busy. Distinct from a broken request, because the response
+    to it is different: wait or move, rather than fix."""
+
+
+class TruncatedResponse(BackendError):
+    """The model ran out of output budget mid-answer.
+
+    Named separately because the failure it otherwise produces — half a JSON
+    object reaching the parser — reads as "the model cannot follow the
+    contract" when the real cause is our token budget. Misattributing a config
+    bug to model quality is exactly the kind of wrong conclusion this
+    prototype exists to avoid.
+    """
+
+
 @dataclass
 class HostedChatBackend:
     model: str = DEFAULT_MODEL
+    fallbacks: tuple[str, ...] = DEFAULT_FALLBACKS
     base_url: str = DEFAULT_BASE_URL
     api_key_env: str = "OPENROUTER_API_KEY"
     timeout_s: float = 90.0
-    max_tokens: int = 2000
+    # Reasoning models spend this budget on thinking before they write a word,
+    # and that spend counts here. Measured: a follow-up draft burned ~1,900
+    # tokens reasoning, so a 2,000 budget left ~80 for the answer and truncated
+    # every longer case. Output tokens are free on this tier; a budget too
+    # small is not.
+    max_tokens: int = 8000
     temperature: float = 0.0
     json_mode: bool = True
 
+    # The model that actually answered and who served it, both as reported by
+    # the API — not what we asked for. Populated on every successful call.
+    _answered_by: str | None = field(default=None, init=False, repr=False)
+
     def version(self) -> str:
-        return self.model
+        """The provenance pin: `model@served_by`.
+
+        Two facts, because both matter for reproducing a clinical decision.
+        The slug says which weights; the upstream provider says whose serving
+        stack ran them, and the same slug on two providers can differ in
+        quantisation, sampling defaults and context handling.
+
+        Before any call this returns the bare slug, with no `@`. That is
+        deliberate: the gate's provenance check then rejects any proposal
+        assembled without a real answer behind it, rather than accepting a
+        placeholder that looks like a pin.
+        """
+        return self._answered_by or self.model
+
+    @property
+    def chain(self) -> list[str]:
+        seen: list[str] = []
+        for name in (self.model, *self.fallbacks):
+            if name not in seen:
+                seen.append(name)
+        return seen
 
     def complete(self, system: str, user: str, *, allow_egress: bool) -> str:
         if not allow_egress:
@@ -86,16 +156,78 @@ class HostedChatBackend:
                 "or export it."
             )
 
-        body = self._post(system, user, api_key, json_mode=self.json_mode)
+        busy: list[str] = []
+        for model in self.chain:
+            try:
+                body = self._call_model(model, system, user, api_key)
+            except RateLimited:
+                busy.append(model)
+                continue
+            served_by = body.get("provider") or "unknown-provider"
+            self._answered_by = f"{body.get('model') or model}@{served_by}"
+            return self._content(body)
 
+        raise RateLimited(
+            "every model in the chain is rate-limited upstream "
+            f"({', '.join(busy)}). These are shared free pools, so this is "
+            "load, not a bad key. Run `make free` to see what is answering "
+            "now and pass --model, or retry in a minute."
+        )
+
+    def _call_model(self, model: str, system: str, user: str, api_key: str) -> dict:
+        for attempt in range(RETRIES_PER_MODEL):
+            try:
+                return self._post(model, system, user, api_key, json_mode=self.json_mode)
+            except RateLimited as exc:
+                if attempt + 1 >= RETRIES_PER_MODEL:
+                    raise
+                time.sleep(getattr(exc, "retry_after", None) or BACKOFF_S * (attempt + 1))
+        raise AssertionError("unreachable")
+
+    def _content(self, body: dict) -> str:
+        """Pull the assistant text out, and refuse an empty one.
+
+        Some reasoning models return `content: null` and put everything in a
+        `reasoning` field. Returning that null downstream produces a parser
+        crash three layers away from the cause, so it is caught here and named.
+        """
         try:
-            return body["choices"][0]["message"]["content"]
+            message = body["choices"][0]["message"]
         except (KeyError, IndexError, TypeError) as exc:
             raise BackendError(f"unexpected response shape: {json.dumps(body)[:300]}") from exc
 
-    def _post(self, system: str, user: str, api_key: str, *, json_mode: bool) -> dict:
+        if body["choices"][0].get("finish_reason") == "length":
+            details = (body.get("usage") or {}).get("completion_tokens_details") or {}
+            spent = details.get("reasoning_tokens", "?")
+            raise TruncatedResponse(
+                f"{body.get('model', self.model)} hit the {self.max_tokens}-token "
+                f"output budget mid-answer ({spent} of it went to reasoning). "
+                "This is our budget, not the model failing the contract — raise "
+                "max_tokens rather than reading it as a parse failure."
+            )
+
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content
+
+        reasoning = message.get("reasoning")
+        if isinstance(reasoning, str) and reasoning.strip():
+            # Not silently accepted as an answer: it is the model thinking, not
+            # the model answering. Handed to the strict parser, which will
+            # reject it unless it genuinely contains the contract.
+            return reasoning
+
+        raise BackendError(
+            f"{body.get('model', self.model)} returned an empty message "
+            f"(finish_reason={body['choices'][0].get('finish_reason')!r}). "
+            "Nothing to parse."
+        )
+
+    def _post(
+        self, model: str, system: str, user: str, api_key: str, *, json_mode: bool
+    ) -> dict:
         payload = {
-            "model": self.model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -123,15 +255,40 @@ class HostedChatBackend:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:400]
+            if exc.code == 429:
+                limited = RateLimited(f"{model}: {_reason(detail)}")
+                limited.retry_after = _retry_after(exc)  # type: ignore[attr-defined]
+                raise limited from exc
             # Many free models do not implement response_format and reject the
             # whole request over it. Retry once without, then lean on the strict
             # parser — which is there precisely because JSON mode is a
             # convenience and never a guarantee.
             if json_mode and exc.code == 400 and "response_format" in detail:
-                return self._post(system, user, api_key, json_mode=False)
-            raise BackendError(f"HTTP {exc.code}: {detail}") from exc
+                return self._post(model, system, user, api_key, json_mode=False)
+            raise BackendError(f"HTTP {exc.code} from {model}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise BackendError(f"network error: {exc.reason}") from exc
+
+
+def _retry_after(exc: urllib.error.HTTPError) -> float | None:
+    try:
+        return float(exc.headers.get("Retry-After"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _reason(detail: str) -> str:
+    """Dig the human-readable half out of a nested provider error."""
+    try:
+        error = json.loads(detail).get("error") or {}
+    except (json.JSONDecodeError, AttributeError):
+        return detail[:120]
+    meta = error.get("metadata") or {}
+    provider = meta.get("provider_name")
+    raw = meta.get("raw")
+    if isinstance(raw, str) and raw:
+        return f"{raw[:150]}"
+    return f"{error.get('message', 'rate limited')}" + (f" ({provider})" if provider else "")
 
 
 def list_free_models(timeout_s: float = 25.0) -> list[dict]:
