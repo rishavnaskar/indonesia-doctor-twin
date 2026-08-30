@@ -75,6 +75,33 @@ request is built. `is_synthetic` defaults to `False`: real-until-proven-
 otherwise is the safe direction for that particular flag. There is a test that a
 hand-built state cannot be exported by accident.
 
+## Demoing it
+
+```bash
+make surface                      # the clinician surface, localhost
+make page                         # one self-contained file you can send
+python -m tools.demo --live       # drive the same scenarios with a real model
+```
+
+Two views, and the toggle between them is the whole argument. **What the
+clinician sees** is the consultation surface: on a green visit, no alert at all.
+**What the system did** is every check that ran, every finding with its rule id
+and citation, the three provenance pins, and the signature record.
+
+The page is generated from a real run and nothing on it is written by hand.
+There is a test for that, and a test that it reaches nothing outside itself — a
+demo that phones out to a CDN while the document argues for data residency is an
+own goal in front of exactly the audience that will notice.
+
+`make surface` rebuilds on every reload, so editing a pack file and refreshing
+shows the verdict move. That is the fastest way to demonstrate that the rules
+are data rather than code.
+
+**Known gap:** gate findings render in English while the clinician-facing
+headlines are in the deployment language. The band labels and headlines come
+from the pack; the individual rule messages do not yet. For a review audience
+that is convenient, and for a real clinic it is wrong.
+
 ## What exists today
 
 The deterministic core, end to end, on synthetic patients:
@@ -102,7 +129,8 @@ The deterministic core, end to end, on synthetic patients:
 | Model-backed reasoner behind the router | Working — needs an API key |
 | Residency guard: only synthetic records may leave | Working |
 | Medication reconciliation (SPEC §5.3) | Not started |
-| Clinician presentation layer — the traffic light (SPEC §5.8) | Not started |
+| Clinician presentation layer — the traffic light (SPEC §5.8) | Working |
+| Demo surface — clinician view and audit view, from a real run | Working |
 | Between-visit follow-up loop (SPEC §5.11) | Not started |
 | Plan-concordance metric (SPEC §8.2) | Not started |
 | Capability evidence view — `evidence_ref` is empty at all three sites | Not started |
@@ -207,14 +235,11 @@ Indonesian physicians. The scorecard prints this caveat on every run.
    round trip. Resolves assumption A1 properly.
 2. Parse the formulary decree into the pack and have a pharmacist verify 200
    rows. Resolves A4.
-3. Close the five SPEC gaps in the table above. Reconciliation first: its
+3. Close the remaining SPEC gaps in the table above. Reconciliation first: its
    deterministic half needs no model, and it is the one that changes what a
    clinician sees rather than what the system knows.
-4. Split the gate's "orderable test" contract from follow-up instructions. A
-   model asked for a plan puts "repeat BP in 2 weeks" where check 9 reads
-   orderable tests, so a routine follow-up converts to a referral. Fail-closed,
-   so it is safe — but it is a nuisance that would erode a clinician's trust in
-   the gate, and the fix is a contract change, not a loosened check.
+4. Translate rule messages through the pack, so a finding reads in the
+   deployment language rather than English.
 5. Get the clinical lead to answer the nine open questions in SPEC-V1 §10 —
    three BP targets are blocking whole patient subgroups today, and the system
    correctly abstains on all of them until then.

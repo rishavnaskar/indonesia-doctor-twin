@@ -1,4 +1,4 @@
-.PHONY: install test score checks pressure demo live free prompt all e2e clean
+.PHONY: install test score checks pressure demo live free prompt surface page all e2e clean
 
 PY := ./.venv/bin/python
 
@@ -39,6 +39,16 @@ clean:
 
 demo:
 	$(PY) -m tools.walkthrough
+
+# The clinician surface. Localhost only, rebuilt on every reload — so editing a
+# pack file and refreshing shows the rules moving, which is the fastest way to
+# demonstrate that they are data rather than code.
+surface:
+	$(PY) -m tools.demo
+
+# One self-contained file, for the people who will not clone a repository.
+page:
+	$(PY) -m tools.demo --export demo.html
 
 live:
 	$(PY) -m tools.live --n 5
