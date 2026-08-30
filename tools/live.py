@@ -61,6 +61,10 @@ def main() -> int:
     parser.add_argument("--no-fallback", action="store_true",
                         help="do not fall back to another free model when one is "
                              "rate-limited; fail loudly instead")
+    parser.add_argument("--samples", type=int, default=1,
+                        help="draft this many times and use the agreement between "
+                             "them as the confidence, instead of the model's own "
+                             "opinion of itself (costs one call per sample)")
     parser.add_argument("--site", default="SITE-A")
     parser.add_argument("--show-prompt", action="store_true")
     args = parser.parse_args()
@@ -91,7 +95,8 @@ def main() -> int:
         # nothing was named.
         if args.no_fallback or args.model:
             kwargs["fallbacks"] = ()
-    router = router_with_model(args.model, provider=args.provider, **kwargs)
+    router = router_with_model(args.model, provider=args.provider,
+                               samples=args.samples, **kwargs)
     backend = router.get("model").backend
     queue = OutboundQueue()
     now = datetime(2026, 8, 29, 10, 0)

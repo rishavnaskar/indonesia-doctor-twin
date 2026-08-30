@@ -111,6 +111,12 @@ class Proposal:
     follow_up_interval_days: int | None = None
     uncertainty_notes: str = ""
 
+    # Fraction of independent samples that produced this exact plan, when the
+    # drafter was sampled more than once. None means it was drafted once and
+    # the question was never asked — which is different from "they disagreed",
+    # and the two must not be conflated by anything reading this.
+    agreement: float | None = None
+
     def citations(self) -> set[str]:
         found = {a.citation for a in self.assertions}
         found |= {c.citation for c in self.medication_changes}

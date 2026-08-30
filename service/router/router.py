@@ -74,7 +74,10 @@ def build_backend(provider: str = "anthropic", model: str | None = None, **kwarg
 
 
 def router_with_model(
-    model: str | None = None, provider: str = "anthropic", **backend_kwargs
+    model: str | None = None,
+    provider: str = "anthropic",
+    samples: int = 1,
+    **backend_kwargs,
 ) -> Router:
     """A router whose default backend is a real model.
 
@@ -82,9 +85,18 @@ def router_with_model(
     and the scorecard run against, because a test suite that costs money per run
     and varies between runs is neither a test suite nor a suite.
     """
-    from service.reason.model_reasoner import register
+    from service.reason.model_reasoner import ModelReasoner
 
     router = default_router()
-    register(router, build_backend(provider, model, **backend_kwargs))
+    reasoner = ModelReasoner(build_backend(provider, model, **backend_kwargs))
+
+    if samples > 1:
+        # Wraps the reasoner and keeps its signature, so nothing downstream —
+        # the gate least of all — knows the difference.
+        from service.reason.consistency import SelfConsistentReasoner
+
+        reasoner = SelfConsistentReasoner(reasoner, samples=samples)
+
+    router.register("model", reasoner)
     router.default = "model"
     return router

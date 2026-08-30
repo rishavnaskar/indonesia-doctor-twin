@@ -59,6 +59,16 @@ class Concordance:
     source: str = "unknown"
     circular: bool = True
 
+    # Split by whether the drafter's own samples agreed, when it was sampled
+    # more than once. This is the only way to find out whether self-consistency
+    # earns its cost: if unstable drafts are no likelier to be wrong than stable
+    # ones, then abstaining on instability buys nothing and should be dropped.
+    stable_matched: int = 0
+    stable_differed: int = 0
+    unstable_matched: int = 0
+    unstable_differed: int = 0
+    unstable_abstained: int = 0
+
     @property
     def compared(self) -> int:
         """Only visits where a draft actually reached the clinician."""
@@ -72,6 +82,16 @@ class Concordance:
     def abstention_rate(self) -> float:
         total = self.compared + self.abstained
         return 100.0 * self.abstained / total if total else 0.0
+
+    @property
+    def measured_stability(self) -> bool:
+        return bool(self.stable_matched or self.stable_differed
+                    or self.unstable_matched or self.unstable_differed
+                    or self.unstable_abstained)
+
+    def _rate(self, matched: int, differed: int) -> float | None:
+        total = matched + differed
+        return 100.0 * matched / total if total else None
 
 
 def load_cases(path: Path) -> list[Case]:
@@ -123,16 +143,31 @@ def score(cases: list[Case], rules=None, router=None, source: str = "unknown",
         decision = run_gate(
             GateContext(state=state, proposal=proposal, rules=rules, site=site)
         )
+        stable = proposal.agreement is None or proposal.agreement >= 1.0
+
         if not decision.rendered:
             result.abstained += 1
+            if not stable:
+                result.unstable_abstained += 1
             continue
 
         ours = proposal.recommendation.value
-        if ours == case.adjudicated:
+        matched = ours == case.adjudicated
+        if matched:
             result.matched += 1
         else:
             result.differed += 1
             result.disagreements.append((case.adjudicated, ours))
+
+        if proposal.agreement is not None:
+            if stable and matched:
+                result.stable_matched += 1
+            elif stable:
+                result.stable_differed += 1
+            elif matched:
+                result.unstable_matched += 1
+            else:
+                result.unstable_differed += 1
 
     return result
 
@@ -152,6 +187,29 @@ def report(result: Concordance) -> str:
         f"({result.abstention_rate:.1f}% of in-scope visits)",
         f"  Out of this pathway          {result.out_of_scope}",
     ]
+
+    if result.measured_stability:
+        stable = result._rate(result.stable_matched, result.stable_differed)
+        unstable = result._rate(result.unstable_matched, result.unstable_differed)
+        lines.append("")
+        lines.append("  Does instability predict error? (self-consistency's whole case)")
+        lines.append(
+            f"    samples agreed      {result.stable_matched + result.stable_differed:>3} drafts"
+            + (f"   {stable:.1f}% concordant" if stable is not None else "   —")
+        )
+        lines.append(
+            f"    samples disagreed   {result.unstable_matched + result.unstable_differed:>3} drafts"
+            + (f"   {unstable:.1f}% concordant" if unstable is not None else "   —")
+        )
+        lines.append(
+            f"    disagreed, abstained {result.unstable_abstained:>2} drafts   "
+            "(never reached a doctor)"
+        )
+        if stable is not None and unstable is not None and unstable >= stable:
+            lines.append("")
+            lines.append("    On this run instability did NOT predict error. Self-consistency")
+            lines.append("    is costing abstentions and buying nothing measurable. That is a")
+            lines.append("    reason to drop it, not to keep it because it sounds rigorous.")
 
     if result.disagreements:
         tally: dict[tuple[str, str], int] = {}
