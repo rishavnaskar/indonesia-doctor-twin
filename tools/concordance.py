@@ -79,8 +79,9 @@ def main() -> int:
         path = Path(args.cases)
         if not path.exists():
             print(f"\n  No such case file: {path}")
-            print("  Set C does not exist yet — there is no client, no hospital and no")
-            print("  lawful basis to touch a real record. The loader is ready for it.\n")
+            print("  Set C is 300 real visits, blind-scored by Indonesian physicians.")
+            print("  Obtaining it is a clinical and legal exercise; scoring it is this")
+            print("  command. Point --cases at the file when it exists.\n")
             return 2
         cases = load_cases(path)
         circular, source = False, f"{path} ({len(cases)} adjudicated visits)"

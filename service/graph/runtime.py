@@ -17,9 +17,10 @@ workflow engine is four verbs, declared here:
 (enforced in tools/ci_checks.py). Everything else depends on this interface, so
 swapping engines is one module's work rather than a rewrite.
 
-The in-memory implementation below is deliberate, not a placeholder to be
-embarrassed about: it makes the interrupt semantics testable today, with no
-service running, and it is the reference the real backend must match.
+The in-memory implementation below is the reference the durable backend must
+match. It makes the interrupt semantics testable with no service running, which
+is what a conformance suite for a persistent checkpointer needs to exist
+against.
 
 Data residency, restated because it is a compliance landmine rather than a
 preference: self-hosted only. No hosted control plane, no SaaS tracing backend.

@@ -206,7 +206,9 @@ Six phases. Each ends with something demonstrable.
 - Synthea forked and re-weighted for Indonesia, writing patients into Khanza's schema.
 - Repo, CI, secrets handling.
 
-**Done when:** you can open Khanza, search a patient, and see a plausible Indonesian history with three prior visits.
+**Done when:** you can open Khanza, search a patient, and see a plausible Indonesian history with three prior visits — and a no-op panel has been added to the outpatient consultation form with the round trip timed. That last item is the one that matters: it is what resolves assumption A1.
+
+**Why Khanza is the first adapter.** It dominates the small-hospital segment, it is open source, it is recognised by the accreditation commission, and its repository already contains a bridging package doing integrations of exactly this shape — so the pattern is not novel to that codebase, it is how the codebase already works. Having the source is what makes A1 answerable for most of the estate, and therefore what lets the safety net live inside the consultation form rather than on a second screen. A sequencing advantage, not an architectural commitment: the port in `adapters/base.py` is the commitment, and the fifty-first hospital on a different system needs a new adapter rather than a new product.
 
 ### Phase 1 — The spine (weeks 2–3)
 One encounter travels the whole path with a deliberately stupid model. Hard-code the clinical logic if you have to. The point is the plumbing.

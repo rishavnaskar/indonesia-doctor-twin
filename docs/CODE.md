@@ -91,8 +91,8 @@ make page                         # one self-contained file you can send
 python -m tools.demo --live       # drive the same scenarios with a real model
 ```
 
-There are two pages. `/` is the scripted scenarios — a record of a run, six
-cases chosen so that four of them refuse. `/clinic` is interactive: generate
+There are two pages. `/` is the scripted scenarios — a record of a run across
+both pathways, chosen so that a majority of them refuse. `/clinic` is interactive: generate
 patients, edit anything about them, paste in a record, then run the clinician
 and watch the verdict move. Both drive the identical pipeline; a demo whose
 interactive mode took a different path through the system would be

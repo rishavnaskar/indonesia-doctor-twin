@@ -97,10 +97,10 @@ class Concordance:
 def load_cases(path: Path) -> list[Case]:
     """Read adjudicated cases from disk. The Set C loader.
 
-    The file does not exist yet and that is the honest state of things: there is
-    no client, no hospital and no lawful basis to touch a real record. The
-    loader exists so that the day 300 adjudicated visits arrive, nothing has to
-    be built to score them.
+    Set C is 300 real visits, blind-scored by Indonesian physicians, and it is
+    the only evidence in this project that would count. Obtaining it is a
+    clinical and legal exercise, not an engineering one. The loader and the
+    metric are finished so that scoring it is a command rather than a project.
     """
     raw = json.loads(path.read_text(encoding="utf-8"))
     return [

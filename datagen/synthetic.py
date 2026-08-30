@@ -1,9 +1,9 @@
 """Synthetic patients.
 
-The pipes are real; the patients are not. We have no client, no hospital and no
-lawful basis to touch a real record, so every patient here is generated. Being
-loud about which parts are fake is the whole discipline — the hospital system,
-the formulary, the guideline rules and the interoperability path are all real.
+The pipes are real; the patients are not. Synthetic data is the only lawful
+basis this system runs on, so every patient here is generated — and being loud
+about which parts are fabricated is the discipline. The formulary, the guideline
+rules, the site capability registry and the interoperability path are all real.
 
 Seeded and deterministic: the same seed gives the same cohort, so a scorecard
 regression is a real change and never a reshuffle.

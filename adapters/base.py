@@ -5,11 +5,12 @@ which one it is talking to, we have built a product for that vendor instead of
 a clinical platform — and the fifty-first hospital, on a different system, then
 needs a new product rather than a new adapter.
 
-So: reads and the in-form panel go through this interface. The first concrete
-adapter targets the open-source system that dominates the small-hospital
-segment, which is why it was chosen — we have the source, so the safety net can
-live inside the consultation form rather than on a second screen. That is a
-sequencing advantage, not an architectural commitment.
+So: reads, the in-form panel and the between-visit channel all go through this
+interface, and nothing above it may name a vendor.
+
+Which system to write the first adapter against is a sequencing decision, not an
+architectural one, and it is made in docs/BUILD.md Phase 0 alongside the rest of
+the integration plan. This module is the whole of the architectural commitment.
 """
 
 from __future__ import annotations
