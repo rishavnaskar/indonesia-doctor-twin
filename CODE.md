@@ -193,15 +193,41 @@ Getting an answer took three runs and one corrected mistake.
   | samples agreed | 19 | **100%** |
   | samples disagreed | 10 | **70%** |
 
-  All three errors in the run were in the unstable group. As an error detector,
-  instability had 100% recall at 30% precision on this set: abstaining on it
-  removes every error at the cost of seven unnecessary abstentions.
+  All three errors in the run were in the unstable group.
 
-That trade is the one this system is built to take — a wrong draft costs more
-than no draft, in a setting where the reviewing doctor may have nobody to ask.
-Caveats stay attached: n=30, three errors, self-labelled cases, and the
-cross-run comparison is noisy. The within-run split is the sound part, because
-it is the same cases and the same model.
+- **Replicated on 30 different patients** (`--seed 2000`): stable 23 drafts,
+  100% concordant; unstable 6 drafts, 83.3%. The single error was again
+  unstable.
+
+Pooled over both runs — 58 drafts, 4 errors:
+
+| | drafts | errors |
+|---|---|---|
+| samples agreed | 42 | **0** |
+| samples disagreed | 16 | **4** |
+
+Every error was unstable; no stable draft was wrong. As a detector, instability
+had **100% recall at 25% precision**. If instability were unrelated to error,
+the chance of all four landing in the unstable group is **p = 0.0043**, so this
+is not noise.
+
+```bash
+python -m tools.concordance --n 30 --live --samples 3 --shadow            # run 1
+python -m tools.concordance --n 30 --seed 2000 --live --samples 3 --shadow # run 2
+```
+
+That trade is the one this system is built to take: abstaining on instability
+removes every error at the cost of twelve unnecessary abstentions, and a wrong
+draft costs more than no draft where the reviewing doctor may have nobody to
+ask.
+
+**What this does not show.** The labels come from the reference reasoner, so
+what is demonstrated is that instability predicts *divergence from our own rule
+engine* — not that it predicts clinical error. Those coincide only to the extent
+the rule engine is right, which is the question Set C exists to answer and this
+cannot. For the same reason self-consistency stays **off by default**: the
+evidence is real but it is not the kind of evidence that should change a default
+which triples the API calls. Re-run it on Set C before promoting it.
 
 ## What exists today
 
