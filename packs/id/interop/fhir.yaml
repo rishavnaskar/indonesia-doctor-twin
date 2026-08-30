@@ -27,12 +27,30 @@ systems:
   practitioner: "http://sys-ids.kemkes.go.id/practitioner"
   patient: "http://sys-ids.kemkes.go.id/patient"
 
-# Only the observations this pathway actually emits.
+# The observations any pathway in this pack may emit.
+#
+# `display` is deliberately absent. The official validator rejects a display
+# that is not the code's registered name — we had "Glomerular filtration rate"
+# against LOINC 62238-1, whose real name is far longer — and a wrong display is
+# worse than none, because a reader believes it. FHIR permits omitting it.
+#
+# `vital_sign: true` marks the codes the FHIR vital-signs profiles govern; those
+# require Observation.category to carry the vital-signs slice.
 observation_codes:
-  sbp:  {loinc: "8480-6",  display: "Systolic blood pressure",  unit: "mm[Hg]"}
-  dbp:  {loinc: "8462-4",  display: "Diastolic blood pressure", unit: "mm[Hg]"}
-  k:    {loinc: "2823-3",  display: "Potassium [Moles/volume] in Serum or Plasma", unit: "mmol/L"}
-  egfr: {loinc: "62238-1", display: "Glomerular filtration rate", unit: "mL/min/{1.73_m2}"}
+  sbp:   {loinc: "8480-6",  unit: "mm[Hg]",           vital_sign: true}
+  dbp:   {loinc: "8462-4",  unit: "mm[Hg]",           vital_sign: true}
+  k:     {loinc: "2823-3",  unit: "mmol/L"}
+  egfr:  {loinc: "62238-1", unit: "mL/min/{1.73_m2}"}
+  hba1c: {loinc: "4548-4",  unit: "%"}
+
+# A systolic or diastolic code on its own triggers the FHIR blood-pressure
+# profile, which requires the panel code with both readings as components. Two
+# separate Observations is not a legal representation of a blood pressure, and
+# the validator says so in six separate errors.
+blood_pressure_panel:
+  loinc: "85354-9"
+  systolic: sbp
+  diastolic: dbp
 
 encounter:
   class_code: "AMB"

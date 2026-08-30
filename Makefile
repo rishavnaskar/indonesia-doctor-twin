@@ -24,6 +24,11 @@ pressure:
 concordance:
 	$(PY) -m tools.concordance
 
+# The official HL7 validator, over the bundles this system emits.
+# Needs FHIR_VALIDATOR_JAR; the tool prints the one-line download if unset.
+fhir:
+	$(PY) -m tools.validate_fhir
+
 # What CI runs. A bad commit fails here. Never calls a model: a test suite that
 # costs money per run and varies between runs is neither a test suite nor a
 # suite.

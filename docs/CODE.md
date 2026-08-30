@@ -274,7 +274,7 @@ The deterministic core, end to end, on synthetic patients:
 | Encounter workflow — the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
-| FHIR R4 bundle construction | Working — builds, does not transmit |
+| FHIR R4 bundle construction | Working — validates clean against the official HL7 R4 validator; builds, does not transmit |
 | Offline-first outbound queue, idempotent, file-backed | Working |
 | Referral-back draft — the payer's own 3B criteria | Working |
 | Synthetic cohort — both pathways, 19 profiles, 19 planted-error mutations | Working |
@@ -398,6 +398,36 @@ clinical.** Sets A and B are generated from the same guideline the gate checks
 against, so a high score is close to tautological. The number that means
 something comes from Set C — real retrospective visits, blind-scored by
 Indonesian physicians. The scorecard prints this caveat on every run.
+
+## Conformance
+
+```bash
+make fhir     # the official HL7 validator over the emitted bundles
+```
+
+The validator is a ~190 MB Java distribution, so it is neither vendored nor a
+dependency; `make fhir` prints the one-line download if `FHIR_VALIDATOR_JAR` is
+unset. Four bundles — both pathways, controlled and uncontrolled, three
+different sites — validate with **0 errors** against FHIR R4.
+
+There is also a hand-written conformance test that runs in CI with no download.
+It is worth having and it is not a substitute: the real validator found nine
+errors it had missed, including one the hand-written test had *introduced*.
+Approximating a specification is not the same as checking against it. What it
+caught:
+
+- every `fullUrl` read `urn:uuid:ENC-1`, which is not a UUID
+- fixing that broke bundle reference resolution, because internal references
+  must use the urn once `fullUrl` is one
+- two codes carried a `display` that was not the code's registered name
+- a blood pressure was emitted as two Observations, when the FHIR blood-pressure
+  profile requires one panel with two components — six errors from one mistake
+- `Observation.category` was missing the vital-signs slice the profile requires
+- the generator produced `E11.65`, which is ICD-10-CM (US) and does not exist in
+  the WHO ICD-10 that Indonesia codes against
+
+Remaining warnings are best-practice recommendations — narrative text, UCUM
+annotations — not conformance failures.
 
 ## What is left, and none of it is code
 

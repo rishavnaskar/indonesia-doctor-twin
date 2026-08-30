@@ -105,7 +105,7 @@ def make_diabetic(seed: int, *, controlled: bool | None = None,
     age = rng.randint(28, 64)
     flags: dict[str, bool] = {"has_dm": True}
     symptoms: dict[str, bool] = {}
-    diagnoses = [Diagnosis(code=rng.choice(["E11.9", "E11.65"]),
+    diagnoses = [Diagnosis(code=rng.choice(["E11.9", "E11.6", "E11.8"]),
                            onset=TODAY - timedelta(days=rng.randint(300, 5000)))]
     allergies: list[Allergy] = []
 
