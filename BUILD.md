@@ -258,6 +258,8 @@ One complete patient journey, not all thirty features. Pick the vertical slice t
 
 Pathway: **adult hypertension follow-up, alone.** `revised v5` An earlier draft paired it with type 2 diabetes; that is one pathway too many for a first build. Hypertension on its own is protocol-dense, longitudinal, exercises the patient-state layer, and proves the whole architecture without diagnostic entropy. T2DM is V2; combined cardiometabolic management is V3. Fully specified in **[SPEC-V1.md](SPEC-V1.md)**.
 
+> **The prototype now carries a second pathway anyway, and that is not a change of mind.** Type 2 diabetes was added to the code as an *architecture test* — to find out whether "the engine is pathway-agnostic" was true, since a claim nobody has tested is a claim. It was not true: the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, and the claim coder produced no primary diagnosis for the second disease. All three are fixed. The pathway has no clinical sign-off, no evaluation set and no adjudicated cases, so **the V1 build order above is unchanged: hypertension alone, done properly.**
+
 **Done when:** you can walk a synthetic patient from waiting room to signed, coded, submitted encounter.
 
 ### Phase 5 — Eval harness (weeks 7–8)

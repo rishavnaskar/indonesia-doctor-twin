@@ -9,7 +9,7 @@ Short answer: **yes.** The brief asks for 60–70% of what a doctor *does* — a
 ## If you have fifteen minutes
 
 ```bash
-make install && make all      # architecture rules, 223 tests, scorecard, pressure suite  (~1 min)
+make install && make all      # architecture rules, tests, scorecard, pressure suite  (~1 min)
 make surface                  # the clinician surface — open /clinic from the header link
 ```
 
@@ -32,6 +32,7 @@ If you have four, read **[DECISION.md](DECISION.md)** and stop.
 | **[RESEARCH.md](RESEARCH.md)** | Reference. Every claim, source, assumption and correction. Scan it; don't read it end to end. | ~55 min |
 | **[BUILD.md](BUILD.md)** | How do we actually build the prototype — stack, order, team, eval bars. | ~15 min |
 | **[SPEC-V1.md](SPEC-V1.md)** | The build order for engineers: one pathway, fully specified. Adult hypertension follow-up. | ~12 min |
+| **[DEMO.md](DEMO.md)** | A running order for a walkthrough — what to show, in what order, and what not to skip. | ~3 min |
 | **[CODE.md](CODE.md)** | The prototype: what is built, how to run it, what the scorecard does and does not prove. | ~4 min |
 
 **Start with DECISION.md.** RESEARCH and BUILD exist so that every number in it can be traced or attacked. **SPEC-V1 is where the work actually starts** — it is the one pathway an engineering team builds first.
