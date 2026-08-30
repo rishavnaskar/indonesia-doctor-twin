@@ -111,6 +111,11 @@ class Interviewer:
 
     def skip(self) -> Turn:
         """Only permitted where the pack marks a question optional."""
+        if self._index >= len(self._questions):
+            # Skipping a finished interview is not an error, it is a no-op.
+            # Indexing past the end raised IndexError instead — a crash in the
+            # one surface that takes input from a patient.
+            return Turn(kind=TurnKind.CLOSING, text=self._closing)
         question = self._questions[self._index]
         if not question.get("optional"):
             return Turn(kind=TurnKind.DEFLECTION, text=self._deflection,
@@ -124,17 +129,38 @@ class Interviewer:
     # ------------------------------------------------------------ validation
 
     def _valid(self, question: dict, value: Any) -> bool:
+        """Whether this is an answer to this question. Anything else deflects.
+
+        Every branch must tolerate any input at all. This is the one surface a
+        patient types into, so an unexpected shape has to become a deflection
+        rather than an exception: `value in allowed` raised TypeError on a list
+        or a dict, because a set membership test needs a hashable, and that
+        crashed the interviewer rather than declining to answer.
+        """
         kind = question.get("type")
         allowed = {o["value"] for o in question.get("options") or []}
 
         if kind == "choice":
-            return value in allowed
+            try:
+                return value in allowed
+            except TypeError:
+                return False
         if kind == "multi_choice":
-            return (
-                isinstance(value, (list, tuple, set))
-                and len(value) > 0
-                and set(value) <= allowed
-            )
+            if not isinstance(value, (list, tuple, set)):
+                return False
+            try:
+                chosen = set(value)
+            except TypeError:
+                return False
+            if not chosen or not chosen <= allowed:
+                return False
+            # "None of these" alongside a specific symptom is contradictory.
+            # Accepting it and dropping one silently would resolve a conflict
+            # in the patient's own answer, which is exactly what this system
+            # refuses to do with a medication list.
+            if "none" in chosen and len(chosen) > 1:
+                return False
+            return True
         if kind == "numeric_pair":
             bounds = question.get("range") or {}
             low, high = bounds.get("min", 0), bounds.get("max", 10**6)

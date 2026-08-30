@@ -14,8 +14,26 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 from dataclasses import dataclass
 from typing import Any
+
+# A fixed namespace so the same resource id always yields the same urn. The
+# bundle is replayed after a connectivity gap, and a fullUrl that changed
+# between attempts would make two submissions of one encounter look like two
+# encounters.
+_URN_NAMESPACE = uuid.UUID("6f2a5d3e-9c41-4b7a-8e2d-1f0c5a7b9d34")
+
+
+def _urn(resource_id: str) -> str:
+    """`urn:uuid:` requires an actual UUID after the prefix.
+
+    Every entry used to read `urn:uuid:ENC-1`, which is not one — a server
+    validating the bundle rejects the whole transaction, and the failure is at
+    submission time rather than anywhere we would have seen it. Derived rather
+    than random so replay stays idempotent.
+    """
+    return f"urn:uuid:{uuid.uuid5(_URN_NAMESPACE, resource_id)}"
 
 
 @dataclass(frozen=True)
@@ -50,7 +68,13 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
                 "resourceType": "Encounter",
                 "id": encounter_id,
                 "status": encounter_cfg.get("status", "finished"),
+                # Encounter.class is a Coding bound to ActEncounterCode, and
+                # Condition.clinicalStatus to condition-clinical. Both bindings
+                # are *required* in R4, so a code without its system is not a
+                # code — a validating server rejects it.
                 "class": {
+                    "system": encounter_cfg.get(
+                        "class_system", "http://terminology.hl7.org/CodeSystem/v3-ActCode"),
                     "code": encounter_cfg.get("class_code", "AMB"),
                     "display": encounter_cfg.get("class_display", "ambulatory"),
                 },
@@ -73,7 +97,10 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
                 {
                     "resourceType": "Condition",
                     "id": f"{encounter_id}-cond-{index}",
-                    "clinicalStatus": {"coding": [{"code": "active"}]},
+                    "clinicalStatus": {"coding": [{
+                        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                        "code": "active",
+                    }]},
                     "code": {
                         "coding": [
                             {
@@ -173,7 +200,7 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
 
 def _entry(resource_type: str, resource: dict[str, Any]) -> dict[str, Any]:
     return {
-        "fullUrl": f"urn:uuid:{resource['id']}",
+        "fullUrl": _urn(str(resource["id"])),
         "resource": resource,
         "request": {"method": "PUT", "url": f"{resource_type}/{resource['id']}"},
     }
