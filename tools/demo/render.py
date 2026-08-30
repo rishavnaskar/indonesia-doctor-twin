@@ -340,6 +340,22 @@ function clinicianView(e){
   return out;
 }
 
+function discrepancyBlock(e){
+  if (!e.discrepancies || !e.discrepancies.length) return "";
+  return `<div class="card"><h2>What the record and the patient disagree about</h2>
+    <div class="note" style="margin:0 0 10px">Surfaced, never resolved. Both sources are
+      routinely wrong in different ways — a record goes stale the moment a patient buys
+      something at a pharmacy, and a patient misremembers a dose. Picking a winner would be
+      guessing about what someone is currently swallowing.</div>
+    ${e.discrepancies.map(d=>`<div class="finding ${d.material?"":"warn"}">
+      <div class="m">${esc(d.text)}</div>
+      ${d.record_says||d.patient_says?`<div class="src">Record: ${esc(d.record_says||"—")}
+        &nbsp;·&nbsp; Patient: ${esc(d.patient_says||"—")}</div>`:""}
+      ${d.interacts_with.length?`<div class="src">Interacts with what they already take:
+        ${d.interacts_with.map(esc).join(", ")}</div>`:""}
+    </div>`).join("")}</div>`;
+}
+
 function auditView(e){
   const p = e.patient;
   if (e.error) {
@@ -383,6 +399,7 @@ function auditView(e){
       <h2>What the checks found</h2>
       ${findings}
     </div>
+    ${discrepancyBlock(e)}
     <div class="card">
       <h2>What this hospital can actually do</h2>
       <table>

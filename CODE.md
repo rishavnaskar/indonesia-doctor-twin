@@ -169,7 +169,7 @@ The deterministic core, end to end, on synthetic patients:
 | Pressure suite — 6 patterns x 5 turns, with a control | Working |
 | Model-backed reasoner behind the router | Working — needs an API key |
 | Residency guard: only synthetic records may leave | Working |
-| Medication reconciliation (SPEC §5.3) | Not started |
+| Medication reconciliation (SPEC §5.3) | Deterministic half working; free-text drug matching still needs a model |
 | Clinician presentation layer — the traffic light (SPEC §5.8) | Working |
 | Demo surface — clinician view and audit view, from a real run | Working |
 | Between-visit follow-up loop (SPEC §5.11) | Not started |

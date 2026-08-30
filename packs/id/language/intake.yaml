@@ -124,3 +124,55 @@ presentation:
     abstain: "The system produced no draft for this visit"
     warnings: "Draft available, with notes"
     clean: "Draft available"
+
+# SPEC-V1 §5.3 — what an intake answer means for reconciliation.
+#
+# The interviewer collects; it does not interpret. This block is the
+# interpretation, and it lives in the pack because "a painkiller" implicating
+# the NSAID class is a clinical and national judgement, not an engine one.
+#
+# Nothing here resolves a discrepancy. Each entry only says what to *tell the
+# clinician*, and which drug class to consider alongside what the record already
+# holds. A patient saying they stopped a drug never removes it from the record.
+reconciliation:
+  outside_medication:
+    painkiller:
+      kind: outside_prescription
+      implicates_class: nsaid
+      text: "Patient reports taking a painkiller obtained outside this hospital."
+      gloss: "Patient reports taking a painkiller obtained outside this hospital."
+    herbal:
+      kind: outside_prescription
+      text: "Patient reports taking jamu or a herbal preparation. Contents unknown."
+      gloss: "Patient reports taking jamu or a herbal preparation. Contents unknown."
+    other:
+      kind: outside_prescription
+      text: "Patient reports another medicine from outside this hospital."
+      gloss: "Patient reports another medicine from outside this hospital."
+  adherence:
+    stopped:
+      kind: stopped_medication
+      material: true
+      text: "Patient reports having stopped their blood-pressure medication."
+      gloss: "Patient reports having stopped their blood-pressure medication."
+    sometimes:
+      kind: adherence_gap
+      material: true
+      text: "Patient reports taking their medication only sometimes."
+      gloss: "Patient reports taking their medication only sometimes."
+    mostly:
+      kind: adherence_gap
+      text: "Patient reports missing doses on some days."
+      gloss: "Patient reports missing doses on some days."
+  # Phrasing for discrepancies the engine derives by comparison rather than
+  # from an answer.
+  derived:
+    dose_differs:
+      text: "The dose the patient describes does not match the record."
+      gloss: "The dose the patient describes does not match the record."
+    not_in_record:
+      text: "The patient reports a medicine that is not on their record."
+      gloss: "The patient reports a medicine that is not on their record."
+    missing_from_report:
+      text: "The record lists a medicine the patient did not mention."
+      gloss: "The record lists a medicine the patient did not mention."

@@ -251,6 +251,7 @@ def _failed(scenario, rules, exc: Exception) -> dict:
             "lines": [], "audit": [],
         },
         "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
+        "discrepancies": [],
         "findings": [],
         "proposal": None,
         "claim": None,
@@ -289,6 +290,7 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
         result.outcome.value, labels,
         decision=result.decision,
         questions=tuple(result.questions_for_clinician),
+        discrepancies=tuple(result.reconciliation.discrepancies),
     )
 
     signature = None
@@ -327,7 +329,16 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
         "checks": [
             {
                 **entry,
-                "findings": [f.rule_id or f.check_name
+                "discrepancies": [
+            {
+                "kind": d.kind, "text": d.text, "gloss": d.gloss,
+                "molecule": d.molecule, "record_says": d.record_says,
+                "patient_says": d.patient_says,
+                "interacts_with": list(d.interacts_with), "material": d.material,
+            }
+            for d in result.reconciliation.discrepancies
+        ],
+        "findings": [f.rule_id or f.check_name
                              for f in (result.decision.findings if result.decision else [])
                              if f.check == entry["number"]],
                 "blocked": any(
@@ -336,6 +347,15 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
                 ),
             }
             for entry in check_catalogue()
+        ],
+        "discrepancies": [
+            {
+                "kind": d.kind, "text": d.text, "gloss": d.gloss,
+                "molecule": d.molecule, "record_says": d.record_says,
+                "patient_says": d.patient_says,
+                "interacts_with": list(d.interacts_with), "material": d.material,
+            }
+            for d in result.reconciliation.discrepancies
         ],
         "findings": [
             {

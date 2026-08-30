@@ -223,6 +223,12 @@ function verdict(p){
       ${d.medication_changes.map(c=>`<div class="plain">${esc(c.action)} ${esc(c.molecule)} ${c.mg_per_dose}mg ×${c.doses_per_day}</div>`).join("")}
       ${r.claim?`<div class="plain">Coded: ${r.claim.codes.map(c=>esc(c.code)).join(", ")}</div>`:""}` : ""}
     ${findings ? `<div class="sec">Why the gate stopped it</div>${findings}` : ""}
+    ${(r.discrepancies||[]).length ? `<div class="sec">Record vs what the patient says</div>
+      ${r.discrepancies.map(d=>`<div class="find ${d.material?"":"warn"}">${esc(d.text)}
+        ${d.record_says||d.patient_says?`<div class="src">Record: ${esc(d.record_says||"—")}
+          · Patient: ${esc(d.patient_says||"—")}</div>`:""}
+        ${d.interacts_with.length?`<div class="src">Interacts with ${d.interacts_with.map(esc).join(", ")}</div>`:""}
+      </div>`).join("")}` : ""}
     ${auditPanel(r)}
   </div>`;
 }

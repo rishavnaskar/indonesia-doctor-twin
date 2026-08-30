@@ -128,6 +128,7 @@ def present(
     *,
     decision: GateDecision | None = None,
     questions: tuple[str, ...] = (),
+    discrepancies: tuple = (),
 ) -> Presentation:
     """Decide what the clinician sees. Pure, and deterministic.
 
@@ -139,6 +140,18 @@ def present(
     blocking = [f for f in findings if f.severity is Severity.BLOCK]
     warnings = [f for f in findings if f.severity is Severity.WARN]
     audit = _lines(findings)
+
+    # A material reconciliation discrepancy is not a gate finding — nothing is
+    # wrong with the draft. It is a disagreement about what the patient is
+    # actually taking, and it is amber for the same reason a warning is: the
+    # clinician can act on it, and nobody else in the room can.
+    material = tuple(
+        Line(text=d.text + (
+            f" Interacts with {', '.join(d.interacts_with)}." if d.interacts_with else ""
+        ))
+        for d in discrepancies if getattr(d, "material", False)
+    )
+    audit = audit + tuple(Line(text=d.text) for d in discrepancies)
 
     # A red flag is not a suggestion and is not suppressible. It is the one
     # case where the system interrupts a clinician who has not asked.
@@ -206,12 +219,12 @@ def present(
             audit=audit,
         )
 
-    if warnings:
+    if warnings or material:
         return Presentation(
             band=Band.AMBER,
             headline=labels.headline("warnings"),
             gloss=labels.gloss("warnings"),
-            lines=_lines(warnings),
+            lines=_lines(warnings) + material,
             shows_draft=True,
             audit=audit,
         )

@@ -31,6 +31,7 @@ from service.emit.referral_back import ReferralBackAssessment, assess as assess_
 from service.gate import GateContext, GateDecision, run_gate
 from service.rules.eligibility import check_eligibility
 from service.rules.predicates import Context
+from service.reconcile.engine import Reconciliation, reconcile
 from service.signing import AuditLog, Signer, sign
 from service.state.derive import derive_flags
 
@@ -52,6 +53,11 @@ class EncounterResult:
     decision: GateDecision | None = None
     questions_for_clinician: list[str] = field(default_factory=list)
     claim: ClaimDraft | None = None
+    # What the record and the patient disagree about. Carried on every outcome,
+    # including the refusals: a patient who says they stopped their medication
+    # is the most useful thing the visit produced, and it must not be lost
+    # because the gate declined to draft.
+    reconciliation: Reconciliation = field(default_factory=Reconciliation)
     referral_back: ReferralBackAssessment | None = None
     bundle: Bundle | None = None
     trail: list[str] = field(default_factory=list)
@@ -98,6 +104,20 @@ def run_encounter(
 
     runtime.start(thread_id, state)
 
+    # Reconciliation is computed here, before the eligibility branch, even
+    # though RECONCILE is a later step in the pathway. It needs only the state,
+    # the rules and the interview, all of which exist by now, and computing it
+    # early is the difference between carrying a discrepancy to a handed-off
+    # patient and dropping it.
+    #
+    # That matters because of how this actually runs: the patient answers the
+    # bounded interview in the waiting room, so "I stopped taking my tablets"
+    # is already on file by the time we discover they are out of scope for this
+    # pathway. Losing it there would discard the single most useful thing the
+    # visit produced, in exchange for nothing. The trail still records RECONCILE
+    # at its proper place.
+    reconciliation = reconcile(state, rules, intake)
+
     # ---- ELIGIBLE: structured checks only, no model, zero tokens ----------
     at("ELIGIBLE")
     derive_flags(state, rules)
@@ -109,6 +129,7 @@ def run_encounter(
             outcome=Outcome.HANDOFF,
             message=eligibility.handoff_message(),
             questions_for_clinician=_patient_questions(intake),
+            reconciliation=reconciliation,
             trail=trail + ["HANDOFF"],
         )
 
@@ -128,9 +149,9 @@ def run_encounter(
     trail.append("INTAKE")
 
     # ---- RECONCILE ---------------------------------------------------------
-    # Still a placeholder: matching free-text drug mentions to molecules needs a
-    # model. The state exists so nothing downstream changes when it is filled
-    # in, and discrepancies must be surfaced rather than silently resolved.
+    # The deterministic half: what the record says against what the patient
+    # says. Neither is overwritten. Matching free text like "the little white
+    # one" to a molecule still needs a model and is not done here.
     at("RECONCILE")
     trail.append("RECONCILE")
     runtime.checkpoint(thread_id, "reconciled", state)
@@ -157,6 +178,7 @@ def run_encounter(
             proposal=proposal,
             decision=gate_decision,
             questions_for_clinician=_patient_questions(intake),
+            reconciliation=reconciliation,
             trail=trail + [outcome.value.upper()],
         )
 
@@ -169,6 +191,7 @@ def run_encounter(
             message="Awaiting a clinician decision.",
             proposal=proposal,
             decision=gate_decision,
+            reconciliation=reconciliation,
             trail=trail,
         )
 
@@ -190,6 +213,7 @@ def run_encounter(
             message="Clinician rejected the draft. Nothing emitted.",
             proposal=proposal,
             decision=gate_decision,
+            reconciliation=reconciliation,
             trail=trail,
         )
 
@@ -223,6 +247,7 @@ def run_encounter(
         claim=claim,
         referral_back=referral,
         bundle=bundle,
+        reconciliation=reconciliation,
         questions_for_clinician=_patient_questions(intake),
         trail=trail,
     )
