@@ -79,6 +79,10 @@ main { padding:22px 26px; max-width:960px; }
 .outcome.green{background:var(--green-bg);color:var(--green)}
 .outcome.amber{background:var(--amber-bg);color:var(--amber)}
 .outcome.red{background:var(--red-bg);color:var(--red)}
+.outcome.fail{background:var(--code);color:var(--muted)}
+.err { border:1px solid var(--line); border-left:3px solid var(--amber); border-radius:8px;
+  padding:14px 16px; margin-bottom:14px; background:var(--panel); }
+.err b { display:block; margin-bottom:5px; }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
   padding:16px 18px; margin-bottom:14px; }
 .card > h2 { margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.07em;
@@ -179,10 +183,14 @@ function meta(){
           so a change in behaviour is a real change rather than the model having a different day.
           The AI model plugs into the same interface and nothing downstream moves.
           Run <span class="mono">make surface-live</span> to see it drafted by an actual model.`);
+  const fails = DATA.drafter_failures || 0;
   document.getElementById("stat").innerHTML =
     `<b>${DATA.declined} of the ${DATA.total} visits below ended with no recommendation reaching the doctor.</b>
      That is the system working, not failing. Every refusal names its own reason, and you can read
-     all of them under &ldquo;What the system did&rdquo;.`;
+     all of them under &ldquo;What the system did&rdquo;.` +
+    (fails ? ` <b>A further ${fails} could not be drafted at all</b> — the model returned something
+      unusable. That is a model failure, not a clinical one, and it is counted separately because
+      the two mean different things.` : "");
 }
 
 function nav(){
@@ -306,6 +314,14 @@ function draftCard(e){
 function clinicianView(e){
   const p = e.presentation;
   let out = `<p class="watch">${esc(e.watch_for)}</p>`;
+  if (e.error) {
+    return out + `<div class="err"><b>The drafter failed on this visit.</b>
+      <span class="mono">${esc(e.error)}</span>
+      <div class="plain" style="margin-top:8px">Nothing reached the safety checks and nothing
+      reached the doctor. The consultation continues exactly as it would without the system.
+      A weak model producing unusable output is a normal event, and containing it to one visit
+      rather than one outage is the behaviour worth showing.</div></div>`;
+  }
   if (p.silent && p.shows_draft) {
     out += `<div class="empty"><b>No alert.</b>
       Nothing here was worth interrupting the doctor for, so the system says nothing —
@@ -325,6 +341,13 @@ function clinicianView(e){
 
 function auditView(e){
   const p = e.patient;
+  if (e.error) {
+    return `<div class="err"><b>No draft was produced, so the safety checks never ran.</b>
+      <span class="mono">${esc(e.error)}</span>
+      <div class="plain" style="margin-top:8px">The failure is recorded against this visit and
+      goes no further. The nine checks sit after the draft, so there was nothing for them to
+      check.</div></div>`;
+  }
   const steps = (G.path_steps)||{};
   const checks = e.checks.map(c=>`<div class="chk ${c.findings.length?"hit":"ok"}">
       <div class="mark">${c.findings.length?"✕":"✓"}</div>
@@ -387,7 +410,7 @@ function draw(){
     `<div class="hd">${esc(e.title)}</div>
      <div class="sub">${esc(e.note)}</div>
      <div style="margin-bottom:14px">
-       <span class="outcome ${e.presentation.band}">${esc(e.outcome.replace(/_/g," "))}</span>
+       <span class="outcome ${e.error?"fail":e.presentation.band}">${esc(e.outcome.replace(/_/g," "))}</span>
        <div class="plain" style="margin-top:6px">${esc(e.outcome_plain)}</div>
      </div>
      ${patientCard(e)}

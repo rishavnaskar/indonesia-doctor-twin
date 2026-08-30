@@ -67,14 +67,24 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
     target_raw = raw.get("target_used")
     target = None
     if isinstance(target_raw, dict) and target_raw.get("citation"):
-        try:
-            target = Target(
-                sbp_lt=float(target_raw["sbp_lt"]),
-                dbp_lt=float(target_raw["dbp_lt"]),
-                citation=str(target_raw["citation"]),
-            )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ProposalParseError(f"bad target_used: {exc}") from exc
+        # A model that does not know the target reports nulls here. That is not
+        # malformed output, it is the model saying so — and it is gate check 2's
+        # decision to make, not the parser's. Check 2 blocks a proposal with no
+        # target and says why in a sentence a clinician can read; a crash here
+        # would take that verdict away and replace it with a stack trace.
+        #
+        # A non-null value that is not a number is different: that IS malformed,
+        # and it still raises.
+        sbp_raw, dbp_raw = target_raw.get("sbp_lt"), target_raw.get("dbp_lt")
+        if sbp_raw is not None and dbp_raw is not None:
+            try:
+                target = Target(
+                    sbp_lt=float(sbp_raw),
+                    dbp_lt=float(dbp_raw),
+                    citation=str(target_raw["citation"]),
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ProposalParseError(f"bad target_used: {exc}") from exc
 
     changes: list[MedicationChange] = []
     for row in raw.get("medication_changes") or []:

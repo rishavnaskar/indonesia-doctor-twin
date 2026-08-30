@@ -185,3 +185,44 @@ def test_the_backend_refuses_egress_before_it_reads_the_key(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "should-never-be-used")
     with pytest.raises(ResidencyError):
         HostedChatBackend().complete("s", "u", allow_egress=False)
+
+
+def test_a_target_with_no_numbers_parses_to_none_for_the_gate_to_judge():
+    """Observed live: a model returned target_used with a citation but null
+    numbers, and the parser crashed on float(None) — taking the whole page with
+    it. A target with no numbers is not a target, and whether that is
+    acceptable is gate check 2's decision, not the parser's."""
+    from service.contracts.proposal import Provenance
+    from service.reason.parse import to_proposal
+
+    provenance = Provenance(model="m@1", prompt_template="p@1", corpus="c@1")
+    proposal = to_proposal(
+        {
+            "assessment": "uncontrolled",
+            "recommendation": "titrate_up",
+            "confidence": 0.8,
+            "target_used": {"sbp_lt": None, "dbp_lt": None, "citation": "some-source"},
+        },
+        provenance,
+    )
+    assert proposal.target_used is None
+
+
+def test_a_target_with_junk_numbers_is_still_a_parse_error():
+    """A null is the model saying it has no target. A string is malformed
+    output, and that distinction is worth keeping."""
+    import pytest as _pytest
+
+    from service.contracts.proposal import Provenance
+    from service.reason.parse import ProposalParseError, to_proposal
+
+    with _pytest.raises(ProposalParseError, match="bad target_used"):
+        to_proposal(
+            {
+                "assessment": "uncontrolled",
+                "recommendation": "titrate_up",
+                "confidence": 0.8,
+                "target_used": {"sbp_lt": "abc", "dbp_lt": 90, "citation": "some-source"},
+            },
+            Provenance(model="m@1", prompt_template="p@1", corpus="c@1"),
+        )

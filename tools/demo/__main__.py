@@ -63,11 +63,16 @@ def main() -> int:
                 body = _build(args).encode("utf-8")
             except Exception as exc:  # noqa: BLE001 - a broken pack should be visible
                 body = f"<pre>{type(exc).__name__}: {exc}</pre>".encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                # The browser gave up while we were building the page — likely
+                # a reload during a slow live run. Nothing to report.
+                pass
 
         def log_message(self, *a):  # quiet
             pass

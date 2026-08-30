@@ -206,6 +206,38 @@ def _proposal(proposal, rules) -> dict | None:
     }
 
 
+def _failed(scenario, rules, exc: Exception) -> dict:
+    """An encounter the drafter could not complete. Not a clinical outcome."""
+    return {
+        "key": scenario.key,
+        "title": scenario.title,
+        "note": scenario.note,
+        "watch_for": scenario.watch_for,
+        "patient": _patient(scenario.state, scenario.site, rules),
+        "outcome": "drafter_failed",
+        "outcome_plain": (
+            "The drafter could not produce a usable proposal, so nothing reached "
+            "the safety checks and nothing reached the doctor. This is a failure "
+            "of the model, not of the patient's care — the doctor proceeds as "
+            "they would without the system."
+        ),
+        "committed": False,
+        "error": f"{type(exc).__name__}: {exc}",
+        "trail": ["ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE"],
+        "presentation": {
+            "band": "green", "band_label": "", "headline": "", "gloss": "",
+            "silent": True, "shows_draft": False, "requires_acknowledgement": False,
+            "lines": [], "audit": [],
+        },
+        "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
+        "findings": [],
+        "proposal": None,
+        "claim": None,
+        "signature": None,
+        "questions": [],
+    }
+
+
 def _encounter(scenario, rules, labels, router) -> dict:
     audit_log = AuditLog()
     practitioner = scenario.site["practitioners"][0]["practitioner_id"]
@@ -225,6 +257,14 @@ def _encounter(scenario, rules, labels, router) -> dict:
             signer=Signer(practitioner, True),
             audit=audit_log, now=NOW,
         )
+    except Exception as exc:  # noqa: BLE001
+        # A model that returns unparseable output, refuses, gets rate-limited or
+        # runs out of token budget is a normal event when the drafter is a weak
+        # free model — and it is exactly the event this architecture is meant to
+        # survive. It belongs on the page as one failed encounter, never as a
+        # dead page: a demo that dies on the first bad JSON is a worse advert
+        # than a demo that shows the failure being contained.
+        return _failed(scenario, rules, exc)
     finally:
         router.propose = original  # type: ignore[method-assign]
 
@@ -341,6 +381,9 @@ def collect(pack_id: str = "id", router=None) -> dict:
         "glossary": rules.glossary,
         "checks": check_catalogue(),
         "encounters": encounters,
-        "declined": sum(1 for e in encounters if not e["committed"]),
+        "declined": sum(
+            1 for e in encounters if not e["committed"] and not e.get("error")
+        ),
+        "drafter_failures": sum(1 for e in encounters if e.get("error")),
         "total": len(encounters),
     }
