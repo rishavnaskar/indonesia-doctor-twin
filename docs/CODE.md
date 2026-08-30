@@ -393,9 +393,9 @@ for any of it.
    subgroups until they exist. Nothing here is clinically active while
    `review.status` reads `awaiting_clinical_signoff`.
 2. **Set C** — 300 real visits, physician-adjudicated. Every number this
-   repository produces is caveated on it, the loader is written, and the file
-   does not exist because there is no client, no hospital and no lawful basis
-   to touch a real record.
+   repository produces is caveated on it. The loader and the metric are
+   finished, so scoring it is a command; obtaining it is a clinical and legal
+   exercise.
 3. **The real hospital system**, standing up from its own migrations against a
    seeded database, to time the panel round trip and resolve assumption A1
    properly. One engineer, two days, per the assumption register.
