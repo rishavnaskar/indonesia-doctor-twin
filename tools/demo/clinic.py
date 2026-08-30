@@ -213,7 +213,9 @@ function verdict(p){
   if (r.error) return `<div class="verdict"><span class="pill fail">drafter failed</span>
     <div class="plain" style="margin-top:6px"><span class="mono">${esc(r.error)}</span></div></div>`;
   const findings = r.findings.map(f=>`<div class="find ${f.severity}">
-      <div class="src">Check ${f.check} · ${esc(f.rule_id||"")}</div>${esc(f.message)}</div>`).join("");
+      <div class="src">Check ${f.check} · ${esc(f.rule_id||"")}</div>
+      ${esc(f.message_local || f.message)}
+      ${f.message_local?`<div class="src" style="font-style:italic">${esc(f.message)}</div>`:""}</div>`).join("");
   const d = r.proposal;
   return `<div class="verdict">
     <span class="pill ${r.presentation.band}">${esc(r.outcome.replace(/_/g," "))}</span>

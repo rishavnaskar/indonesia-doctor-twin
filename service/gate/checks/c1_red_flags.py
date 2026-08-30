@@ -42,6 +42,7 @@ def run(ctx: GateContext) -> list[Finding]:
                     check_name=NAME,
                     severity=Severity.BLOCK,
                     message=rule["message"],
+                    message_local=rule.get("message_local", ""),
                     rule_id=rule["id"],
                     citation=rule.get("citation"),
                 )

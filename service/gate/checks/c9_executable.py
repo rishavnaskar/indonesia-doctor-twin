@@ -22,6 +22,7 @@ from __future__ import annotations
 from datetime import date
 
 from service.contracts.proposal import ChangeAction
+from service.gate.messages import localise
 from service.gate.types import Finding, GateContext, Severity
 
 NUMBER = 9
@@ -75,6 +76,8 @@ def run(ctx: GateContext) -> list[Finding]:
                         f"{change.molecule} is not stocked at {site_id} "
                         f"(stock list as of {as_of}). This is a referral, not a prescription."
                     ),
+                    message_local=localise(ctx.rules, "not_stocked",
+                                          molecule=change.molecule, site_id=site_id),
                     rule_id="not_stocked",
                     converts_to_referral=True,
                 )
@@ -145,6 +148,8 @@ def run(ctx: GateContext) -> list[Finding]:
                         f"at {site_id} (capability as of {as_of}). "
                         "This is a referral, not an order."
                     ),
+                    message_local=localise(ctx.rules, "test_unavailable",
+                                          label=catalogue[investigation], site_id=site_id),
                     rule_id="test_unavailable",
                     converts_to_referral=True,
                 )

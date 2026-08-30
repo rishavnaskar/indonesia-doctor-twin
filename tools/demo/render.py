@@ -271,7 +271,8 @@ function patientCard(e){
 function bandBlock(e){
   const p = e.presentation;
   const lines = p.lines.length ? `<ul>${p.lines.map(l=>
-    `<li>${esc(l.text)}${l.rule_id?` <span class="src mono">[rule ${esc(l.rule_id)}]</span>`:""}</li>`).join("")}</ul>` : "";
+    `<li>${esc(l.text)}${l.rule_id?` <span class="src mono">[rule ${esc(l.rule_id)}]</span>`:""}
+       ${l.gloss?`<div class="gloss">${esc(l.gloss)}</div>`:""}</li>`).join("")}</ul>` : "";
   const ack = p.requires_acknowledgement ? (acked[e.key]
       ? `<button class="act" disabled>Acknowledged — the doctor may now proceed</button>`
       : `<button class="act" data-ack="${esc(e.key)}">Saya mengerti &nbsp;/&nbsp; I understand</button>`) : "";
@@ -376,7 +377,8 @@ function auditView(e){
       <div class="src">Check ${f.check} — ${esc(f.check_name.replace(/_/g," "))}
         &middot; rule <span class="mono">${esc(f.rule_id||"")}</span>
         ${f.converts_to_referral?" &middot; means: send the patient elsewhere":""}</div>
-      <div class="m">${esc(f.message)}</div>
+      <div class="m">${esc(f.message_local || f.message)}</div>
+      ${f.message_local?`<div class="gloss">${esc(f.message)}</div>`:""}
       ${f.citation?`<div class="src">Source: ${esc(f.citation)}</div>`:""}
     </div>`).join("") : `<div class="plain">No check raised anything.</div>`;
 

@@ -35,6 +35,10 @@ class Finding:
     message: str
     rule_id: str | None = None
     citation: str | None = None
+    # The same finding in the deployment language, when the pack supplies one.
+    # Empty means untranslated, which is a pack gap rather than an engine one —
+    # and a visible one, because the surface shows what it has.
+    message_local: str = ""
     # Gate check 9: a plan that cannot be delivered here is not a bad plan,
     # it is a referral. The distinction changes what the clinician is shown.
     converts_to_referral: bool = False

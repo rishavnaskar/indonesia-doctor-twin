@@ -149,6 +149,7 @@ red_flags:
             - {symptom: altered_consciousness}
     message: "Hypertensive emergency. Immediate clinician alert. No draft produced."
     citation: "inash_2024#emergency"
+    message_local: "Kondisi darurat hipertensi. Segera beri tahu dokter. Tidak ada draf yang dibuat."
 
   - id: R2
     label: "Hypertensive urgency"
@@ -168,6 +169,7 @@ red_flags:
             - {symptom: altered_consciousness}
     message: "Hypertensive urgency. Clinician must acknowledge before proceeding."
     citation: "inash_2024#urgency"
+    message_local: "Tekanan darah sangat tinggi. Dokter harus memeriksa sebelum melanjutkan."
 
   - id: R3
     label: "Over-treatment"
@@ -181,6 +183,7 @@ red_flags:
             - {symptom: symptomatic_hypotension}
     message: "Over-treatment. Draft a reduction; never draft an increase."
     citation: "inash_2024#hypotension"
+    message_local: "Kehamilan dengan tekanan darah tinggi. Keluar dari alur ini."
 
   - id: R4
     label: "New cardiovascular or neurological symptom"
@@ -193,6 +196,7 @@ red_flags:
         - {symptom: focal_neurological_deficit}
     message: "New chest pain, syncope or focal neurological symptom. Route out of the pathway."
     citation: "inash_2024#redflags"
+    message_local: "Nyeri dada, pingsan, atau gejala saraf baru. Keluar dari alur ini."
 
   - id: R5
     label: "Renal function fall"
@@ -202,6 +206,7 @@ red_flags:
       relative_fall: {code: egfr, fraction: 0.30}
     message: "eGFR has fallen more than 30% from baseline. ACEi/ARB review required."
     citation: "inash_2024#renal"
+    message_local: "Tekanan darah turun terlalu rendah. Tinjau ulang obatnya."
 
   - id: R6
     label: "Hyperkalaemia"
@@ -210,6 +215,7 @@ red_flags:
     predicate: {obs: k, op: ">", value: 5.5}
     message: "Potassium above 5.5 mmol/L. Blocks any ACEi, ARB or MRA action."
     citation: "inash_2024#electrolytes"
+    message_local: "Kalium darah terlalu tinggi. Jangan tambah atau naikkan obat golongan RAAS."
 
   - id: R7
     label: "Newly positive pregnancy"
@@ -218,6 +224,7 @@ red_flags:
     predicate: {flag: pregnancy_positive}
     message: "Pregnancy. ACE inhibitors and ARBs must stop immediately."
     citation: "inash_2024#pregnancy"
+    message_local: "Fungsi ginjal menurun tajam. Perlu tinjauan dokter."
 
 # ---------------------------------------------------------------- exclusions
 # SPEC-V1 §1. Routing rules, not "not yet". Evaluated before any model call, on
@@ -392,3 +399,22 @@ between_visits:
     grace_days: 10
     message: "Chronic medication was not collected on schedule."
     gloss: "Chronic medication was not collected on schedule."
+
+# Wording for findings the engine composes from numbers it worked out, rather
+# than from a sentence written here. The check supplies the placeholders.
+#
+# A rule id absent from this block is untranslated, and the surface shows it in
+# the language the engine composed. That is a visible gap rather than a silent
+# English fallback nobody notices for a year.
+#
+# Clinical wording is awaiting_clinical_signoff like everything else in this
+# pack: it was written by an engineer, not a clinician, and a clinician must
+# read it before a patient's doctor does.
+messages:
+  dose_per_dose: "{molecule}: dosis {mg:g} mg sekali minum melebihi batas {max_mg:g} mg."
+  dose_daily: "{molecule}: total {mg:g} mg per hari melebihi batas {max_mg:g} mg."
+  not_stocked: "{molecule} tidak tersedia di {site_id}. Ini rujukan, bukan resep."
+  test_unavailable: "{label} tidak tersedia di {site_id}. Ini rujukan, bukan permintaan pemeriksaan."
+  insufficient_data: "Data belum cukup untuk memberi saran. Diperlukan: {needed}."
+  no_target_defined: "Tidak ada target yang ditetapkan untuk kelompok pasien ini ({group})."
+  below_floor: "Tingkat keyakinan {confidence:.2f} di bawah ambang {floor:.2f}. Sistem tidak membuat draf."

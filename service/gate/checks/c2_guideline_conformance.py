@@ -9,6 +9,7 @@ correct output is silence, and this check enforces it.
 
 from __future__ import annotations
 
+from service.gate.messages import localise
 from service.gate.types import Finding, GateContext, Severity
 from service.rules.predicates import Context
 from service.rules.targets import resolve_target
@@ -46,6 +47,7 @@ def run(ctx: GateContext) -> list[Finding]:
                     f"({group}). {resolution.reason} The system abstains rather "
                     "than applying the general adult target."
                 ),
+                message_local=localise(ctx.rules, "no_target_defined", group=group),
                 rule_id="no_target_defined",
             )
         )

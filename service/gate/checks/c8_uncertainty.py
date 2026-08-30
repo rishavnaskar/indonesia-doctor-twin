@@ -14,6 +14,7 @@ own opinion of itself, the gate has already failed.
 from __future__ import annotations
 
 from service.gate.types import Finding, GateContext, Severity
+from service.gate.messages import localise
 
 NUMBER = 8
 NAME = "uncertainty"
@@ -62,6 +63,8 @@ def run(ctx: GateContext) -> list[Finding]:
                     f"Confidence {float(confidence):.2f} is below the abstention floor "
                     f"of {float(floor):.2f}. Escalating rather than drafting."
                 ),
+                message_local=localise(ctx.rules, "below_floor",
+                                        confidence=float(confidence), floor=float(floor)),
                 rule_id="below_floor",
             )
         ]

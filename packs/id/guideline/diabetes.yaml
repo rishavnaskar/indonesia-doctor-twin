@@ -90,7 +90,9 @@ red_flags:
     message: >
       Markedly elevated HbA1c with osmotic symptoms. Immediate clinician review.
       No draft produced.
+    message_local: "Gula darah sangat tinggi disertai gejala. Perlu pemeriksaan dokter segera."
     citation: "perkeni_2021#red_flags"
+    message_local: "Gula darah sangat tinggi disertai gejala. Perlu pemeriksaan dokter segera."
   - id: D2
     label: "Suspected ketoacidosis"
     predicate:
@@ -98,20 +100,25 @@ red_flags:
     message: >
       Symptoms that may indicate acute metabolic decompensation. Route out of
       the pathway immediately.
+    message_local: "Gejala yang dapat menandakan komplikasi akut. Segera keluar dari alur ini."
     citation: "perkeni_2021#red_flags"
+    message_local: "Gejala yang dapat menandakan komplikasi akut. Segera keluar dari alur ini."
   - id: D3
     label: "Severe or recurrent hypoglycaemia"
     predicate: {symptom: hypoglycaemia}
     message: >
       Hypoglycaemia requires the regimen to be reduced, not escalated. Clinician
       decision, no draft.
+    message_local: "Gula darah terlalu rendah. Obat perlu dikurangi, bukan dinaikkan."
     citation: "perkeni_2021#red_flags"
+    message_local: "Gula darah terlalu rendah. Obat perlu dikurangi, bukan dinaikkan."
   - id: D4
     label: "New focal neurological symptom"
     predicate:
       any_of: [{symptom: focal_neurological_deficit}, {symptom: visual_disturbance}]
     message: "Route out of the pathway."
     citation: "perkeni_2021#red_flags"
+    message_local: "Gejala saraf baru. Keluar dari alur ini."
 
 exclusions:
   - id: DE1

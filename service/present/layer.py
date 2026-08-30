@@ -42,6 +42,12 @@ class Band(str, Enum):
 class Line:
     """One thing the clinician can read, with its provenance attached.
 
+    `text` is the deployment language where the pack supplies one and the
+    engine's English otherwise; `gloss` is the English, for a reviewer who does
+    not read the deployment language. An untranslated finding shows an empty
+    gloss and its English in `text` — a visible gap rather than a silent
+    fallback nobody notices for a year.
+
     `rule_id` and `citation` travel with the text rather than being looked up
     later. A clinician who cannot see why the system said something has no way
     to disagree with it, and a system a clinician cannot disagree with is one
@@ -49,6 +55,7 @@ class Line:
     """
 
     text: str
+    gloss: str = ""
     rule_id: str | None = None
     citation: str | None = None
     check: int | None = None
@@ -117,7 +124,13 @@ _ABSTAIN = "abstain"
 
 def _lines(findings: list[Finding]) -> tuple[Line, ...]:
     return tuple(
-        Line(text=f.message, rule_id=f.rule_id, citation=f.citation, check=f.check)
+        Line(
+            text=f.message_local or f.message,
+            gloss=f.message if f.message_local else "",
+            rule_id=f.rule_id,
+            citation=f.citation,
+            check=f.check,
+        )
         for f in findings
     )
 

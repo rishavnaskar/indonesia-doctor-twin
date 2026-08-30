@@ -138,10 +138,14 @@ and identical every run, so a change in behaviour is a real change rather than
 the model having a different day. `make surface-live` drafts with an actual
 model through the same interface, and nothing downstream moves.
 
-**Known gap:** gate findings render in English while the clinician-facing
-headlines are in the deployment language. The band labels and headlines come
-from the pack; the individual rule messages do not yet. For a review audience
-that is convenient, and for a real clinic it is wrong.
+Findings now render in the deployment language with the English beneath, and
+none of that text lives under `/service` — the same rule that keeps a drug name
+out of the engine, applied to the words a doctor reads. Pack-authored messages
+carry a translation directly; messages the engine composes from numbers it
+worked out use a pack template with placeholders. Every red flag on both
+pathways is translated. A rule with no template shows the engine's English and
+an empty gloss, which is a visible gap rather than a silent fallback nobody
+notices for a year.
 
 ## Making the drafter better
 
@@ -365,8 +369,6 @@ Indonesian physicians. The scorecard prints this caveat on every run.
 3. Close the remaining SPEC gaps in the table above. Reconciliation first: its
    deterministic half needs no model, and it is the one that changes what a
    clinician sees rather than what the system knows.
-4. Translate rule messages through the pack, so a finding reads in the
-   deployment language rather than English.
 5. Get the clinical lead to answer the nine open questions in SPEC-V1 §10 —
    three BP targets are blocking whole patient subgroups today, and the system
    correctly abstains on all of them until then.

@@ -370,6 +370,7 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
                 "check_name": f.check_name,
                 "severity": _plain(f.severity),
                 "message": f.message,
+                "message_local": f.message_local,
                 "rule_id": f.rule_id,
                 "citation": f.citation,
                 "converts_to_referral": f.converts_to_referral,
