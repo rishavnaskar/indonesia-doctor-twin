@@ -361,3 +361,34 @@ referral_back:
     right_drugs:
       all_medications_on_formulary: true
       all_restrictions_satisfied: true
+
+# SPEC-V1 §5.11 — the between-visit loop.
+#
+# A follow-up interval is not a silence. Between visits the state keeps syncing
+# on structured channels, and the escalation rules below are deterministic: the
+# same red flags, applied to readings that arrive from home.
+#
+# The confirmation rule is the important one. A home reading carries more noise
+# than a clinic one — wrong cuff, wrong arm, no rest, a frightened patient — so
+# a single alarming value asks for a repeat before it alerts anyone. Firing a
+# red flag on one unconfirmed reading would train a clinic to ignore the
+# channel within a month.
+between_visits:
+  confirm_before_escalating:
+    sources: [patient_reported]
+    repeat_within_hours: 24
+    instruction_text: >-
+      Tolong istirahat 5 menit, lalu ukur ulang tekanan darah Anda dan
+      masukkan hasilnya.
+    instruction_gloss: >-
+      Please rest for 5 minutes, then measure your blood pressure again and
+      enter the result.
+  # A device reading is trusted directly: it is not subject to technique error
+  # in the same way, and treating it as noisy would waste the one channel with
+  # good provenance.
+  trusted_sources: [device, emr, clinician_entered]
+  refill:
+    expected_every_days: 30
+    grace_days: 10
+    message: "Chronic medication was not collected on schedule."
+    gloss: "Chronic medication was not collected on schedule."

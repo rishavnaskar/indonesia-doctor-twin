@@ -198,3 +198,21 @@ referral_back:
     deterministically checkable.
 
 output_language: "Bahasa Indonesia"
+
+# SPEC-V1 §5.11. Same machinery, different channel: this pathway has no daily
+# home measurement equivalent to a blood pressure, so the loop here is the
+# refill signal and the symptom check-in. Twelve dispensing touchpoints a year
+# against four visits is the point.
+between_visits:
+  confirm_before_escalating:
+    sources: [patient_reported]
+    repeat_within_hours: 24
+    instruction_text: >-
+      Mohon periksa ulang dan masukkan hasilnya.
+    instruction_gloss: "Please check again and enter the result."
+  trusted_sources: [device, emr, clinician_entered]
+  refill:
+    expected_every_days: 30
+    grace_days: 10
+    message: "Chronic medication was not collected on schedule."
+    gloss: "Chronic medication was not collected on schedule."

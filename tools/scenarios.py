@@ -14,9 +14,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from datagen.synthetic import make_patient
+from datetime import timedelta
+
+from datagen.synthetic import TODAY, make_patient
 from service.contracts.proposal import MedicationChange
 from service.state.models import Diagnosis, Medication, Observation, Source
+
+
+def _diabetic(seed: int, *, hba1c: float, mg: float = 500, doses: int = 2,
+              egfr: float = 88, age: int = 52, symptoms: dict | None = None):
+    """A type 2 diabetes follow-up patient.
+
+    Built here rather than in datagen because the generator is hypertension-
+    shaped and generalising it is a separate job from proving the engine takes
+    a second pathway.
+    """
+    state = make_patient(seed, controlled=True)
+    state.age = age
+    state.diagnoses = [Diagnosis(code="E11.9")]
+    state.flags = {"has_dm": True}
+    state.symptoms = symptoms or {}
+    state.observations = [
+        Observation("hba1c", hba1c, "%", TODAY, Source.EMR),
+        Observation("egfr", egfr, "mL/min/1.73m2", TODAY - timedelta(days=20), Source.EMR),
+    ]
+    state.medications = [Medication("metformin", float(mg), doses, Source.EMR)]
+    return state
 
 
 @dataclass
@@ -113,5 +136,34 @@ def build(rules) -> list[Scenario]:
             watch_for="The plan is correct and undeliverable here. That is a "
                       "referral, not a recommendation — and getting this wrong "
                       "is how a tool loses a clinician's trust for good.",
+        ),
+
+        # --- a second disease, through the identical engine -----------------
+        Scenario(
+            "dm_routine", "Diabetes: at target, routine review",
+            "A different disease. Same nine checks, same gate, same signature.",
+            _diabetic(410, hba1c=6.4), site_a,
+            watch_for="Nothing under /service was written for diabetes. The "
+                      "pathway is two pack files; the engine reads whichever one "
+                      "the router picked and does not know there are others.",
+        ),
+        Scenario(
+            "dm_titration", "Diabetes: above target, metformin increased",
+            "The ladder, the formulary limits and the site's stock all apply unchanged.",
+            _diabetic(411, hba1c=8.2, mg=500, doses=2), site_a,
+            watch_for="The target here is a single HbA1c, not a blood pressure. "
+                      "That is what broke the Target contract when this pathway "
+                      "was added — the engine had one disease's measurement "
+                      "baked into its idea of a target.",
+        ),
+        Scenario(
+            "dm_hypo", "Diabetes: patient reports hypoglycaemia",
+            "A red flag belonging to this pathway alone.",
+            _diabetic(412, hba1c=7.4, symptoms={"hypoglycaemia": True}), site_a,
+            watch_for="This is the case that exposed the second leak. Refusal "
+                      "routing matched rule ids against `R<digit>`, so a pack "
+                      "numbering its red flags D1..D4 had them caught correctly "
+                      "and then reported as a quiet abstention instead of "
+                      "alerting anyone. It routes on the check number now.",
         ),
     ]

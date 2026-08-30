@@ -258,7 +258,7 @@ The deterministic core, end to end, on synthetic patients:
 | Medication reconciliation (SPEC §5.3) | Deterministic half working; free-text drug matching still needs a model |
 | Clinician presentation layer — the traffic light (SPEC §5.8) | Working |
 | Demo surface — clinician view and audit view, from a real run | Working |
-| Between-visit follow-up loop (SPEC §5.11) | Not started |
+| Between-visit loop (SPEC §5.11) | Schema, provenance and escalation working; patient-facing channel is V1.5 by design |
 | Plan-concordance metric (SPEC §8.2) | Working — reported, not gated; needs Set C to mean anything |
 | Capability evidence — proof each service was actually delivered | Working |
 | Live transport to the national exchange | Not started — no credentials, sandbox only |

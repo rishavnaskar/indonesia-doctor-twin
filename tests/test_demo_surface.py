@@ -11,9 +11,16 @@ from tools.demo.render import render
 from tools.demo.run import collect
 
 
+def _scenario_count():
+    from service.packs.loader import load_pack
+    from tools import scenarios
+
+    return len(scenarios.build(load_pack("id")))
+
+
 def test_every_scenario_runs_and_is_captured():
     data = collect()
-    assert len(data["encounters"]) == data["total"] == 6
+    assert len(data["encounters"]) == data["total"] == _scenario_count()
     for encounter in data["encounters"]:
         assert encounter["outcome"]
         assert encounter["presentation"]["band"] in ("green", "amber", "red")
@@ -59,7 +66,7 @@ def test_page_embeds_valid_json_and_escapes_it():
     # line after it is edited.
     payload = html.split("const DATA = ", 1)[1].split("\n", 1)[0].rstrip(";")
     data = json.loads(payload.replace("<\\/", "</"))
-    assert data["total"] == 6
+    assert data["total"] == _scenario_count()
 
 
 def test_one_bad_draft_does_not_take_down_the_page():
@@ -80,8 +87,9 @@ def test_one_bad_draft_does_not_take_down_the_page():
             raise ProposalParseError("bad target_used: simulated")
 
     data = collect_run(router=AlwaysFails())
-    assert data["total"] == 6
-    assert data["drafter_failures"] == 6
+    expected = _scenario_count()
+    assert data["total"] == expected
+    assert data["drafter_failures"] == expected
     # A model failure is not a clinical refusal, and conflating them would
     # inflate the one number this page exists to report.
     assert data["declined"] == 0
