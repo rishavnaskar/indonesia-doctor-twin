@@ -23,11 +23,11 @@ from service.rules.targets import resolve_target
 from tools.demo.patients import to_wire
 
 
-def _self_labelled(n: int, rules) -> list[Case]:
+def _self_labelled(n: int, rules, seed0: int = 600) -> list[Case]:
     """Cases labelled by the reference reasoner. Deliberately circular."""
     site = rules.sites["SITE-A"]
     cases: list[Case] = []
-    for seed in range(600, 600 + n):
+    for seed in range(seed0, seed0 + n):
         state = make_patient(seed)
         state.is_synthetic = True
         try:
@@ -43,6 +43,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Plan concordance (SPEC-V1 §8.2).")
     parser.add_argument("--cases", help="adjudicated case file (Set C)")
     parser.add_argument("--n", type=int, default=120)
+    parser.add_argument("--seed", type=int, default=600,
+                        help="first patient seed, so a finding can be replicated "
+                             "on different cases rather than the same ones")
     parser.add_argument("--live", action="store_true", help="draft with a real model")
     parser.add_argument("--model", default=None)
     parser.add_argument("--shadow", action="store_true",
@@ -82,8 +85,8 @@ def main() -> int:
         cases = load_cases(path)
         circular, source = False, f"{path} ({len(cases)} adjudicated visits)"
     else:
-        cases = _self_labelled(args.n, rules)
-        circular, source = True, f"self-labelled synthetic ({len(cases)} cases)"
+        cases = _self_labelled(args.n, rules, args.seed)
+        circular, source = True, f"self-labelled synthetic ({len(cases)} cases, seed {args.seed})"
 
     print(report(score(cases, rules, router=router, source=source, circular=circular)))
     return 0

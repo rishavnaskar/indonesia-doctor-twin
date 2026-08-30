@@ -175,9 +175,33 @@ invention. The strict parser remains the thing that actually holds.
 **Whether these help is a question, not an assumption.** `make concordance`
 splits its result by whether the samples agreed, so if unstable drafts are no
 likelier to be wrong than stable ones the report says so and recommends dropping
-the technique. First measurement was uncomfortable: at n=12, self-consistency
-abstained on four cases single-shot got right, and instability did not predict
-error. A larger run is still owed.
+the technique.
+
+Getting an answer took three runs and one corrected mistake.
+
+- **n=30, applied.** Abstention rose from 10% to 23.3%; concordance among
+  surviving drafts stayed at 100% either way. It looked like pure cost.
+- **The split meant to settle it was unanswerable.** 23 stable drafts, *zero*
+  unstable ones — because agreement feeds the confidence, low agreement falls
+  below the abstention floor, and check 8 removes exactly the cases the
+  measurement needs. Any conclusion from that run would have been circular.
+- **n=30, shadow.** Agreement measured but not applied, so unstable drafts
+  proceed and can be scored:
+
+  | | drafts | concordant |
+  |---|---|---|
+  | samples agreed | 19 | **100%** |
+  | samples disagreed | 10 | **70%** |
+
+  All three errors in the run were in the unstable group. As an error detector,
+  instability had 100% recall at 30% precision on this set: abstaining on it
+  removes every error at the cost of seven unnecessary abstentions.
+
+That trade is the one this system is built to take — a wrong draft costs more
+than no draft, in a setting where the reviewing doctor may have nobody to ask.
+Caveats stay attached: n=30, three errors, self-labelled cases, and the
+cross-run comparison is noisy. The within-run split is the sound part, because
+it is the same cases and the same model.
 
 ## What exists today
 
