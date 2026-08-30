@@ -224,6 +224,10 @@ function verdict(p){
       <div><b>${esc(d.recommendation.replace(/_/g," "))}</b> — ${esc(d.recommendation_plain)}</div>
       ${d.medication_changes.map(c=>`<div class="plain">${esc(c.action)} ${esc(c.molecule)} ${c.mg_per_dose}mg ×${c.doses_per_day}</div>`).join("")}
       ${r.claim?`<div class="plain">Coded: ${r.claim.codes.map(c=>esc(c.code)).join(", ")}</div>`:""}` : ""}
+    ${(r.exclusions||[]).length ? `<div class="sec">Why this patient is out of scope</div>
+      ${r.exclusions.map(x=>`<div class="find">
+        <div class="src">Exclusion ${esc(x.id)}</div><b>${esc(x.label)}</b>
+        <div class="plain">${esc(x.reason)}</div></div>`).join("")}` : ""}
     ${findings ? `<div class="sec">Why the gate stopped it</div>${findings}` : ""}
     ${(r.discrepancies||[]).length ? `<div class="sec">Record vs what the patient says</div>
       ${r.discrepancies.map(d=>`<div class="find ${d.material?"":"warn"}">${esc(d.text)}

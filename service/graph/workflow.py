@@ -59,6 +59,10 @@ class EncounterResult:
     # is the most useful thing the visit produced, and it must not be lost
     # because the gate declined to draft.
     reconciliation: Reconciliation = field(default_factory=Reconciliation)
+    # Why an encounter was handed off, rule by rule. A handoff is a terminal
+    # state that counts as a success, and a success the clinician cannot
+    # interrogate looks exactly like a failure.
+    exclusions: list = field(default_factory=list)
     referral_back: ReferralBackAssessment | None = None
     bundle: Bundle | None = None
     trail: list[str] = field(default_factory=list)
@@ -147,6 +151,7 @@ def run_encounter(
             message=eligibility.handoff_message(),
             questions_for_clinician=_patient_questions(intake),
             reconciliation=reconciliation,
+            exclusions=list(eligibility.exclusions),
             trail=trail + ["HANDOFF"],
         )
 

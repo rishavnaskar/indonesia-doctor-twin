@@ -180,3 +180,38 @@ def test_the_walkthrough_and_the_demo_report_the_same_ratio(rules):
     source = inspect.getsource(walkthrough.main)
     assert "build_scenarios" in source
     assert "make_patient(" not in source, "the walkthrough must not build its own cases"
+
+
+def test_a_handoff_says_which_rule_excluded_the_patient(rules):
+    """A handoff is a terminal state that counts as a success, and a success the
+    clinician cannot interrogate looks exactly like a bug. The exclusion id,
+    label and reason were all computed and then dropped before reaching any
+    surface."""
+    from tools.demo.patients import generate
+    from tools.demo.run import run_patients
+
+    encounter = run_patients(
+        generate(1, seed=8117, profile="excluded_first_presentation"), site_id="SITE-A"
+    )["encounters"][0]
+
+    assert encounter["outcome"] == "handoff"
+    assert encounter["message"]
+    assert encounter["exclusions"], "the reason must survive to the surface"
+    first = encounter["exclusions"][0]
+    assert first["id"] and first["label"] and first["reason"]
+
+
+def test_an_unrouted_patient_explains_itself_differently(rules):
+    """No pathway matched is not the same as a pathway rejecting them, and the
+    two must not be conflated: one means we do not cover this problem, the
+    other means we cover it and this patient is outside its bounds."""
+    from tools.demo.patients import generate
+    from tools.demo.run import run_patients
+
+    row = generate(1, seed=8200)[0]
+    row["diagnoses"], row["flags"], row["medications"] = ["J45"], {}, []
+    encounter = run_patients([row], site_id="SITE-A")["encounters"][0]
+
+    assert encounter["outcome"] == "handoff"
+    assert "No pathway" in encounter["message"]
+    assert encounter["exclusions"] == []

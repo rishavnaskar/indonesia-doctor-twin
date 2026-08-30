@@ -313,9 +313,23 @@ function draftCard(e){
   </div>`;
 }
 
+function exclusionBlock(e){
+  if (!e.exclusions || !e.exclusions.length) return "";
+  return `<div class="band amber">
+    <div class="lbl">Out of scope</div>
+    <div class="h">${esc(e.message || "Not handled by the assistant.")}</div>
+    <ul>${e.exclusions.map(x=>`<li><b>${esc(x.label)}</b>
+      <span class="src mono">[${esc(x.id)}]</span>
+      <div class="gloss">${esc(x.reason)}</div></li>`).join("")}</ul>
+    <div class="note" style="margin-top:8px">A handoff is a terminal state that
+      counts as a success. The clinician gets the encounter untouched, with a
+      stated reason and no clinical content from us.</div></div>`;
+}
+
 function clinicianView(e){
   const p = e.presentation;
   let out = `<p class="watch">${esc(e.watch_for)}</p>`;
+  if (e.exclusions && e.exclusions.length) return out + exclusionBlock(e);
   if (e.error) {
     return out + `<div class="err"><b>The drafter failed on this visit.</b>
       <span class="mono">${esc(e.error)}</span>
@@ -402,6 +416,16 @@ function auditView(e){
       ${findings}
     </div>
     ${discrepancyBlock(e)}
+    ${e.exclusions && e.exclusions.length ? `<div class="card">
+      <h2>Why this patient is out of scope</h2>
+      ${e.exclusions.map(x=>`<div class="finding">
+        <div class="src">Exclusion ${esc(x.id)} — checked before any model call</div>
+        <div class="m"><b>${esc(x.label)}</b></div>
+        <div class="src">${esc(x.reason)}</div></div>`).join("")}
+      <div class="note">An excluded encounter costs zero tokens. That is a nice
+        property and not the point: deciding "this patient is not ours" is a rules
+        decision, and asking a model to notice it should not be involved is
+        strictly worse than checking.</div></div>` : ""}
     <div class="card">
       <h2>What this hospital can actually do</h2>
       <table>

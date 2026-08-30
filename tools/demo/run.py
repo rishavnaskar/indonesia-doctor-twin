@@ -258,6 +258,8 @@ def _failed(scenario, rules, exc: Exception) -> dict:
             "lines": [], "audit": [],
         },
         "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
+        "message": "",
+        "exclusions": [],
         "discrepancies": [],
         "findings": [],
         "proposal": None,
@@ -320,6 +322,11 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
         "patient": _patient(scenario.state, scenario.site, rules),
         "outcome": result.outcome.value,
         "outcome_plain": (rules.glossary.get("outcomes") or {}).get(result.outcome.value, ""),
+        "message": result.message,
+        "exclusions": [
+            {"id": e.exclusion_id, "label": e.label, "reason": e.reason}
+            for e in result.exclusions
+        ],
         "committed": result.outcome is Outcome.COMMITTED,
         "trail": list(result.trail),
         "presentation": {
