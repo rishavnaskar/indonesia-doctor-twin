@@ -26,12 +26,19 @@ make live     # the same, with a real model drafting
 Nothing else is optional-but-required: no Docker, no validator jar and no API
 key each degrade to a named skip rather than a failure.
 
-**The second run picks up where the first stopped.** Each encounter is stored
-under a thread id derived from its inputs — patient, site, pack version, which
-drafter is behind the router — so a re-run replays what is already there rather
-than doing it again. `make live` is nine model calls the first time and none
-after that. Edit a guideline file and they all run again, because the pack
-version is part of the id.
+**The second run picks up where the first stopped.** Each encounter is stored —
+Postgres if this machine has Docker, append-only files otherwise — under a
+thread id derived from its inputs: patient, site, pack version, which drafter is
+behind the router. A re-run replays what is already there rather than doing it
+again. `make live` is nine model calls the first time and none after that
+(measured: 3m28s, then 1.1s, same outcomes). Edit a guideline file and they all
+run again, because the pack version is part of the id.
+
+`/clinic` keeps what you build there. Patients you generate and run come back
+the next time you open it — editable, with their verdicts, signatures and codes
+— because they were written to the store rather than to the tab. Clearing that
+list deletes nothing: the store refuses `UPDATE` and `DELETE`, so it writes a
+marker forward instead.
 
 Then, in order:
 
