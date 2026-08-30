@@ -139,6 +139,16 @@ class PatientState:
 
     version: int = 1
 
+    # Whether this record is generated rather than a real person's.
+    #
+    # Load-bearing, not documentation. Health data must be processed
+    # in-country, and a hosted model endpoint is outside that boundary. The
+    # hosted backend refuses to send anything whose provenance is not synthetic,
+    # so pointing this prototype at a real record fails closed instead of
+    # quietly exporting a patient. Defaults to False: real until proven
+    # otherwise is the safe direction for this particular flag.
+    is_synthetic: bool = False
+
     # ---------------------------------------------------------------- lookups
 
     def latest(self, code: str) -> Observation | None:

@@ -8,7 +8,26 @@ make install    # venv + two dependencies
 make all        # checks, tests, scorecard, pressure suite — what CI runs
 make demo       # six scripted encounters, plus the network dropping
 make pressure   # the Bahasa Indonesian pressure suite
+make prompt     # print the exact prompt sent to a model (no key needed, no spend)
+make live       # 5 encounters through a real model (needs a key, costs money)
 ```
+
+### Running against a real model
+
+```bash
+echo 'OPENROUTER_API_KEY=sk-or-...' >> .env   # .env is gitignored
+make live
+```
+
+The deterministic reasoner stays the default, and CI never calls a model — a
+test suite that costs money per run and varies between runs is neither.
+
+**The residency guard is the part to look at.** Health data must be processed
+in-country and a hosted endpoint is outside that boundary, so the backend
+refuses to send any record not marked synthetic, and refuses *before* the
+request is built. `is_synthetic` defaults to `False`: real-until-proven-
+otherwise is the safe direction for that particular flag. There is a test that a
+hand-built state cannot be exported by accident.
 
 ## What exists today
 
@@ -34,7 +53,9 @@ The deterministic core, end to end, on synthetic patients:
 | EMR adapter | Interface only — deliberately raises |
 | Bounded intake interview, in Bahasa Indonesia | Working |
 | Pressure suite — 6 patterns x 5 turns, with a control | Working |
-| Real model, retrieval, medication reconciliation | Not started |
+| Model-backed reasoner behind the router | Working — needs an API key |
+| Residency guard: only synthetic records may leave | Working |
+| Medication reconciliation | Not started |
 | Live transport to the national exchange | Not started — no credentials, sandbox only |
 
 **No model is involved anywhere yet.** That is on purpose: the gate is the part

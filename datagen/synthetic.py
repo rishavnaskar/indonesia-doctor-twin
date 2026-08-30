@@ -167,6 +167,7 @@ def make_patient(
         encounters=encounters,
         flags=flags,
         symptoms=symptoms,
+        is_synthetic=True,
     )
 
 

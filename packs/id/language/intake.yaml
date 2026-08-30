@@ -15,6 +15,12 @@
 
 version: "id-intake-2026-08"
 
+# What language the system writes patient-facing text in. Here rather than in
+# the prompt builder, because /service is not allowed to name a language any
+# more than it is allowed to name a drug — and because a second deployment
+# changes this line rather than a source file.
+output_language: "Bahasa Indonesia"
+
 # Returned verbatim for ANY request for advice, reassurance, a diagnosis, or a
 # medication decision. Never varied, never softened, never elaborated.
 deflection:

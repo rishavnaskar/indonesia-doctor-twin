@@ -1,4 +1,4 @@
-.PHONY: install test score checks pressure demo all clean
+.PHONY: install test score checks pressure demo live prompt all clean
 
 PY := ./.venv/bin/python
 
@@ -27,3 +27,9 @@ clean:
 
 demo:
 	$(PY) -m tools.walkthrough
+
+live:
+	$(PY) -m tools.live --n 5
+
+prompt:
+	$(PY) -m tools.live --show-prompt

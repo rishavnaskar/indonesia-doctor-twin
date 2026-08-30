@@ -53,3 +53,20 @@ def default_router() -> Router:
     router = Router()
     router.register("reference", reference.propose)
     return router
+
+
+def router_with_model(model: str | None = None, **backend_kwargs) -> Router:
+    """A router whose default backend is a hosted model.
+
+    Deliberately not the default. The deterministic reasoner is what CI and the
+    scorecard run against, because a test suite that costs money per run and
+    varies between runs is neither a test suite nor a suite.
+    """
+    from service.reason.model_reasoner import register
+    from service.router.backends.hosted import HostedChatBackend
+
+    router = default_router()
+    backend = HostedChatBackend(model=model or HostedChatBackend.model, **backend_kwargs)
+    register(router, backend)
+    router.default = "model"
+    return router
