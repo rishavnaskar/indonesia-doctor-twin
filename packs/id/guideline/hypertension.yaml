@@ -418,3 +418,12 @@ messages:
   insufficient_data: "Data belum cukup untuk memberi saran. Diperlukan: {needed}."
   no_target_defined: "Tidak ada target yang ditetapkan untuk kelompok pasien ini ({group})."
   below_floor: "Tingkat keyakinan {confidence:.2f} di bawah ambang {floor:.2f}. Sistem tidak membuat draf."
+
+# Which diagnosis this pathway is the primary manager of, for the claim draft.
+# Read by the coder, which otherwise falls back to the payer pack's single
+# `typical_primary` — a value that can only be right for one pathway, and was
+# silently producing a claim with no primary code for the other.
+#
+# Essential hypertension and its hypertensive complications.
+coding:
+  primary_prefixes: ["I10", "I11", "I12", "I13"]

@@ -490,7 +490,14 @@ Measured: consultation time · history completeness · diagnostic and treatment 
 ## 9. What V1 does not do
 
 - No diagnosis of new or undifferentiated presentations
-- No type 2 diabetes (V2), no combined cardiometabolic management (V3)
+- No combined cardiometabolic management (V3)
+- **Type 2 diabetes was V2 and now exists in the prototype** — as an architecture
+  test, not as clinical scope. It was added to find out whether "the engine is
+  pathway-agnostic" was true, and it was not: see the corrections in CODE.md. The
+  pathway has no clinical sign-off, no evaluation set and no adjudicated cases,
+  so it must not be run on a patient. What it demonstrates is that a second
+  disease costs two pack files, which is a claim about the architecture and not
+  about diabetes care.
 - No autonomous prescribing under any condition
 - No open-ended patient conversation
 - No voice input (typed and structured intake first — A10 is unverified)

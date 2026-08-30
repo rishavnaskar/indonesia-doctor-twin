@@ -20,6 +20,7 @@ from service.router.router import default_router
 from service.signing import AuditLog, Signer
 from service.emit.queue import OutboundQueue
 from service.state.models import Diagnosis, Medication, Observation, Source
+from tools.scenarios import build as build_scenarios
 
 NOW = datetime(2026, 8, 29, 10, 0)
 RULE = "─" * 74
@@ -144,66 +145,25 @@ def offline_demo(rules, site) -> None:
 
 
 def main() -> None:
+    """Every scenario in tools/scenarios.py, in order.
+
+    The list used to be written out again here. It drifted the moment a second
+    pathway added three scenarios: this script kept reporting "4 of 6" while the
+    demo surface, reading the shared list, reported 5 of 9. Two copies of the
+    refusal ratio is precisely the failure the shared module was created to
+    prevent, and it happened anyway because the module was added without this
+    caller being moved onto it.
+    """
     rules = load_pack("id")
-    site_a, site_c = rules.sites["SITE-A"], rules.sites["SITE-C"]
 
-    print("\n  AI clinician — adult hypertension follow-up")
-    print("  Synthetic patients. No model in the loop. Every rule from the pack.")
+    print("\n  AI clinician — synthetic patients, no model in the loop.")
+    print("  Every rule from the pack. Two pathways, one engine.")
 
-    # 1 — the ordinary case
-    show("1. Controlled patient, routine review",
-         "The common case. Continue, code, schedule.",
-         make_patient(101, controlled=True), rules, site_a)
+    for index, scenario in enumerate(build_scenarios(rules), start=1):
+        show(f"{index}. {scenario.title}", scenario.note,
+             scenario.state, rules, scenario.site, tamper=scenario.tamper)
 
-    # 2 — the useful case
-    show("2. Above target, titration drafted",
-         "The draft a doctor accepts in one click.",
-         make_patient(102, controlled=False), rules, site_a)
-
-    # 3 — the safety case
-    def ten_times(proposal):
-        if proposal.medication_changes:
-            change = proposal.medication_changes[0]
-            proposal.medication_changes = [
-                MedicationChange(change.action, change.molecule,
-                                 (change.mg_per_dose or 5) * 10, change.doses_per_day,
-                                 "tampered for the demo", change.citation)
-            ]
-    show("3. The same case, with the dose out by ten",
-         "What the doctor sees when the model gets it wrong: nothing.",
-         make_patient(102, controlled=False), rules, site_a, tamper=ten_times)
-
-    # 4 — the honest case
-    diabetic = make_patient(104, controlled=False)
-    diabetic.flags.pop("has_dm", None)
-    diabetic.diagnoses.append(Diagnosis(code="E11.9"))
-    show("4. Diabetic patient, target not yet extracted",
-         "Diabetes present only as a code. The system declines rather than guessing.",
-         diabetic, rules, site_a)
-
-    # 5 — the emergency
-    emergency = make_patient(105, controlled=False)
-    emergency.observations.append(Observation("sbp", 206, "mmHg", emergency.as_of, Source.EMR))
-    emergency.observations.append(Observation("dbp", 126, "mmHg", emergency.as_of, Source.EMR))
-    emergency.symptoms["chest_pain"] = True
-    show("5. Hypertensive emergency",
-         "No draft. The clinician is alerted and the encounter leaves the pathway.",
-         emergency, rules, site_a)
-
-    # 6 — the site that cannot deliver the plan
-    # On maximum first-line therapy, so the ladder wants an ACE inhibitor. That
-    # needs potassium and eGFR, and this site cannot run either.
-    remote = make_patient(106, controlled=False)
-    remote.medications = [
-        Medication(molecule="amlodipine", mg_per_dose=10.0, doses_per_day=1,
-                   source=Source.EMR)
-    ]
-    remote.observations = [o for o in remote.observations if o.code not in ("k", "egfr")]
-    show("6. Remote basic-tier site, plan needs a test it cannot run",
-         "A plan is only a plan if this hospital can actually carry it out.",
-         remote, rules, site_c)
-
-    offline_demo(rules, site_a)
+    offline_demo(rules, rules.sites["SITE-A"])
 
     declined = sum(1 for o in OUTCOMES if o is not Outcome.COMMITTED)
     print(f"\n{RULE}")

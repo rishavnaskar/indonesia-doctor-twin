@@ -57,13 +57,23 @@ def build_claim(state, rules) -> ClaimDraft:
     """
     payer = rules.payer.get("coding") or {}
     capture = payer.get("comorbidity_capture") or []
-    typical_primary = payer.get("typical_primary")
+
+    # The pathway in force says which diagnosis it is managing. The payer pack's
+    # single `typical_primary` is the fallback, and it can only ever be right for
+    # one pathway — with a second one loaded it was silently producing a claim
+    # with no primary code at all, which is an unbillable encounter.
+    prefixes = [
+        str(prefix).upper()
+        for prefix in ((rules.guideline.get("coding") or {}).get("primary_prefixes") or [])
+    ]
+    if not prefixes and payer.get("typical_primary"):
+        prefixes = [str(payer["typical_primary"]).upper()]
 
     draft = ClaimDraft()
     active = [d for d in state.diagnoses if d.status == "active"]
 
     for diagnosis in active:
-        if typical_primary and diagnosis.code.upper().startswith(typical_primary.upper()):
+        if any(diagnosis.code.upper().startswith(prefix) for prefix in prefixes):
             draft.primary = CodedDiagnosis(
                 code=diagnosis.code,
                 label="primary condition managed at this encounter",

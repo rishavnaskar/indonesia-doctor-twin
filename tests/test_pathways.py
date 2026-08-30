@@ -153,3 +153,30 @@ def test_a_ladder_step_missing_a_field_fails_at_load_not_at_a_bedside(rules):
     broken.pathways["diabetes"]["escalation_ladder"]["steps"][0].pop("start_mg")
     with pytest.raises(loader.PackError, match="missing"):
         loader._validate(broken)
+
+
+def test_each_pathway_codes_its_own_primary_diagnosis(rules):
+    """The coder read the payer pack's single `typical_primary`, which can only
+    be right for one pathway. With a second one loaded it produced a claim with
+    no primary code at all — an unbillable encounter, and silent."""
+    from service.emit.coding import build_claim
+
+    htn = build_claim(make_patient(301), pathways.with_pathway(rules, "hypertension"))
+    assert htn.primary is not None and htn.primary.code.startswith("I10")
+
+    dm2 = build_claim(_diabetic(), pathways.with_pathway(rules, "diabetes"))
+    assert dm2.primary is not None and dm2.primary.code.startswith("E11")
+
+
+def test_the_walkthrough_and_the_demo_report_the_same_ratio(rules):
+    """Two copies of the refusal ratio is the failure tools/scenarios.py exists
+    to prevent, and it happened anyway: the module was added without the
+    walkthrough being moved onto it, so one said 4 of 6 while the other said
+    5 of 9."""
+    import inspect
+
+    from tools import walkthrough
+
+    source = inspect.getsource(walkthrough.main)
+    assert "build_scenarios" in source
+    assert "make_patient(" not in source, "the walkthrough must not build its own cases"

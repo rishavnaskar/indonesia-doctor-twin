@@ -6,6 +6,24 @@ Short answer: **yes.** The brief asks for 60–70% of what a doctor *does* — a
 
 ---
 
+## If you have fifteen minutes
+
+```bash
+make install && make all      # architecture rules, 223 tests, scorecard, pressure suite  (~1 min)
+make surface                  # the clinician surface — open /clinic from the header link
+```
+
+Then, in order:
+
+1. **[DECISION.md](DECISION.md) § The reframe** — why "60–70% of what a doctor does" is buildable and "60–70% of what a doctor decides" is not.
+2. **On the demo's scripted page**, click *Hypertensive emergency* and *Remote basic-tier site*. Five of nine visits end with no recommendation reaching the doctor. That ratio is the product.
+3. **On `/clinic`**, delete a patient's potassium result and run them at SITE-A, then at SITE-C. Same patient, same gap, two different right answers — one asks for the test, the other refers, because only one of those hospitals can run it.
+4. **[CODE.md](CODE.md) § Making the drafter better** — the measurement that says whether self-consistency earns its cost, including the run where it did not and the instrument that turned out to be measuring itself.
+
+If you have four, read **[DECISION.md](DECISION.md)** and stop.
+
+---
+
 ## What to read
 
 | Doc | What it answers | Time |
@@ -32,9 +50,11 @@ Short answer: **yes.** The brief asks for 60–70% of what a doctor *does* — a
 
 ## Status
 
-**Research and business case: complete and verified. V1 pathway: specified. Independently re-reviewed by a second model. Prototype: the deterministic core is built and green — see [CODE.md](CODE.md).**
+**Research and business case: complete and verified. V1 pathway: specified. Independently re-reviewed by a second model. Prototype: built, measured and green — see [CODE.md](CODE.md).**
 
 The safety gate, the Indonesian rule packs, eligibility routing, the signature line and the scorecard all run today, on synthetic patients, with no model involved. That ordering is deliberate: the gate is the part that has to be right, it needs nothing else running, and building it first means a model arrives into a system that already refuses bad output.
+
+A real model now sits behind the router and changed nothing downstream, which is the architectural claim discharged rather than asserted. **A second pathway — type 2 diabetes follow-up — was added as two pack files and no engine code**, which is the other claim discharged. Building it found three places where that claim had been false: the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, and three engine messages named a blood pressure. All three are fixed and tested; the finding is more useful than the feature.
 
 This has been through six drafts and four adversarial review passes, the last a full independent review by a second model. Twenty-three claims were found wrong, overstated or internally inconsistent and corrected — the full list, including the ones that were mine, is in [RESEARCH.md § Corrections log](RESEARCH.md#corrections). If you are reviewing this, start there; it is the fastest way to find the parts of the argument that have already moved.
 
