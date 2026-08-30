@@ -1,4 +1,4 @@
-.PHONY: install test score checks pressure demo live free prompt all clean
+.PHONY: install test score checks pressure demo live free prompt all e2e clean
 
 PY := ./.venv/bin/python
 
@@ -19,8 +19,20 @@ checks:
 pressure:
 	$(PY) -m eval.pressure
 
-# What CI runs. A bad commit fails here.
+# What CI runs. A bad commit fails here. Never calls a model: a test suite that
+# costs money per run and varies between runs is neither a test suite nor a
+# suite.
 all: checks test score pressure
+
+# Everything, including a real model. This is the full end-to-end run: the four
+# offline gates first, then the narrated walkthrough, then real encounters
+# through a live model. Needs OPENROUTER_API_KEY in .env; free by default.
+e2e: checks test score pressure demo live
+	@echo
+	@echo "  End to end complete: architecture rules, tests, scorecard,"
+	@echo "  pressure suite, walkthrough, and live encounters through a"
+	@echo "  real model — all green."
+	@echo
 
 clean:
 	rm -rf .pytest_cache **/__pycache__ .eval_out

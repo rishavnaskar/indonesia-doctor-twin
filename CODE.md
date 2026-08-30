@@ -101,12 +101,24 @@ The deterministic core, end to end, on synthetic patients:
 | Pressure suite — 6 patterns x 5 turns, with a control | Working |
 | Model-backed reasoner behind the router | Working — needs an API key |
 | Residency guard: only synthetic records may leave | Working |
-| Medication reconciliation | Not started |
+| Medication reconciliation (SPEC §5.3) | Not started |
+| Clinician presentation layer — the traffic light (SPEC §5.8) | Not started |
+| Between-visit follow-up loop (SPEC §5.11) | Not started |
+| Plan-concordance metric (SPEC §8.2) | Not started |
+| Capability evidence view — `evidence_ref` is empty at all three sites | Not started |
 | Live transport to the national exchange | Not started — no credentials, sandbox only |
 
-**No model is involved anywhere yet.** That is on purpose: the gate is the part
-that has to be right, it needs nothing else running, and building it first means
-the model arrives into a system that already refuses bad output.
+**The deterministic core runs with no model involved at all** — `make checks
+test score pressure` never makes an API call. That ordering was on purpose: the
+gate is the part that has to be right, it needs nothing else running, and
+building it first meant the model arrived into a system that already refused bad
+output.
+
+A real model now sits behind the router (`make live`) and changed nothing
+downstream — same three-argument signature, same gate, same signature line. That
+is the architectural claim discharged rather than asserted. The deterministic
+reasoner remains the default, because a test suite that costs money per run and
+varies between runs is neither.
 
 ## The walkthrough
 
@@ -195,8 +207,14 @@ Indonesian physicians. The scorecard prints this caveat on every run.
    round trip. Resolves assumption A1 properly.
 2. Parse the formulary decree into the pack and have a pharmacist verify 200
    rows. Resolves A4.
-3. Put a real model behind the router. It implements the same three-argument
-   signature as the reference reasoner, and the gate does not change.
-4. Get the clinical lead to answer the nine open questions in SPEC-V1 §10 —
+3. Close the five SPEC gaps in the table above. Reconciliation first: its
+   deterministic half needs no model, and it is the one that changes what a
+   clinician sees rather than what the system knows.
+4. Split the gate's "orderable test" contract from follow-up instructions. A
+   model asked for a plan puts "repeat BP in 2 weeks" where check 9 reads
+   orderable tests, so a routine follow-up converts to a referral. Fail-closed,
+   so it is safe — but it is a nuisance that would erode a clinician's trust in
+   the gate, and the fix is a contract change, not a loosened check.
+5. Get the clinical lead to answer the nine open questions in SPEC-V1 §10 —
    three BP targets are blocking whole patient subgroups today, and the system
    correctly abstains on all of them until then.
