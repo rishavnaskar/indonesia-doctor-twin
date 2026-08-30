@@ -369,14 +369,53 @@ $("add").onclick = ()=>{
   draw();
 };
 
+const MAX_PASTED = 12;
+
 $("load").onclick = ()=>{
+  let parsed;
   try {
-    const parsed = JSON.parse($("paste").value);
-    patients = Array.isArray(parsed) ? parsed : [parsed];
-    patients.forEach((p,i)=>{ p.medications = p.medications||[]; p.observations = p.observations||[];
-      p.patient_id = p.patient_id || `UPLOAD-${i+1}`; });
-    results = {}; $("msg").innerHTML = ""; draw();
-  } catch (err) { $("msg").innerHTML = `<div class="err">Could not read that JSON: ${esc(err.message)}</div>`; }
+    parsed = JSON.parse($("paste").value);
+  } catch (err) {
+    $("msg").innerHTML = `<div class="err">That is not valid JSON: ${esc(err.message)}</div>`;
+    return;
+  }
+
+  const rows = Array.isArray(parsed) ? parsed : [parsed];
+
+  // Validate before touching what is on screen. An earlier version assigned
+  // first and validated never, so pasting [1,2,3] surfaced a JavaScript
+  // internal error — a crash leaking into a place a reader reads as a
+  // statement about their data.
+  if (!rows.length){
+    $("msg").innerHTML = `<div class="err">That JSON is empty — no records to load.
+      Nothing on screen was changed.</div>`;
+    return;
+  }
+  if (rows.length > MAX_PASTED){
+    $("msg").innerHTML = `<div class="err">${rows.length} records is more than this
+      surface runs at once. Paste ${MAX_PASTED} or fewer.</div>`;
+    return;
+  }
+  const bad = rows.findIndex(r => r === null || typeof r !== "object" || Array.isArray(r));
+  if (bad !== -1){
+    $("msg").innerHTML = `<div class="err">Entry ${bad + 1} is not a patient record — each
+      one has to be an object like the example. Nothing on screen was changed.</div>`;
+    return;
+  }
+
+  patients = rows.map((p,i)=>({
+    ...p,
+    medications: p.medications || [],
+    observations: p.observations || [],
+    patient_id: p.patient_id || `UPLOAD-${i+1}`,
+  }));
+  results = {};
+  const unmarked = patients.filter(p => !p.is_synthetic).length;
+  $("msg").innerHTML = `<div class="stat">Loaded ${patients.length} record(s).` +
+    (unmarked ? ` <b>${unmarked} not marked synthetic</b> — a hosted model will refuse
+      those before any request is built. The rule-following reasoner runs them fine.` : "") +
+    `</div>`;
+  draw();
 };
 
 function summarise(j){
@@ -384,6 +423,9 @@ function summarise(j){
     <b>${j.declined} of ${j.total} ended with no recommendation reaching the doctor.</b>
     ${j.drafter_failures?` ${j.drafter_failures} could not be drafted at all — the model
       returned something unusable, which is a model failure rather than a clinical one.`:""}
+    ${j.residency_refused?` <b>${j.residency_refused} refused before any request was
+      built</b> — not marked synthetic, so nothing left the machine.`:""}
+    ${j.unreadable?` ${j.unreadable} record(s) could not be read at all.`:""}
     Drafted by <span class="mono">${esc(j.reasoner)}</span>.</div>`;
 }
 

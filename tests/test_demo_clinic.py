@@ -53,8 +53,18 @@ def test_a_residency_refusal_is_contained_to_one_visit():
     result = run_patients([row], site_id="SITE-A", router=router)
 
     assert result["total"] == 1
-    assert result["drafter_failures"] == 1
-    assert "ResidencyError" in result["encounters"][0]["error"]
+    encounter = result["encounters"][0]
+    assert "ResidencyError" in encounter["error"]
+
+    # Counted apart from a model failure, because they are not the same event.
+    # Nothing was sent: the guard refused before a request was built, and
+    # reporting that as "the model returned something unusable" would misstate
+    # the one behaviour this system most wants understood.
+    assert result["residency_refused"] == 1
+    assert result["drafter_failures"] == 0
+    assert encounter["outcome"] == "residency_refused"
+    assert "nothing left the machine" in encounter["outcome_plain"].lower() or \
+        "Nothing left the machine" in encounter["outcome_plain"]
 
 
 def test_a_hand_built_emergency_routes_out_of_the_pathway():

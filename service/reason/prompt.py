@@ -86,7 +86,16 @@ def _relevant_codes(rules, target) -> list[str]:
     return codes
 
 
-def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
+def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
+                      withhold_tool_served: bool = False) -> str:
+    """The context the drafter sees.
+
+    `withhold_tool_served` removes the material the read-only tools can fetch —
+    measurements, drug limits, site capability. Without it, tool use is inert by
+    construction: the model is handed everything and has no reason to ask, which
+    is exactly what a live run showed. Nothing is hidden that the model cannot
+    retrieve, and what it chooses to retrieve is the signal worth having.
+    """
     """Assemble the clinical context. All content comes from the pack."""
     language = (rules.language or {}).get("output_language", "the local language")
     formulary = [
@@ -112,7 +121,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
             if target
             else None
         ),
-        "formulary": formulary,
+        **({} if withhold_tool_served else {"formulary": formulary}),
         "interaction_rules": rules.interactions,
         "escalation_ladder": rules.guideline.get("escalation_ladder"),
         "patient": {
@@ -133,7 +142,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
                 {"class": i.drug_class, "documented_at": i.documented_at.isoformat()}
                 for i in state.intolerances
             ],
-            "observations": [
+            **({} if withhold_tool_served else {"observations": [
                 {
                     "code": code,
                     "value": obs.value,
@@ -142,10 +151,11 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
                 }
                 for code in _relevant_codes(rules, target)
                 if (obs := state.latest(code)) is not None
-            ],
+            ]}),
             "reported_symptoms": sorted(k for k, v in state.symptoms.items() if v),
         },
-        "site_labs_available": sorted((site or {}).get("labs_available") or []),
+        **({} if withhold_tool_served else
+           {"site_labs_available": sorted((site or {}).get("labs_available") or [])}),
         "response_schema": {
             "assessment": "controlled | uncontrolled | over_treated",
             "recommendation": (
@@ -183,6 +193,14 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
     }
 
     parts = [json.dumps(context, indent=2, default=str)]
+
+    if withhold_tool_served:
+        parts.append(
+            "\nMeasurements, drug limits and what this hospital can do are NOT in the "
+            "context above. Call the tools for whatever you need before you draft, "
+            f"including any of: {', '.join(_relevant_codes(rules, target)) or 'the relevant measurements'}. "
+            "Drafting without looking is not permitted."
+        )
 
     # Field-level constraints that do not fit in a shape. Kept out of the schema
     # object above so that nothing here can be mistaken for a key to emit.

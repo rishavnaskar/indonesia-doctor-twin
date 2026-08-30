@@ -277,13 +277,28 @@ def _unreadable(wire: dict, index: int, rules, site, exc: Exception) -> dict:
 
 
 def _failed(scenario, rules, exc: Exception) -> dict:
-    """An encounter the drafter could not complete. Not a clinical outcome."""
+    """An encounter the drafter could not complete. Not a clinical outcome.
+
+    A residency refusal is separated from a model failure because they are not
+    the same event and describing one as the other is a false statement about
+    what happened. Nothing was sent: the guard refused before a request was
+    built. Reporting that as "the model returned something unusable" would
+    misdescribe the one behaviour this system most wants understood.
+    """
+    residency = type(exc).__name__ == "ResidencyError"
+    if residency:
+        return {
+            **_failed_shell(scenario, rules),
+            "outcome": "residency_refused",
+            "outcome_plain": (
+                "This record is not marked synthetic, so it was refused before any "
+                "request was built. Nothing left the machine. Health data must be "
+                "processed in-country, and a hosted model sits outside that boundary."
+            ),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
     return {
-        "key": scenario.key,
-        "title": scenario.title,
-        "note": scenario.note,
-        "watch_for": scenario.watch_for,
-        "patient": _patient(scenario.state, scenario.site, rules),
+        **_failed_shell(scenario, rules),
         "outcome": "drafter_failed",
         "outcome_plain": (
             "The drafter could not produce a usable proposal, so nothing reached "
@@ -291,9 +306,20 @@ def _failed(scenario, rules, exc: Exception) -> dict:
             "of the model, not of the patient's care — the doctor proceeds as "
             "they would without the system."
         ),
-        "committed": False,
         "error": f"{type(exc).__name__}: {exc}",
-        "trail": ["ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE"],
+    }
+
+
+def _failed_shell(scenario, rules) -> dict:
+    """The fields every failed encounter carries, whatever failed."""
+    return {
+        "key": scenario.key,
+        "title": scenario.title,
+        "note": scenario.note,
+        "watch_for": scenario.watch_for,
+        "patient": _patient(scenario.state, scenario.site, rules),
+        "committed": False,
+        "trail": ["ROUTE", "ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE"],
         "presentation": {
             "band": "green", "band_label": "", "headline": "", "gloss": "",
             "silent": True, "shows_draft": False, "requires_acknowledgement": False,
@@ -520,10 +546,9 @@ def run_patients(
         "reasoner": reasoner,
         "is_model": is_model,
         "declined": sum(1 for e in encounters if not e["committed"] and not e.get("error")),
-        "drafter_failures": sum(
-            1 for e in encounters if e.get("error") and e["outcome"] != "unreadable"
-        ),
+        "drafter_failures": sum(1 for e in encounters if e["outcome"] == "drafter_failed"),
         "unreadable": sum(1 for e in encounters if e["outcome"] == "unreadable"),
+        "residency_refused": sum(1 for e in encounters if e["outcome"] == "residency_refused"),
         "total": len(encounters),
     }
 

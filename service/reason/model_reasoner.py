@@ -40,12 +40,16 @@ class ModelReasoner:
     def propose(self, state, rules, site: dict[str, Any] | None = None):
         resolution = resolve_target(rules.guideline, Context(state))
 
+        wants_tools = self.use_tools and hasattr(self.backend, "complete_with_tools")
         system = prompt_module.system_prompt()
-        user = prompt_module.build_user_prompt(state, rules, site, resolution.target)
+        user = prompt_module.build_user_prompt(
+            state, rules, site, resolution.target,
+            withhold_tool_served=wants_tools,
+        )
 
         # The guard: only generated patients may cross the boundary.
         toolbox = None
-        if self.use_tools and hasattr(self.backend, "complete_with_tools"):
+        if wants_tools:
             from service.reason.tools import MAX_CALLS, Toolbox, tool_specs
 
             toolbox = Toolbox(state, rules, site)

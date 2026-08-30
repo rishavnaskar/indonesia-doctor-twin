@@ -148,3 +148,51 @@ def test_tools_are_off_unless_asked_for(rules):
         make_patient(3, controlled=True), rules, rules.sites["SITE-A"]
     )
     assert proposal.tools_requested == []
+
+
+def test_tools_mode_withholds_what_the_tools_serve(rules):
+    """Otherwise tool use is inert by construction. A live run with tools
+    enabled requested nothing at all, because the prompt had already handed the
+    model every measurement, every drug limit and the site's capability — there
+    was nothing left to ask for. Withholding them took the prompt from ~10k to
+    ~5k characters, and the same model then made nine to twelve lookups per
+    encounter."""
+    from datagen.synthetic import make_patient
+    from service.reason import prompt as prompt_module
+    from service.rules.predicates import Context
+    from service.rules.targets import resolve_target
+
+    state = make_patient(1)
+    target = resolve_target(rules.guideline, Context(state)).target
+    site = rules.sites["SITE-A"]
+
+    full = prompt_module.build_user_prompt(state, rules, site, target)
+    trimmed = prompt_module.build_user_prompt(
+        state, rules, site, target, withhold_tool_served=True)
+
+    for served in ("observations", "formulary", "site_labs_available"):
+        assert served in full
+        assert served not in trimmed, f"{served} is tool-served and must be withheld"
+
+    assert len(trimmed) < len(full)
+    assert "Call the tools" in trimmed
+
+    # Nothing is hidden that the model cannot retrieve.
+    names = {t["function"]["name"] for t in tool_specs(rules)}
+    assert {"get_measurement", "get_drug", "get_site_capability"} <= names
+
+
+def test_the_prompt_is_unchanged_when_tools_are_off(rules):
+    """Tools are opt-in, and turning them off must not quietly alter what a
+    baseline run sees — otherwise every comparison against it is meaningless."""
+    from datagen.synthetic import make_patient
+    from service.reason import prompt as prompt_module
+    from service.rules.predicates import Context
+    from service.rules.targets import resolve_target
+
+    state = make_patient(1)
+    target = resolve_target(rules.guideline, Context(state)).target
+    site = rules.sites["SITE-A"]
+    assert prompt_module.build_user_prompt(state, rules, site, target) == \
+        prompt_module.build_user_prompt(state, rules, site, target,
+                                        withhold_tool_served=False)

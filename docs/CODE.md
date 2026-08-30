@@ -186,6 +186,16 @@ nothing here may have. If it fails, the draft continues and is marked
 unreviewed — an advisory component being down is not a reason to deny care, but
 an unreviewed draft must never look like a reviewed one.
 
+**Read-only tools** (`--tools`) let the drafter request what it needs instead of
+being handed everything, and record what it asked for. That only works if the
+prompt stops pre-loading it: with tools on and the full context still supplied,
+a live run requested nothing at all, because there was nothing left to ask for.
+Withholding the tool-served material halves the prompt, and the same model then
+makes nine to twelve lookups per encounter — and runs slightly faster, because
+the prompt is half the size. What a model asks for is evidence: one that
+titrates a RAAS-acting drug without ever requesting a potassium has told you
+something its output never would.
+
 **Schema enforcement** is on by default and steps down cleanly where a provider
 will not take it. It is worth having and it is not a defence: asked for a strict
 schema, one free model accepted the request and returned a structure of its own
