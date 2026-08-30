@@ -79,6 +79,7 @@ def router_with_model(
     samples: int = 1,
     critic: bool = False,
     use_tools: bool = False,
+    shadow: bool = False,
     **backend_kwargs,
 ) -> Router:
     """A router whose default backend is a real model.
@@ -107,7 +108,7 @@ def router_with_model(
         # the gate least of all — knows the difference.
         from service.reason.consistency import SelfConsistentReasoner
 
-        reasoner = SelfConsistentReasoner(reasoner, samples=samples)
+        reasoner = SelfConsistentReasoner(reasoner, samples=samples, apply=not shadow)
 
     router.register("model", reasoner)
     router.default = "model"

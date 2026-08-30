@@ -56,6 +56,21 @@ class SelfConsistentReasoner:
     inner: Any
     samples: int = 3
     max_workers: int = 3
+    # Shadow mode: measure agreement, record it, and do NOT let it touch the
+    # confidence.
+    #
+    # This exists because the obvious experiment cannot answer its own question.
+    # With agreement feeding the confidence, a low-agreement draft falls below
+    # the abstention floor and never reaches a clinician — so "are unstable
+    # drafts likelier to be wrong?" has no unstable drafts left to measure. The
+    # mechanism removes exactly the cases the measurement needs. Observed: at
+    # n=30, six unstable drafts, none of which reached the comparison.
+    #
+    # In shadow mode the draft proceeds on its stated confidence and the
+    # agreement is recorded alongside. Only then can the two be correlated, and
+    # only then is keeping self-consistency an evidenced decision rather than a
+    # fashionable one.
+    apply: bool = True
 
     @property
     def backend(self):
@@ -111,8 +126,11 @@ class SelfConsistentReasoner:
         return replace(
             winner,
             agreement=agreement,
-            confidence=min(stated, agreement),
-            uncertainty_notes=(winner.uncertainty_notes + " " + note).strip(),
+            confidence=min(stated, agreement) if self.apply else winner.confidence,
+            uncertainty_notes=(
+                winner.uncertainty_notes + " " + note
+                + ("" if self.apply else " [shadow: agreement measured, not applied]")
+            ).strip(),
             provenance=_pin(winner.provenance, drafts),
         )
 

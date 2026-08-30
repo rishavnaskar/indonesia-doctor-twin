@@ -131,3 +131,27 @@ def test_it_is_not_a_second_gate():
     result = reasoner.propose(None, None)
     assert isinstance(result, Proposal)
     assert result.medication_changes, "it returns a plan; the gate decides its fate"
+
+
+def test_shadow_mode_measures_without_applying():
+    """The obvious experiment cannot answer its own question. With agreement
+    feeding the confidence, a low-agreement draft falls below the abstention
+    floor and never reaches a clinician — so 'are unstable drafts likelier to
+    be wrong?' has no unstable drafts left to measure. Observed at n=30: six
+    unstable drafts, none of which reached the comparison."""
+    scattered = Scripted(_draft(mg=10.0, confidence=0.95),
+                         _draft(mg=5.0, confidence=0.95),
+                         _draft(recommendation="add_agent", confidence=0.95))
+
+    applied = SelfConsistentReasoner(scattered, samples=3, apply=True).propose(None, None)
+    assert applied.confidence == pytest.approx(1 / 3)
+
+    shadow = SelfConsistentReasoner(
+        Scripted(_draft(mg=10.0, confidence=0.95),
+                 _draft(mg=5.0, confidence=0.95),
+                 _draft(recommendation="add_agent", confidence=0.95)),
+        samples=3, apply=False,
+    ).propose(None, None)
+    assert shadow.confidence == pytest.approx(0.95), "untouched, so the draft proceeds"
+    assert shadow.agreement == pytest.approx(1 / 3), "but the instability is recorded"
+    assert "shadow" in shadow.uncertainty_notes

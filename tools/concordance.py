@@ -45,6 +45,9 @@ def main() -> int:
     parser.add_argument("--n", type=int, default=120)
     parser.add_argument("--live", action="store_true", help="draft with a real model")
     parser.add_argument("--model", default=None)
+    parser.add_argument("--shadow", action="store_true",
+                        help="with --samples: measure agreement but do not apply "
+                             "it to the confidence, so its value can be tested")
     parser.add_argument("--tools", action="store_true",
                         help="let the drafter request what it needs (read-only "
                              "lookups) instead of being handed the whole pack")
@@ -67,7 +70,7 @@ def main() -> int:
 
         load_env()
         router = router_with_model(args.model, provider=args.provider,
-                                   samples=args.samples, critic=args.critic, use_tools=args.tools)
+                                   samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow)
 
     if args.cases:
         path = Path(args.cases)

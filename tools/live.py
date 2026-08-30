@@ -61,6 +61,9 @@ def main() -> int:
     parser.add_argument("--no-fallback", action="store_true",
                         help="do not fall back to another free model when one is "
                              "rate-limited; fail loudly instead")
+    parser.add_argument("--shadow", action="store_true",
+                        help="with --samples: measure agreement but do not apply "
+                             "it to the confidence, so its value can be tested")
     parser.add_argument("--tools", action="store_true",
                         help="let the drafter request what it needs (read-only "
                              "lookups) instead of being handed the whole pack")
@@ -102,7 +105,7 @@ def main() -> int:
         if args.no_fallback or args.model:
             kwargs["fallbacks"] = ()
     router = router_with_model(args.model, provider=args.provider,
-                               samples=args.samples, critic=args.critic, use_tools=args.tools, **kwargs)
+                               samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow, **kwargs)
     backend = router.get("model").backend
     queue = OutboundQueue()
     now = datetime(2026, 8, 29, 10, 0)
