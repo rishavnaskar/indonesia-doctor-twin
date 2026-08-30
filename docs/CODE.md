@@ -1,7 +1,7 @@
 # The prototype
 
 The code that implements [SPEC-V1.md](SPEC-V1.md). Start here if you are
-building; start at [README.md](README.md) if you are deciding.
+building; start at [README.md](../README.md) if you are deciding.
 
 ```bash
 make install       # venv + two dependencies
@@ -262,7 +262,7 @@ The deterministic core, end to end, on synthetic patients:
 | Referral-back draft — the payer's own 3B criteria | Working |
 | Synthetic patients, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
-| EMR adapter | Interface only — deliberately raises |
+| EMR adapter | Port defined; the vendor adapter is a Phase 0 scaffold that raises rather than inventing a read. Blocked on access to the real system |
 | Bounded intake interview, in Bahasa Indonesia | Working |
 | Pressure suite — 6 patterns x 5 turns, with a control | Working |
 | Model-backed reasoner behind the router | Working — needs an API key |
@@ -273,7 +273,7 @@ The deterministic core, end to end, on synthetic patients:
 | Between-visit loop (SPEC §5.11) | Schema, provenance and escalation working; patient-facing channel is V1.5 by design |
 | Plan-concordance metric (SPEC §8.2) | Working — reported, not gated; needs Set C to mean anything |
 | Capability evidence — proof each service was actually delivered | Working |
-| Live transport to the national exchange | Not started — no credentials, sandbox only |
+| Live transport to the national exchange | Bundles build and queue; transmission is blocked on credentials, sandbox only |
 
 **The deterministic core runs with no model involved at all** — `make checks
 test score pressure` never makes an API call. That ordering was on purpose: the
@@ -368,15 +368,28 @@ against, so a high score is close to tautological. The number that means
 something comes from Set C — real retrospective visits, blind-scored by
 Indonesian physicians. The scorecard prints this caveat on every run.
 
-## Next
+## What is left, and none of it is code
 
-1. Stand up the real hospital system with a seeded database and time the panel
-   round trip. Resolves assumption A1 properly.
-2. Parse the formulary decree into the pack and have a pharmacist verify 200
-   rows. Resolves A4.
-3. Close the remaining SPEC gaps in the table above. Reconciliation first: its
-   deterministic half needs no model, and it is the one that changes what a
-   clinician sees rather than what the system knows.
-5. Get the clinical lead to answer the nine open questions in SPEC-V1 §10 —
-   three BP targets are blocking whole patient subgroups today, and the system
-   correctly abstains on all of them until then.
+Every pathway step in SPEC-V1 §5 is built and tested. What remains needs
+somebody this project does not have, and no amount of engineering substitutes
+for any of it.
+
+1. **A clinical lead with STR + SIP** to sign the packs off against primary
+   sources and answer the nine questions in SPEC-V1 §10. Three blood-pressure
+   targets are missing today and the system correctly abstains on those
+   subgroups until they exist. Nothing here is clinically active while
+   `review.status` reads `awaiting_clinical_signoff`.
+2. **Set C** — 300 real visits, physician-adjudicated. Every number this
+   repository produces is caveated on it, the loader is written, and the file
+   does not exist because there is no client, no hospital and no lawful basis
+   to touch a real record.
+3. **The real hospital system**, standing up from its own migrations against a
+   seeded database, to time the panel round trip and resolve assumption A1
+   properly. One engineer, two days, per the assumption register.
+4. **A pharmacist** to verify 200 formulary rows against the decree, resolving
+   A4.
+
+The honest summary: the engineering question — can a system draft safely,
+refuse well, and stay pathway- and country-agnostic — has been answered as far
+as synthetic patients can answer it. The clinical question has not been
+touched, and asking a repository to answer it would be a category error.

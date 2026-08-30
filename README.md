@@ -15,12 +15,12 @@ make surface                  # the clinician surface — open /clinic from the 
 
 Then, in order:
 
-1. **[DECISION.md](DECISION.md) § The reframe** — why "60–70% of what a doctor does" is buildable and "60–70% of what a doctor decides" is not.
+1. **[DECISION.md](docs/DECISION.md) § The reframe** — why "60–70% of what a doctor does" is buildable and "60–70% of what a doctor decides" is not.
 2. **On the demo's scripted page**, click *Hypertensive emergency* and *Remote basic-tier site*. Five of nine visits end with no recommendation reaching the doctor. That ratio is the product.
 3. **On `/clinic`**, delete a patient's potassium result and run them at SITE-A, then at SITE-C. Same patient, same gap, two different right answers — one asks for the test, the other refers, because only one of those hospitals can run it.
-4. **[CODE.md](CODE.md) § Making the drafter better** — the measurement that says whether self-consistency earns its cost, including the run where it did not and the instrument that turned out to be measuring itself.
+4. **[CODE.md](docs/CODE.md) § Making the drafter better** — the measurement that says whether self-consistency earns its cost, including the run where it did not and the instrument that turned out to be measuring itself.
 
-If you have four, read **[DECISION.md](DECISION.md)** and stop.
+If you have four, read **[DECISION.md](docs/DECISION.md)** and stop.
 
 ---
 
@@ -28,12 +28,12 @@ If you have four, read **[DECISION.md](DECISION.md)** and stop.
 
 | Doc | What it answers | Time |
 |---|---|---|
-| **[DECISION.md](DECISION.md)** | Should we do this? What would we build, what would it earn, what could kill it? | ~12 min |
-| **[RESEARCH.md](RESEARCH.md)** | Reference. Every claim, source, assumption and correction. Scan it; don't read it end to end. | ~55 min |
-| **[BUILD.md](BUILD.md)** | How do we actually build the prototype — stack, order, team, eval bars. | ~15 min |
-| **[SPEC-V1.md](SPEC-V1.md)** | The build order for engineers: one pathway, fully specified. Adult hypertension follow-up. | ~12 min |
-| **[DEMO.md](DEMO.md)** | A running order for a walkthrough — what to show, in what order, and what not to skip. | ~3 min |
-| **[CODE.md](CODE.md)** | The prototype: what is built, how to run it, what the scorecard does and does not prove. | ~4 min |
+| **[DECISION.md](docs/DECISION.md)** | Should we do this? What would we build, what would it earn, what could kill it? | ~12 min |
+| **[RESEARCH.md](docs/RESEARCH.md)** | Reference. Every claim, source, assumption and correction. Scan it; don't read it end to end. | ~55 min |
+| **[BUILD.md](docs/BUILD.md)** | How do we actually build the prototype — stack, order, team, eval bars. | ~15 min |
+| **[SPEC-V1.md](docs/SPEC-V1.md)** | The build order for engineers: one pathway, fully specified. Adult hypertension follow-up. | ~12 min |
+| **[DEMO.md](docs/DEMO.md)** | A running order for a walkthrough — what to show, in what order, and what not to skip. | ~3 min |
+| **[CODE.md](docs/CODE.md)** | The prototype: what is built, how to run it, what the scorecard does and does not prove. | ~4 min |
 
 **Start with DECISION.md.** RESEARCH and BUILD exist so that every number in it can be traced or attacked. **SPEC-V1 is where the work actually starts** — it is the one pathway an engineering team builds first.
 
@@ -51,13 +51,13 @@ If you have four, read **[DECISION.md](DECISION.md)** and stop.
 
 ## Status
 
-**Research and business case: complete and verified. V1 pathway: specified. Independently re-reviewed by a second model. Prototype: built, measured and green — see [CODE.md](CODE.md).**
+**Complete.** Research and business case verified and independently re-reviewed by a second model. V1 pathway specified. Prototype built, measured and green — every pathway step in SPEC-V1 §5 is implemented and tested. What remains needs a clinical lead, a hospital and 300 adjudicated visits, none of which is an engineering task; the list is at the end of [CODE.md](docs/CODE.md).
 
 The safety gate, the Indonesian rule packs, eligibility routing, the signature line and the scorecard all run today, on synthetic patients, with no model involved. That ordering is deliberate: the gate is the part that has to be right, it needs nothing else running, and building it first means a model arrives into a system that already refuses bad output.
 
 A real model now sits behind the router and changed nothing downstream, which is the architectural claim discharged rather than asserted. **A second pathway — type 2 diabetes follow-up — was added as two pack files and no engine code**, which is the other claim discharged. Building it found three places where that claim had been false: the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, and three engine messages named a blood pressure. All three are fixed and tested; the finding is more useful than the feature.
 
-This has been through six drafts and four adversarial review passes, the last a full independent review by a second model. Twenty-three claims were found wrong, overstated or internally inconsistent and corrected — the full list, including the ones that were mine, is in [RESEARCH.md § Corrections log](RESEARCH.md#corrections). If you are reviewing this, start there; it is the fastest way to find the parts of the argument that have already moved.
+This has been through six drafts and four adversarial review passes, the last a full independent review by a second model. Twenty-three claims were found wrong, overstated or internally inconsistent and corrected — the full list, including the ones that were mine, is in [RESEARCH.md § Corrections log](docs/RESEARCH.md#corrections). If you are reviewing this, start there; it is the fastest way to find the parts of the argument that have already moved.
 
 Four numbers cannot be established from public sources and set the size of the prize: the group's actual BPJS revenue share, its current coding accuracy and pending-claim rate, whether it employs or contracts its clinicians, and per-site drug stock. Each is a replaceable input, not a blocker.
 
