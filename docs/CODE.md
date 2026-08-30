@@ -262,7 +262,7 @@ The deterministic core, end to end, on synthetic patients:
 | Referral-back draft — the payer's own 3B criteria | Working |
 | Synthetic patients, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
-| EMR adapter | Port defined; the vendor adapter is a Phase 0 scaffold that raises rather than inventing a read. Blocked on access to the real system |
+| EMR adapter | Port defined. Writing one needs access to a real hospital system; the sequencing is BUILD.md Phase 0 |
 | Bounded intake interview, in Bahasa Indonesia | Working |
 | Pressure suite — 6 patterns x 5 turns, with a control | Working |
 | Model-backed reasoner behind the router | Working — needs an API key |
@@ -289,17 +289,17 @@ varies between runs is neither.
 
 ## The walkthrough
 
-`make demo` runs six encounters end to end. Four of them end without a
-recommendation — a handoff, two refusals and an escalation — and that ratio is
-the point rather than an embarrassment. A demo where the assistant always has an
+`make demo` runs every scripted encounter end to end, across both pathways. A
+majority end without a recommendation reaching the doctor, and that ratio is the
+point rather than an embarrassment. A demo where the assistant always has an
 answer is a demo of a system nobody should deploy.
 
-The seventh is not an encounter at all: it pulls the network out mid-clinic,
+The last section is not an encounter at all: it pulls the network out mid-clinic,
 kills the process, and shows three encounters surviving and syncing without
 duplicating. At a site with unreliable power and connectivity that is the normal
 case rather than the edge case.
 
-The one worth reading closely is the sixth: a patient at a basic-tier site who
+The one worth reading closely is the basic-tier site: a patient who
 needs an ACE inhibitor added. Three layers fire at once and agree — the drug
 rule wants potassium and eGFR, the sufficiency check says both are absent, and
 the capability registry says this hospital cannot run either test. The output is
@@ -328,20 +328,33 @@ runs the same suite without that structural advantage.
 ## Layout
 
 ```
-packs/id/      the country. Rules as data, versioned, with citations
+packs/id/      the country. Rules as data, versioned, with citations.
+               Two pathways live here; adding a third adds no code
+
 service/
   state/       longitudinal patient state, provenance mandatory
-  rules/       predicate evaluator, target resolution, eligibility
+  rules/       predicates, target resolution, eligibility, pathway routing
   contracts/   the Proposal — shared vocabulary, owned by neither side
   gate/        the nine checks. stdlib only. no model, ever
+  intake/      the bounded interview. structured, never a conversation
+  reason/      drafting: prompt, strict parser, schema, reference reasoner,
+               self-consistency, critic, read-only tools
+  router/      the only place a model provider is named
+  reconcile/   record against patient. surfaces, never resolves
+  present/     the traffic light. green is silent
+  followup/    the between-visit loop
+  emit/        coding, FHIR bundles, referral-back, offline queue
   graph/       the only module allowed to import an orchestration library
   packs/       the only module that reads YAML
   signing/     the signature line
+
 adapters/      EMR ports. Vendor names are allowed here and nowhere else
 datagen/       synthetic patients, reference proposer, planted errors
-eval/          the scorecard
-tools/         architectural checks that run in CI
+eval/          scorecard, pressure suite, plan concordance
+tools/         CI checks, walkthrough, live runner, the demo surface
+docs/          every document, including this one
 ```
+
 
 ## The four rules CI enforces
 

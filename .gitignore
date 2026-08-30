@@ -7,3 +7,6 @@
 .venv/
 __pycache__/
 demo.html
+
+# Internal: the running order for presenting this. Not part of the deliverable.
+docs/DEMO.md
