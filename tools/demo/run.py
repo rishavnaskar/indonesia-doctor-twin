@@ -155,6 +155,13 @@ def _patient(state, site, rules) -> dict:
         "site_as_of": site.get("as_of", ""),
         "labs_available": sorted(site.get("labs_available") or []),
         "stocked": sorted(site.get("stocked_molecules") or []),
+        "evidence": [
+            {"service": row.get("service"),
+             "label": (obs_terms.get(row.get("service")) or {}).get("label", row.get("service")),
+             "last_performed": row.get("last_performed"),
+             "volume_30d": row.get("volume_30d")}
+            for row in (site.get("evidence_ref") or [])
+        ],
     }
 
 

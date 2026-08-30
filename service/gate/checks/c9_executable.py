@@ -19,6 +19,8 @@ worse than no check at all, so the registry is capped at slow-moving facts, the
 
 from __future__ import annotations
 
+from datetime import date
+
 from service.contracts.proposal import ChangeAction
 from service.gate.types import Finding, GateContext, Severity
 
@@ -86,6 +88,35 @@ def run(ctx: GateContext) -> list[Finding]:
     # reporting that as "not available at SITE-A" states something false about
     # the site. It is a malformed proposal, so it blocks without converting to a
     # referral: there is nowhere to refer to.
+    # Permenkes-style operational evidence: naming a service is not the same as
+    # delivering it. A capability listed but never exercised is the stale-
+    # registry failure (A13, unverified) waiting to happen, and a confidently
+    # wrong "yes, we run that" is worse than no check at all.
+    #
+    # This warns rather than blocks. The plan may well be right and the test may
+    # well happen — the registry is what is doubtful, not the medicine — so the
+    # clinician gets a line and keeps the draft. Blocking on a records problem
+    # would deny care over paperwork.
+    evidence = {row.get("service"): row for row in (site.get("evidence_ref") or [])}
+    max_age = (getattr(ctx.rules, "evidence_policy", {}) or {}).get("max_age_days")
+    today = ctx.state.as_of if isinstance(getattr(ctx.state, "as_of", None), date) else None
+
+    def unevidenced(code: str) -> str | None:
+        row = evidence.get(code)
+        if row is None:
+            return "no delivery evidence on file"
+        last = row.get("last_performed")
+        if not last:
+            return "listed but never recorded as performed"
+        if max_age and today:
+            try:
+                age = (today - date.fromisoformat(str(last))).days
+            except ValueError:
+                return f"unreadable evidence date {last!r}"
+            if age > max_age:
+                return f"last performed {age} days ago, beyond the {max_age}-day policy"
+        return None
+
     catalogue = getattr(ctx.rules, "investigations", {}) or {}
     for investigation in ctx.proposal.investigations:
         if investigation not in catalogue:
@@ -118,5 +149,22 @@ def run(ctx: GateContext) -> list[Finding]:
                     converts_to_referral=True,
                 )
             )
+        else:
+            reason = unevidenced(investigation)
+            if reason:
+                findings.append(
+                    Finding(
+                        check=NUMBER,
+                        check_name=NAME,
+                        severity=Severity.WARN,
+                        message=(
+                            f"{site_id} lists {catalogue[investigation]} "
+                            f"({investigation}) but {reason}. The order may not be "
+                            "deliverable in practice."
+                        ),
+                        rule_id="capability_unevidenced",
+                        citation=(getattr(ctx.rules, "evidence_policy", {}) or {}).get("citation"),
+                    )
+                )
 
     return findings

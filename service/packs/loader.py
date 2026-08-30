@@ -53,6 +53,9 @@ class RuleSet:
     # meaningful to test at all, so an unrecognised value can be named as a
     # malformed proposal rather than misreported as unavailable here.
     investigations: dict[str, str] = field(default_factory=dict)
+    # How long a site's capability claim stays credible without evidence that
+    # the service was actually delivered.
+    evidence_policy: dict[str, Any] = field(default_factory=dict)
     payer: dict[str, Any] = field(default_factory=dict)
     interop: dict[str, Any] = field(default_factory=dict)
     language: dict[str, Any] = field(default_factory=dict)
@@ -156,6 +159,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
             row["code"]: row.get("label", row["code"])
             for row in (capability.get("investigation_catalogue") or [])
         },
+        evidence_policy=capability.get("evidence") or {},
         payer=payer,
         interop=interop,
         language=language,

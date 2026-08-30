@@ -210,7 +210,7 @@ The deterministic core, end to end, on synthetic patients:
 | Demo surface — clinician view and audit view, from a real run | Working |
 | Between-visit follow-up loop (SPEC §5.11) | Not started |
 | Plan-concordance metric (SPEC §8.2) | Working — reported, not gated; needs Set C to mean anything |
-| Capability evidence view — `evidence_ref` is empty at all three sites | Not started |
+| Capability evidence — proof each service was actually delivered | Working |
 | Live transport to the national exchange | Not started — no credentials, sandbox only |
 
 **The deterministic core runs with no model involved at all** — `make checks

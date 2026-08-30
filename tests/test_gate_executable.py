@@ -81,3 +81,52 @@ def test_a_pack_whose_halves_disagree_fails_at_load(rules, tmp_path, monkeypatch
     )
     with pytest.raises(loader.PackError, match="absent from the catalogue"):
         loader._validate(broken)
+
+
+def _with_investigation(rules, site_id, codes):
+    state = make_patient(1, controlled=True)
+    proposal = propose(state, rules)
+    proposal.investigations = list(codes)
+    proposal.medication_changes = []
+    return c9_executable.run(
+        GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites[site_id])
+    )
+
+
+def test_an_evidenced_capability_is_silent(rules):
+    assert _with_investigation(rules, "SITE-A", ["k"]) == []
+
+
+def test_a_capability_listed_but_never_performed_warns(rules):
+    """Permenkes 6/2026 Art. 74: naming a service is no longer sufficient, you
+    have to show it happened. SITE-A lists urine protein and has never recorded
+    running one."""
+    findings = _with_investigation(rules, "SITE-A", ["urine_protein"])
+    assert len(findings) == 1
+    assert findings[0].rule_id == "capability_unevidenced"
+    assert findings[0].severity is Severity.WARN
+    assert findings[0].citation
+
+
+def test_stale_evidence_warns_with_the_age_named(rules):
+    """SITE-B claims HbA1c and has not run one since mid-2025."""
+    findings = _with_investigation(rules, "SITE-B", ["hba1c"])
+    assert findings[0].rule_id == "capability_unevidenced"
+    assert "days ago" in findings[0].message
+
+
+def test_an_unevidenced_capability_warns_but_never_blocks(rules):
+    """The plan may well be right and the test may well happen — the registry
+    is what is doubtful, not the medicine. Blocking here would deny care over
+    a records problem."""
+    findings = _with_investigation(rules, "SITE-A", ["urine_protein"])
+    assert not any(f.severity is Severity.BLOCK for f in findings)
+    assert not any(f.converts_to_referral for f in findings)
+
+
+def test_unavailable_still_beats_unevidenced(rules):
+    """A test the site cannot run at all is a referral, not a paperwork note.
+    The stronger finding must not be softened by the weaker one."""
+    findings = _with_investigation(rules, "SITE-C", ["k"])
+    assert {f.rule_id for f in findings} == {"test_unavailable"}
+    assert findings[0].converts_to_referral

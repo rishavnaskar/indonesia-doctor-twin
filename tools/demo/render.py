@@ -408,6 +408,14 @@ function auditView(e){
         ${row("Drugs in stock", `<span class="mono">${p.stocked.map(esc).join(", ")||"none"}</span>`)}
         ${row("Information current as of", esc(p.site_as_of))}
       </table>
+      ${p.evidence && p.evidence.length ? `<h3>Proof each service was actually delivered</h3>
+        <table><thead><tr><th style="width:auto">Service</th>
+          <th style="width:auto">Last performed</th><th style="width:auto">Last 30 days</th></tr></thead>
+        ${p.evidence.map(e=>`<tr><td>${esc(e.label)}</td>
+          <td>${e.last_performed?esc(e.last_performed):`<span style="color:var(--amber)">never recorded</span>`}</td>
+          <td class="mono">${e.volume_30d}</td></tr>`).join("")}</table>
+        <div class="note">Naming a service is not the same as delivering it. A capability listed
+          with nothing behind it is the stale-registry failure this check exists to catch.</div>`:""}
       <div class="note">A plan is only a plan if this hospital can carry it out. A drug the pharmacy
         does not stock, or a test that has to travel to another island, makes the output a referral
         rather than a recommendation.</div>
