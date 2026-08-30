@@ -71,16 +71,41 @@ def run(ctx: GateContext) -> list[Finding]:
                 )
             )
 
+    # Two different failures, deliberately not merged.
+    #
+    # A known test this site cannot run is a referral: the plan is right, the
+    # place is wrong. An unrecognised value is neither — it means the proposal
+    # put something in this field that is not an orderable investigation, and
+    # reporting that as "not available at SITE-A" states something false about
+    # the site. It is a malformed proposal, so it blocks without converting to a
+    # referral: there is nowhere to refer to.
+    catalogue = getattr(ctx.rules, "investigations", {}) or {}
     for investigation in ctx.proposal.investigations:
-        if investigation not in labs:
+        if investigation not in catalogue:
             findings.append(
                 Finding(
                     check=NUMBER,
                     check_name=NAME,
                     severity=Severity.BLOCK,
                     message=(
-                        f"{investigation} is not available at {site_id} "
-                        f"(capability as of {as_of}). This is a referral, not an order."
+                        f"{investigation!r} is not a recognised investigation code. "
+                        "This field takes codes from the catalogue; monitoring "
+                        "intent and intervals belong in the follow-up fields."
+                    ),
+                    rule_id="unrecognised_investigation",
+                    converts_to_referral=False,
+                )
+            )
+        elif investigation not in labs:
+            findings.append(
+                Finding(
+                    check=NUMBER,
+                    check_name=NAME,
+                    severity=Severity.BLOCK,
+                    message=(
+                        f"{catalogue[investigation]} ({investigation}) is not available "
+                        f"at {site_id} (capability as of {as_of}). "
+                        "This is a referral, not an order."
                     ),
                     rule_id="test_unavailable",
                     converts_to_referral=True,

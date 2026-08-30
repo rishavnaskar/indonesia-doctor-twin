@@ -94,3 +94,33 @@ questions:
       - {value: painkiller, text: "Ya, obat nyeri"}
       - {value: herbal,   text: "Ya, jamu atau herbal"}
       - {value: other,    text: "Ya, lainnya"}
+
+# SPEC-V1 §5.8 — what the clinician reads, per band.
+#
+# Here rather than in /service/present for the same reason the deflection text
+# is here: the engine may not name a language. A second country changes this
+# block, not a source file.
+#
+# Green has a headline but the surface never shows it. It exists so the audit
+# view can say what the system concluded while staying silent.
+presentation:
+  bands:
+    green: "Tidak ada catatan"
+    amber: "Perlu diperiksa"
+    red: "Perlu tindakan"
+  headlines:
+    escalate: "Tanda bahaya — rujuk segera, tidak ada draf"
+    referral: "Rencana ini tidak dapat dijalankan di sini — perlu rujukan"
+    handoff: "Pasien ini di luar alur hipertensi dewasa"
+    request_info: "Data belum cukup untuk memberi saran"
+    abstain: "Sistem tidak mengeluarkan draf untuk kunjungan ini"
+    warnings: "Draf tersedia, dengan catatan"
+    clean: "Draf tersedia"
+  glosses:
+    escalate: "Red flag — refer immediately, no draft"
+    referral: "This plan cannot be delivered here — referral needed"
+    handoff: "This patient is outside the adult hypertension pathway"
+    request_info: "Not enough information to advise"
+    abstain: "The system produced no draft for this visit"
+    warnings: "Draft available, with notes"
+    clean: "Draft available"

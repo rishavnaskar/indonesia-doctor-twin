@@ -48,6 +48,11 @@ class RuleSet:
     interactions: list[dict[str, Any]] = field(default_factory=list)
     guideline: dict[str, Any] = field(default_factory=dict)
     sites: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Closed vocabulary for the proposal's `investigations` field. Gate check 9
+    # tests membership of a site's list; this is the set of codes that are
+    # meaningful to test at all, so an unrecognised value can be named as a
+    # malformed proposal rather than misreported as unavailable here.
+    investigations: dict[str, str] = field(default_factory=dict)
     payer: dict[str, Any] = field(default_factory=dict)
     interop: dict[str, Any] = field(default_factory=dict)
     language: dict[str, Any] = field(default_factory=dict)
@@ -142,6 +147,10 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
         interactions=list(interactions.get("rules") or []),
         guideline=guideline,
         sites={s["site_id"]: s for s in capability.get("sites", [])},
+        investigations={
+            row["code"]: row.get("label", row["code"])
+            for row in (capability.get("investigation_catalogue") or [])
+        },
         payer=payer,
         interop=interop,
         language=language,
@@ -159,6 +168,17 @@ def _validate(rs: RuleSet) -> None:
         raise PackError("guideline defines no red flags")
     if not rs.guideline.get("targets"):
         raise PackError("guideline defines no targets")
+    if not rs.investigations:
+        raise PackError("capability defines no investigation_catalogue")
+
+    # A site offering a lab that is not in the catalogue means the two halves of
+    # the pack disagree, and check 9 would silently never match it.
+    for site_id, site in rs.sites.items():
+        unknown = set(site.get("labs_available") or []) - set(rs.investigations)
+        if unknown:
+            raise PackError(
+                f"{site_id} offers investigations absent from the catalogue: {sorted(unknown)}"
+            )
 
     known_classes = {m.drug_class for m in rs.molecules.values()} | set(rs.recognised.values())
     for rule in rs.interactions:

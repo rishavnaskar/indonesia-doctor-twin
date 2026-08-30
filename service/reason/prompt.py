@@ -130,7 +130,13 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
                     "citation": "string",
                 }
             ],
-            "investigations": ["string"],
+            # An enumeration, exactly like the fields above it. The schema
+            # block is a shape, and anything placed inside it is read as part
+            # of that shape: a first attempt at constraining this field put the
+            # explanation in a nested object here, and the model dutifully
+            # emitted the explanation's own keys as investigation codes. Prose
+            # goes outside the JSON, below.
+            "investigations": [" | ".join(sorted(rules.investigations))],
             "assertions": [{"text": "string", "citation": "string"}],
             "patient_instructions": f"string, in plain {language}",
             "follow_up_interval_days": "integer",
@@ -140,6 +146,17 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target) -> str:
     }
 
     parts = [json.dumps(context, indent=2, default=str)]
+
+    # Field-level constraints that do not fit in a shape. Kept out of the schema
+    # object above so that nothing here can be mistaken for a key to emit.
+    parts.append(
+        "\nRules for `investigations`: codes only, drawn from the enumeration "
+        "in the schema, and only tests that are genuinely needed now. It is not "
+        "a place for sentences, intervals or monitoring plans — a test you want "
+        "repeated later is `follow_up_interval_days` plus "
+        "`patient_instructions`. An empty list is the correct answer when no "
+        "new test is needed."
+    )
 
     # Untrusted text goes last, fenced, and clearly labelled as data. The gate
     # is the real defence; this only removes the easy win.

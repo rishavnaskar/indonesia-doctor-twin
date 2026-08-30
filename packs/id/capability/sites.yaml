@@ -15,6 +15,26 @@
 
 version: "id-sites-2026-08-29"
 
+# Every investigation this pathway can order, as a code.
+#
+# Needed because gate check 9 tests site capability by exact membership, so the
+# field it reads has to have a closed vocabulary. Without one, a model asked for
+# a management plan writes a sentence — "repeat potassium and eGFR in 90 days to
+# monitor RAAS safety" — into the field the gate reads as an orderable test, and
+# the check reports it as unavailable at a site that runs potassium every day.
+# That is a false refusal caused by an underspecified contract, and the fix
+# belongs here and in the prompt rather than in a loosened check.
+#
+# Monitoring intent, intervals and advice are not investigations. They belong in
+# follow_up_interval_days and patient_instructions, which already exist.
+investigation_catalogue:
+  - {code: k,             label: "Serum potassium"}
+  - {code: egfr,          label: "Estimated GFR"}
+  - {code: creatinine,    label: "Serum creatinine"}
+  - {code: hba1c,         label: "HbA1c"}
+  - {code: lipids,        label: "Lipid panel"}
+  - {code: urine_protein, label: "Urine protein"}
+
 sites:
 
   - site_id: SITE-A

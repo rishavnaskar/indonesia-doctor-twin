@@ -88,6 +88,19 @@ class RateLimited(BackendError):
     to it is different: wait or move, rather than fix."""
 
 
+class TransientTransport(BackendError):
+    """The connection failed in a way that says nothing about the request.
+
+    A reset peer, a dropped socket, a timeout. Retryable for the same reason a
+    429 is: nothing about the proposal changed. Kept distinct from BackendError
+    because a connection reset misreported as a model failure is the same class
+    of wrong conclusion as a truncation misreported as a parse failure.
+
+    This also happens to be the failure mode a rural site sees constantly, which
+    is the case the offline queue exists for.
+    """
+
+
 class TruncatedResponse(BackendError):
     """The model ran out of output budget mid-answer.
 
@@ -160,7 +173,7 @@ class HostedChatBackend:
         for model in self.chain:
             try:
                 body = self._call_model(model, system, user, api_key)
-            except RateLimited:
+            except (RateLimited, TransientTransport):
                 busy.append(model)
                 continue
             served_by = body.get("provider") or "unknown-provider"
@@ -178,7 +191,7 @@ class HostedChatBackend:
         for attempt in range(RETRIES_PER_MODEL):
             try:
                 return self._post(model, system, user, api_key, json_mode=self.json_mode)
-            except RateLimited as exc:
+            except (RateLimited, TransientTransport) as exc:
                 if attempt + 1 >= RETRIES_PER_MODEL:
                     raise
                 time.sleep(getattr(exc, "retry_after", None) or BACKOFF_S * (attempt + 1))
@@ -267,7 +280,12 @@ class HostedChatBackend:
                 return self._post(model, system, user, api_key, json_mode=False)
             raise BackendError(f"HTTP {exc.code} from {model}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise BackendError(f"network error: {exc.reason}") from exc
+            raise TransientTransport(f"network error talking to {model}: {exc.reason}") from exc
+        except (TimeoutError, ConnectionError) as exc:
+            # ConnectionResetError and friends are OSError but NOT URLError, so
+            # they escape the handler above and surface as an unhandled crash
+            # mid-clinic. Observed in a live run.
+            raise TransientTransport(f"{type(exc).__name__} talking to {model}: {exc}") from exc
 
 
 def _retry_after(exc: urllib.error.HTTPError) -> float | None:
