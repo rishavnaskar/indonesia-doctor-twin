@@ -328,6 +328,12 @@ def main() -> int:
                     ))
                     return
 
+                if path == "/api/history/clear":
+                    from tools.demo.run import clear_clinic_history
+
+                    self._json({"cleared_at": clear_clinic_history()})
+                    return
+
                 if path == "/api/run":
                     patients = body.get("patients") or []
                     if not patients:
@@ -374,6 +380,15 @@ def main() -> int:
                 return
             if path == "/api/vocabulary":
                 self._json(vocabulary(args.pack))
+                return
+            if path == "/api/history":
+                from tools.demo.run import clinic_history, store
+
+                self._json({
+                    "visits": clinic_history(),
+                    "backend": store().backend,
+                    "location": store().summary()["location"],
+                })
                 return
             if path == "/status":
                 self._send(json.dumps(build.status()).encode(), "application/json")

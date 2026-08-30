@@ -26,6 +26,13 @@ make live     # the same, with a real model drafting
 Nothing else is optional-but-required: no Docker, no validator jar and no API
 key each degrade to a named skip rather than a failure.
 
+**The second run picks up where the first stopped.** Each encounter is stored
+under a thread id derived from its inputs — patient, site, pack version, which
+drafter is behind the router — so a re-run replays what is already there rather
+than doing it again. `make live` is nine model calls the first time and none
+after that. Edit a guideline file and they all run again, because the pack
+version is part of the id.
+
 Then, in order:
 
 1. **[DECISION.md](docs/DECISION.md) § The reframe** — why "60–70% of what a doctor does" is buildable and "60–70% of what a doctor decides" is not.

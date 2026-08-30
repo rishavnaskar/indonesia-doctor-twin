@@ -140,6 +140,7 @@ hospital without a potassium assay, and the verdict moves with it.</div>
   <div><button id="run" disabled>Run the AI clinician</button></div>
   <div><button class="ghost" id="compare" disabled title="Run these patients at every hospital">Compare hospitals</button></div>
 </div>
+<div id="restored"></div>
 <div id="msg"></div>
 <div class="grid" id="grid"></div>
 <details style="margin-top:20px"><summary>Paste a patient record as JSON</summary>
@@ -174,6 +175,43 @@ async function boot(){
   $("profile").innerHTML = V.profiles.map(p=>`<option value="${esc(p.key)}">${esc(p.label)}</option>`).join("");
   $("site").innerHTML = V.sites.map(s=>
     `<option value="${esc(s.site_id)}">${esc(s.site_id)} — ${esc(s.label)}</option>`).join("");
+  await restore();
+}
+
+// Everything run here in an earlier session, read back from the store. This
+// page used to keep its results in a dict in the server process and its
+// patients in the tab, so closing either one lost the work — while the store
+// had been recording all of it and nothing ever read it back.
+async function restore(){
+  let h;
+  try { h = await (await fetch("/api/history")).json(); }
+  catch (e) { return; }                      // a page that cannot restore still works
+  const visits = (h.visits||[]).filter(v=>v.wire);
+  if (!visits.length) return;
+
+  patients = visits.map(v=>v.wire);
+  visits.forEach(v=>{ results[v.key] = v; });
+  draw();
+
+  const last = visits[0].ran_at || "";
+  $("restored").innerHTML = `<div class="stat">
+    <b>${visits.length} visit(s) restored from ${esc(h.backend)}</b>
+    <span class="mono">${esc(h.location||"")}</span>. Last run ${esc(last.replace("T"," ").slice(0,19))}.
+    These are the patients and verdicts from earlier sessions — edit and re-run any of them.
+    <button class="ghost" id="forget" style="margin-left:10px">Clear this list</button>
+    </div>`;
+  $("forget").onclick = async ()=>{
+    // Nothing is deleted. The store refuses UPDATE and DELETE, so clearing
+    // writes a marker forward and the page starts after it — the visits stay on
+    // the record and `python -m tools.store` still replays them. An audit log
+    // with a working clear button would not be an audit log.
+    await fetch("/api/history/clear", {method:"POST", body:"{}"});
+    patients = []; results = {};
+    $("restored").innerHTML = `<div class="stat">List cleared from this page. Nothing was
+      deleted — the store is append-only, so every visit is still on the record and still
+      replayable with <span class="mono">python -m tools.store</span>.</div>`;
+    draw();
+  };
 }
 
 function medRow(p, i){

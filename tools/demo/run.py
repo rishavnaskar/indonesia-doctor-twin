@@ -8,6 +8,9 @@ exactly the audience that will ask.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
@@ -32,7 +35,19 @@ NOW = datetime(2026, 8, 29, 10, 0)
 MAX_CONCURRENT_ENCOUNTERS = 3
 
 _STORE = None
+_RUNTIME = None
 _STORE_LOCK = threading.Lock()
+
+# Bump when the shape of an encounter dict changes. It is part of the thread id,
+# so a stored view built by older code is simply never found — the encounter
+# re-runs rather than being handed to a renderer that no longer understands it.
+VIEW_VERSION = 1
+
+# CLINICIAN_FRESH=1 re-runs everything even when a stored result matches. For
+# watching a live model disagree with itself across runs, which is a real thing
+# to want and the exact thing resumption otherwise hides.
+def _forced_fresh() -> bool:
+    return os.environ.get("CLINICIAN_FRESH", "").lower() in ("1", "true", "yes")
 
 
 def store():
@@ -51,6 +66,158 @@ def store():
 
             _STORE = Store()
     return _STORE
+
+
+def runtime():
+    """The durable runtime, loaded once per process.
+
+    Unlike the queue and the audit log this one is shared between the three
+    concurrent encounters, because it is also the thing they look themselves up
+    in — rebuilding it per encounter would re-read every checkpoint the
+    deployment has ever written, once per patient. Sharing is safe here in a way
+    it is not for the queue: distinct thread ids mean distinct lists, and
+    `setdefault` on the thread dict is atomic.
+    """
+    global _RUNTIME
+    # store() outside the lock, not inside it: threading.Lock is not reentrant,
+    # and taking it here and again in store() deadlocks the first caller.
+    durable = store()
+    with _STORE_LOCK:
+        if _RUNTIME is None:
+            _RUNTIME = durable.runtime()
+    return _RUNTIME
+
+
+def _reported_drafter(encounters, fallback: str) -> str:
+    """Who actually drafted these encounters, taken from the encounters.
+
+    A resumed run never calls the model, so the backend object still reports its
+    *configured* name — `some/model` rather than the `some/model@served_by` a
+    hosted backend rewrites itself to once it has an answer. The page would then
+    under-report provenance on exactly the runs where the provenance is already
+    on file. The encounters are the record of what happened; the live object is
+    only this process's configuration, so the record wins.
+    """
+    for encounter in encounters:
+        recorded = ((encounter.get("proposal") or {}).get("provenance") or [None])[0]
+        if recorded:
+            return recorded
+    return fallback
+
+
+CLEAR_MARKER = "CLINIC-HISTORY-CLEARED"
+
+
+def clinic_history(limit: int = 24) -> list[dict]:
+    """Visits run at /clinic in earlier sessions, newest first.
+
+    The interactive page was the one part of the system that kept nothing: its
+    results lived in a dict in the server process and its patients lived in the
+    browser tab, so closing either one lost the work. They were being written to
+    the store the whole time — nothing was reading them back.
+    """
+    since = _cleared_at()
+    latest: dict[str, dict] = {}
+    for history in runtime().checkpoints.values():
+        for entry in reversed(history):
+            if entry.step != "rendered" or not isinstance(entry.state, dict):
+                continue
+            view = entry.state
+            if view.get("origin") != "clinic":
+                break
+            ran_at = view.get("ran_at") or ""
+            if since and ran_at <= since:
+                break
+            # One card per patient: re-running the same record is the same
+            # patient seen again, not a second patient.
+            keep = latest.get(view.get("key"))
+            if keep is None or ran_at > (keep.get("ran_at") or ""):
+                latest[view.get("key")] = view
+            break
+    ordered = sorted(latest.values(), key=lambda v: v.get("ran_at") or "", reverse=True)
+    return ordered[:limit]
+
+
+def clear_clinic_history() -> str:
+    """Hide what is on the page without deleting any of it.
+
+    The store refuses UPDATE and DELETE — that is the point of it — so clearing
+    is a marker written forward rather than history rewritten backwards. The
+    visits stay on the record and remain replayable by `python -m tools.store`;
+    the page simply starts after the marker. An audit log with a clear button
+    that worked would not be an audit log.
+    """
+    at = datetime.now().isoformat()
+    runtime().checkpoint(CLEAR_MARKER, "rendered", {"origin": "cleared", "ran_at": at})
+    return at
+
+
+def _cleared_at() -> str:
+    history = runtime().checkpoints.get(CLEAR_MARKER) or []
+    stamps = [e.state.get("ran_at", "") for e in history
+              if isinstance(e.state, dict) and e.state.get("origin") == "cleared"]
+    return max(stamps) if stamps else ""
+
+
+def _drafter_identity(router) -> str:
+    """Who is drafting, named stably enough to key a cache on.
+
+    Deliberately not `backend.version()`. That reports who *answered* — a
+    hosted backend rewrites it to `model@served_by` after its first reply — so
+    using it here would give the first encounter of a run a different key from
+    the second, and no run would ever resume.
+
+    The router's class is part of the key, because failing to name a backend is
+    not itself a name. An earlier version returned "reference" whenever the
+    lookup raised, which is how the reference reasoner reports itself — so a
+    router that raises for a different reason, such as one that fails every
+    draft, resumed the reference reasoner's successful results and reported
+    zero failures. Two different drafters must never share a key.
+    """
+    kind = type(router).__name__
+    try:
+        backend = router.get(router.default).backend
+    except (KeyError, AttributeError):
+        return f"{kind}/reference"
+    return f"{kind}/{getattr(backend, 'model', None) or backend.version()}"
+
+
+def _thread_id(scenario, rules, router) -> str:
+    """A thread id derived from everything that could change the answer.
+
+    Content-addressed on purpose. Re-running `make` re-uses what is already in
+    the store, and the moment any input moves — a pack edited, a different site,
+    a real model swapped in for the reference reasoner, a different patient —
+    the id moves with it and the encounter runs again. So the demo is fast on
+    the second run without ever showing a result that belongs to a question
+    nobody asked.
+
+    This is also what makes `make live` usable: nine model calls the first time,
+    none the second, and an edit to a guideline file still costs nine.
+    """
+    material = json.dumps({
+        "view": VIEW_VERSION,
+        "scenario": scenario.key,
+        "pack": f"{rules.pack_id}@{rules.version}",
+        "site": scenario.site.get("site_id", ""),
+        "drafter": _drafter_identity(router),
+        "tampered": bool(scenario.tamper),
+        # The patient itself, because /clinic builds them in the browser and two
+        # patients under one scenario key are two different encounters.
+        "patient": _plain(scenario.state),
+    }, sort_keys=True, default=str)
+    return f"DEMO-{scenario.key}-{hashlib.sha256(material.encode()).hexdigest()[:12]}"
+
+
+def _stored(thread_id: str) -> dict | None:
+    """A finished encounter from a previous run, if this is the same question."""
+    if _forced_fresh():
+        return None
+    history = runtime().checkpoints.get(thread_id) or []
+    for entry in reversed(history):
+        if entry.step == "rendered" and isinstance(entry.state, dict):
+            return {**entry.state, "resumed": True}
+    return None
 
 
 def _plain(value: Any) -> Any:
@@ -364,13 +531,37 @@ def _failed_shell(scenario, rules) -> dict:
     }
 
 
-def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
+def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
+               extra: dict | None = None) -> dict:
+    """Run one encounter, or replay it if the same question was answered before.
+
+    `resume=False` for `/clinic`, and the distinction is not arbitrary. The
+    scripted page is a *report* of a run, so serving a stored one is right. A
+    patient built in the browser and run with a button is an *action*, and an
+    action that silently returns an earlier answer looks broken — especially on
+    camera, with a live model that was expected to visibly think. Two runs of
+    the same patient at different times are also genuinely two encounters, so
+    they get two thread ids rather than appending to one.
+    """
     # The surface used to run every encounter through an in-memory runtime and
     # an unbacked audit log, so a demo produced nothing that outlived the tab.
     # That made the persistence story a claim in a document rather than
     # something you could restart the process and go looking for.
     durable = store()
-    runtime = durable.runtime()
+    thread_id = _thread_id(scenario, rules, router)
+
+    if resume:
+        # If this exact question has been answered before, hand back the answer.
+        # A checkpoint whose only use is proving a checkpoint exists is
+        # decoration; this is the runtime being load-bearing.
+        already = _stored(thread_id)
+        if already is not None:
+            if on_step is not None:
+                on_step("RESUMED")
+            return already
+    else:
+        thread_id = f"{thread_id}-{uuid4().hex[:8]}"
+
     audit_log = durable.audit_log()
     queue = durable.outbound()
 
@@ -387,8 +578,8 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
 
     try:
         result = run_encounter(
-            scenario.state, rules, scenario.site, effective, runtime,
-            thread_id=f"DEMO-{scenario.key}-{uuid4().hex[:8]}",
+            scenario.state, rules, scenario.site, effective, runtime(),
+            thread_id=thread_id,
             signer=Signer(practitioner, True),
             audit=audit_log, queue=queue, now=NOW, on_step=on_step,
         )
@@ -421,7 +612,7 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
             "provenance": list(record.proposal_provenance),
         }
 
-    return {
+    rendered = {
         "key": scenario.key,
         "title": scenario.title,
         "note": scenario.note,
@@ -502,7 +693,21 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
         } if result.claim else None,
         "signature": signature,
         "questions": list(result.questions_for_clinician),
+        "resumed": False,
+        # Microseconds, not seconds. `ran_at` orders the restored list and is
+        # compared against the clear marker, and at second resolution a clear
+        # followed immediately by a run discarded the run — the two stamps were
+        # equal and the filter is "after the marker".
+        "ran_at": datetime.now().isoformat(),
+        **(extra or {}),
     }
+
+    # What the clinician was actually shown, kept with the rest of the record.
+    # Two jobs, and the second is the one that justifies it being here rather
+    # than in a cache: a later run finds it and skips the work, and "what did
+    # the doctor see" stops being a question only a screenshot can answer.
+    runtime().checkpoint(thread_id, "rendered", rendered)
+    return rendered
 
 
 def run_patients(
@@ -524,6 +729,12 @@ def run_patients(
 
     rules = load_pack(pack_id)
     labels = Labels.from_pack(rules.language)
+    # Whether the *caller* named a drafter, captured before the default is
+    # applied. The concurrency decision below used to read `router is None`
+    # after this line had made that impossible, so every run went wide —
+    # including reference-reasoner runs, where three threads buy nothing and
+    # cost the deterministic ordering that a restored list is sorted by.
+    drafter_named = router is not None
     router = router or default_router()
 
     if site_id not in rules.sites:
@@ -550,7 +761,14 @@ def run_patients(
                 site=site,
                 watch_for="",
             )
-            encounter = _encounter(scenario, rules, labels, router, on_step=step)
+            encounter = _encounter(
+                scenario, rules, labels, router, on_step=step, resume=False,
+                # Stored with the encounter so the page can be rebuilt from the
+                # store alone. `wire` is the patient exactly as the browser
+                # submitted it, which is what makes a restored visit editable
+                # and re-runnable rather than a read-only picture of one.
+                extra={"origin": "clinic", "site_id": site_id, "wire": wire},
+            )
         if on_progress:
             on_progress(index, len(wire_patients),
                         encounter.get("title") or str(index),
@@ -565,7 +783,7 @@ def run_patients(
     # per patient against a free reasoning model, three patients sequentially is
     # six minutes of a silent screen. Concurrency is modest because the free
     # tiers are shared pools and hammering one earns a 429 for everybody.
-    workers = 1 if router is None else min(MAX_CONCURRENT_ENCOUNTERS, len(wire_patients))
+    workers = 1 if not drafter_named else min(MAX_CONCURRENT_ENCOUNTERS, len(wire_patients))
     if workers > 1:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             encounters = list(pool.map(one, enumerate(wire_patients, start=1)))
@@ -722,6 +940,8 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         is_model = True
     except (KeyError, AttributeError):
         pass
+    if is_model:
+        reasoner = _reported_drafter(encounters, reasoner)
 
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -730,6 +950,10 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         # states where this deployment keeps its state, because "durable" is
         # the kind of claim that should be checkable from the thing itself.
         "store": store().summary(),
+        # How many of the encounters below came back from the store rather than
+        # being run again. On a second `make live` this is the whole page, and
+        # zero model calls.
+        "resumed": sum(1 for e in encounters if e.get("resumed")),
         "pack": {
             "pack_id": rules.pack_id,
             "version": rules.version,

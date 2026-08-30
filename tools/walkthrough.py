@@ -39,6 +39,11 @@ OUTCOMES: list[Outcome] = []
 
 
 def show(title: str, note: str, state, rules, site, *, tamper=None) -> None:
+    # In memory on purpose, unlike the surface and the live runner. The
+    # walkthrough narrates the same scripted encounters on every run to explain
+    # the state machine; persisting them would add a set of identical rows to
+    # the store each time `make` is typed, and the store is meant to be a record
+    # of clinical work rather than of documentation being printed.
     router, runtime, audit = default_router(), InMemoryRuntime(), AuditLog()
 
     print(f"\n{RULE}\n  {title}\n  {note}\n{RULE}")

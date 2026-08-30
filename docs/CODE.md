@@ -346,7 +346,7 @@ The deterministic core, end to end, on synthetic patients:
 | The nine-check gate | Working |
 | Signature line — roster and licence enforced | Working |
 | Durable runtime — interrupt / resume / replay | Working. Postgres or files; conformance suite runs against all three implementations |
-| Persisted state — checkpoints, signatures, outbound queue | Working — `python -m tools.store`; the surface persists every encounter it runs |
+| Persisted state — checkpoints, signatures, outbound queue | Working — `python -m tools.store`. Both surfaces persist every encounter; `/clinic` restores its patients and verdicts across restarts, and a second run replays rather than re-running |
 | Encounter workflow — the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
@@ -526,6 +526,91 @@ writes `pending`, a drain writes the outcome, and the current state of an item
 is its newest row. An operator at a site with one bar of signal asks how many
 times a bundle failed and with what error, and a queue that overwrites its own
 rows cannot say.
+
+### The second run picks up where the first stopped
+
+`make` twice does not run `make` twice. Each encounter is stored under a thread
+id derived from everything that could change its answer — the scenario, the
+patient, the site, the pack and its version, and which drafter is behind the
+router — and a run that finds a stored result for the same id replays it
+instead of running it again. The page says how many it replayed.
+
+This is the checkpoint being load-bearing rather than decorative. Without it the
+durable runtime writes a record nothing ever reads.
+
+It matters most for `make live`, where every encounter is a model call over a
+rate-limited free tier:
+
+| | first run | second run |
+|---|---|---|
+| `make` | 9 encounters run | 9 replayed, 0 run |
+| `make live` | 9 model calls | **0 model calls** |
+
+The risk a cache introduces is showing an answer to a question nobody asked, so
+the invalidation is the part worth reading. Edit a guideline file and the pack
+version moves, so every encounter runs again — the "edit a pack, refresh, watch
+the verdict move" property is preserved rather than defeated. Swap the reference
+reasoner for a real model and everything re-runs, because a page drafted by
+plain code must never be served as though a model had written it. Build a
+different patient in `/clinic` and it is a different encounter.
+
+Two escapes, both deliberate:
+
+```bash
+CLINICIAN_FRESH=1 make live     # re-run everything even if it is stored
+CLINICIAN_STORE_BACKEND=files make   # ignore the database, use .store/
+```
+
+`CLINICIAN_FRESH` exists because watching a live model disagree with itself
+across runs is a real thing to want, and it is the exact thing resumption
+otherwise hides.
+
+**`/clinic` restores but never resumes**, and the two are different things.
+
+*Resuming* would mean pressing Run and getting an earlier answer back. It does
+not do that. The scripted page is a *report* of a run, so serving a stored one
+is right; a patient you built and ran with a button is an *action*, and an
+action that silently hands back an earlier answer looks broken — especially on
+camera, with a live model that was expected to visibly think. Two runs of the
+same record at different times are also genuinely two encounters, so they get
+two thread ids rather than one overwriting the other.
+
+*Restoring* is what happens when you open the page. Everything run there in
+earlier sessions comes back — the patients as editable records, with their
+verdicts, signatures and codes — read from the store by `/api/history`. This
+was the one part of the system that kept nothing: results lived in a dict in
+the server process and patients lived in the browser tab, so closing either one
+lost the work. They had been written to the store the whole time; nothing was
+reading them back.
+
+Only the newest run of a record gets a card, because re-running a patient is
+that patient seen again rather than a second patient. Every run stays on the
+record and stays replayable with `python -m tools.store --thread <id>`.
+
+**Clearing the list deletes nothing.** The store refuses `UPDATE` and `DELETE`,
+so "Clear this list" writes a marker forward and the page starts after it. An
+audit log with a working clear button would not be an audit log — and this is
+the append-only constraint being designed around rather than fought, which is
+the more useful thing to show someone than the trigger itself.
+
+One known limit, stated rather than discovered later: the runtime loads a
+deployment's checkpoints once per process, so a store with tens of thousands of
+encounters in it would make startup slow and memory-hungry. A targeted query
+per lookup is the fix, and it is not written because a demo store holds
+hundreds. It becomes real the moment this runs somewhere that is not a demo.
+
+Deriving the key was the fiddly part, and two versions of it were wrong:
+
+- Keying on `backend.version()` looked obvious and never resumed anything. A
+  hosted backend rewrites that string to `model@served_by` once it has an
+  answer, so the first encounter of a run and the second had different keys.
+- Falling back to `"reference"` when the router could not name a backend put
+  two different drafters in one bucket — that string is how the reference
+  reasoner reports itself, so a router that raised for an unrelated reason
+  (one that fails every draft, in the test that caught it) replayed the
+  reference reasoner's *successful* results and the page reported zero
+  failures. The router's class is part of the key now. Failing to name a
+  backend is not itself a name.
 
 This was missing, and its absence made two claims false rather than merely
 incomplete. A checkpoint is supposed to be a recovery point for *service

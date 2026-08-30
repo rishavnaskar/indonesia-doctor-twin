@@ -28,7 +28,16 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-DEFAULT_DIR = Path(os.environ.get("CLINICIAN_STORE", ".store"))
+def default_dir() -> Path:
+    """Where the file backend writes, read on each call rather than at import.
+
+    A module-level constant here silently ignored any `CLINICIAN_STORE` set
+    after this module was first imported, which in a test suite is all of them:
+    every test that pointed the store at its own temporary directory quietly
+    shared one instead, and a test asserting a fresh store found the previous
+    test's encounters in it.
+    """
+    return Path(os.environ.get("CLINICIAN_STORE", ".store"))
 
 def _forced_to_files() -> bool:
     """CLINICIAN_STORE_BACKEND=files stays on disk with a database running.
@@ -46,7 +55,7 @@ class Store:
     """The durable side of one deployment."""
 
     def __init__(self, directory: Path | str | None = None, *, connection=None):
-        self.dir = Path(directory or DEFAULT_DIR)
+        self.dir = Path(directory or default_dir())
         self._conn = connection
         if self._conn is None and not _forced_to_files():
             from service import db

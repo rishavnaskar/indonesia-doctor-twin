@@ -398,3 +398,97 @@ that re-running against an existing schema does not raise.
 **Overturned if:** a real migration cannot be made idempotent — a destructive
 column rewrite, say. At that point the tracking table becomes authoritative and
 the initdb mount goes away, which is a one-line change to `docker-compose.yml`.
+
+---
+
+### D29 — An encounter's thread id is derived from its inputs, so a second run replays instead of re-running
+
+**Why.** Two problems, one answer. The durable runtime was writing checkpoints
+nothing ever read, which makes a checkpoint decoration rather than a
+mechanism. And every reload of the clinician surface re-ran nine encounters —
+nine model calls on a rate-limited free tier under `make live`, which made the
+second demo of the day slower than the first for no reason.
+
+The thread id is now a hash of everything that could change the answer: the
+scenario, the patient state, the site, the pack and its version, the drafter,
+and whether the scenario tampers with the router. A run that finds a stored
+result for the same id replays it. `make live` costs nine model calls once and
+zero thereafter, and the page states how many it replayed rather than leaving
+it to be inferred from the page appearing faster.
+
+Invalidation is the whole risk, so it is derived rather than remembered: editing
+a guideline file moves the pack version, which moves every id, which preserves
+the "edit a pack, refresh, watch the verdict move" property that the surface
+exists to demonstrate. `CLINICIAN_FRESH=1` forces a re-run, because watching a
+live model disagree with itself across runs is a real thing to want and is
+precisely what resumption otherwise hides.
+
+Two keys were wrong before this one was right, and both failed quietly:
+`backend.version()` rewrites itself to `model@served_by` after a hosted
+backend's first reply, so nothing ever resumed; and returning `"reference"`
+whenever the router could not name a backend collided with how the reference
+reasoner names *itself*, so a router that failed every draft replayed the
+reference reasoner's successes and the page reported zero failures. The router's
+class is part of the key now — failing to name a backend is not a name.
+
+**Overturned if:** the surface stops being the demo artefact, or an input that
+can change an answer is found that the id does not cover. The second is the
+live risk: anything added to the encounter path that affects the result must be
+added to `_thread_id`, or it will be silently cached across the change.
+
+---
+
+### D30 — `default_dir()` and the backend flag are read per call, never at import
+
+**Why.** Both started as module-level constants reading the environment once,
+at import. That is invisible until something sets the variable after the
+import — which in the test suite is everything: each test pointed the store at
+its own temporary directory, every one of them silently shared a single
+directory instead, and a test asserting a fresh store found the previous test's
+encounters sitting in it.
+
+It surfaced as a resumption test failing only when run with the rest of the
+suite and passing on its own, which is the shape this bug always takes.
+
+**Overturned if:** never. Configuration read at import is configuration that
+cannot be overridden by anything that runs later, which includes every test and
+every embedding process.
+
+---
+
+### D31 — Clearing the clinic list writes a marker forward; it never deletes
+
+**Why.** `/clinic` restores every visit run in an earlier session, which is what
+makes it a prototype rather than a demo. It also means the list grows, and a
+list that only grows needs a way to be cleared.
+
+The obvious implementation is a `DELETE`, and the store refuses one — that is
+D26 working as designed. So clearing writes a `cleared` marker with a timestamp
+and the page lists only what came after it. The visits stay on the record and
+stay replayable by `python -m tools.store`.
+
+This is worth more than the trigger it works around. Anyone can add a
+constraint; the question a reviewer actually has is what happens the first time
+the product wants to violate it. The answer here is that the feature changed
+shape and the constraint did not.
+
+**Overturned if:** a real retention policy arrives, at which point deletion
+becomes a supervised operation with its own audit record — never a button on a
+page.
+
+---
+
+### D32 — `/clinic` runs sequentially unless a model was named
+
+**Why.** The concurrency decision read `router is None` fifteen lines after
+`router = router or default_router()` had made that permanently false, so every
+interactive run went three-wide — including reference-reasoner runs, where
+concurrency buys nothing and costs the deterministic ordering that the restored
+list is sorted by. The check now reads whether the *caller* named a drafter,
+captured before the default is applied.
+
+Found by a test asserting restored visits come back newest-first, which failed
+intermittently on the ordering rather than on anything it was written to check.
+
+**Overturned if:** never. A decision that reads a variable the code has already
+overwritten is a bug whatever it decides.

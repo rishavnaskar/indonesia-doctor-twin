@@ -186,7 +186,13 @@ function meta(){
     // below was checkpointed, and the count survives restarting the process.
     ["State kept in", (DATA.store||{}).location || "memory only"],
     ["Encounters on record", (DATA.store||{}).encounters_checkpointed],
-    ["Signatures on record", (DATA.store||{}).signatures]
+    ["Signatures on record", (DATA.store||{}).signatures],
+    // Resumption is the checkpoint being load-bearing rather than decorative,
+    // so it is stated rather than left to be inferred from the page appearing
+    // faster than it did last time.
+    ["This page", DATA.resumed
+      ? `${DATA.resumed} of ${DATA.total} replayed from the store, not re-run`
+      : "every visit run fresh"]
   ].map(([k,v])=>`${esc(k)}: <b>${esc(v)}</b>`).join("");
   document.getElementById("drafter").innerHTML =
     `<b>Drafts written by:</b> <span class="mono">${esc(DATA.reasoner)}</span>` +

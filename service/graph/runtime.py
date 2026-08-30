@@ -110,10 +110,20 @@ class FileRuntime(InMemoryRuntime):
 
     Append-only JSONL, the same shape the outbound queue already uses and for
     the same reasons: a partial final line from a power cut is skipped rather
-    than fatal, and later entries win on replay. Deliberately not a database —
-    a file that can be read with `cat`, copied, and diffed is the right weight
-    for a prototype, and the contract in this module is what a Postgres or
-    LangGraph backend would implement instead.
+    than fatal, and later entries win on replay.
+
+    This is the fallback rather than the default. `service/db.py` implements the
+    same contract against Postgres and `Store` prefers it, because there the
+    append-only rule is enforced by a trigger instead of by everyone agreeing
+    not to edit the file. But the fallback is not a courtesy: about one facility
+    in twelve lacks 24-hour power and one in five has unreliable connectivity,
+    and a clinical system that will not start without a database is one that
+    does not start. A file that can be read with `cat`, copied off a machine and
+    diffed is also the right weight for a laptop.
+
+    Both are run against the same conformance suite in
+    tests/test_runtime_contract.py, which is what makes the choice an
+    implementation detail rather than a fork in the system's behaviour.
     """
 
     path: Path | None = None
