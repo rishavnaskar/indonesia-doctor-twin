@@ -206,6 +206,27 @@ def _proposal(proposal, rules) -> dict | None:
     }
 
 
+class _Tampered:
+    """A router that corrupts the draft on its way out.
+
+    Used to plant the errors the gate is supposed to catch. Holds no state of
+    its own and never touches the router it wraps, so concurrent encounters
+    cannot interfere with each other.
+    """
+
+    def __init__(self, router, tamper):
+        self._router = router
+        self._tamper = tamper
+
+    def __getattr__(self, name):
+        return getattr(self._router, name)
+
+    def propose(self, state, rules, site=None, **kwargs):
+        proposal = self._router.propose(state, rules, site, **kwargs)
+        self._tamper(proposal)
+        return proposal
+
+
 def _failed(scenario, rules, exc: Exception) -> dict:
     """An encounter the drafter could not complete. Not a clinical outcome."""
     return {
@@ -242,17 +263,15 @@ def _encounter(scenario, rules, labels, router) -> dict:
     audit_log = AuditLog()
     practitioner = scenario.site["practitioners"][0]["practitioner_id"]
 
-    original = router.propose
-    if scenario.tamper is not None:
-        def tampered(state, rs, site=None, **kwargs):
-            proposal = original(state, rs, site)
-            scenario.tamper(proposal)
-            return proposal
-        router.propose = tampered  # type: ignore[method-assign]
+    # A tampering scenario used to swap router.propose in place and swap it back
+    # in a finally. That mutates state shared with every other caller, which was
+    # already wrong when two requests overlapped and is plainly wrong now that a
+    # background thread builds the page. Wrap the router instead.
+    effective = _Tampered(router, scenario.tamper) if scenario.tamper else router
 
     try:
         result = run_encounter(
-            scenario.state, rules, scenario.site, router, InMemoryRuntime(),
+            scenario.state, rules, scenario.site, effective, InMemoryRuntime(),
             thread_id=f"DEMO-{scenario.key}",
             signer=Signer(practitioner, True),
             audit=audit_log, now=NOW,
@@ -265,8 +284,6 @@ def _encounter(scenario, rules, labels, router) -> dict:
         # dead page: a demo that dies on the first bad JSON is a worse advert
         # than a demo that shows the failure being contained.
         return _failed(scenario, rules, exc)
-    finally:
-        router.propose = original  # type: ignore[method-assign]
 
     view = present(
         result.outcome.value, labels,
@@ -346,16 +363,26 @@ def _encounter(scenario, rules, labels, router) -> dict:
     }
 
 
-def collect(pack_id: str = "id", router=None) -> dict:
-    """Run every scenario and return the whole page's data."""
+def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
+    """Run every scenario and return the whole page's data.
+
+    `on_progress(done, total, title, outcome)` is called after each encounter.
+    A live run makes one model call per scenario and can take minutes on a
+    rate-limited free tier; a surface that says nothing for that long is
+    indistinguishable from one that has hung.
+    """
     rules = load_pack(pack_id)
     labels = Labels.from_pack(rules.language)
     router = router or default_router()
 
-    encounters = [
-        _encounter(scenario, rules, labels, router)
-        for scenario in scenario_module.build(rules)
-    ]
+    scenarios = scenario_module.build(rules)
+    encounters = []
+    for index, scenario in enumerate(scenarios, start=1):
+        encounter = _encounter(scenario, rules, labels, router)
+        encounters.append(encounter)
+        if on_progress:
+            on_progress(index, len(scenarios), scenario.title,
+                        encounter.get("error") or encounter["outcome"])
 
     reasoner = "rule-following reference reasoner (no AI model)"
     is_model = False

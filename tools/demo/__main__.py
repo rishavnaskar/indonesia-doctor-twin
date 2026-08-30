@@ -7,14 +7,23 @@
 Serving and exporting produce the same page from the same run. The export
 exists because the people who most need to see this are the least likely to
 clone a repository and run make.
+
+The server answers immediately and builds in the background. A live run makes
+one model call per scenario and, on a rate-limited free tier, that can take
+minutes — during which a server that simply does not respond is
+indistinguishable from one that has hung. It says what it is doing instead.
 """
 
 from __future__ import annotations
 
 import argparse
+import html as html_lib
 import http.server
+import json
 import socketserver
 import sys
+import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -23,14 +32,119 @@ from tools.demo.run import collect
 from tools.live import load_env
 
 
-def _build(args) -> str:
-    router = None
-    if args.live:
-        load_env()
-        from service.router.router import router_with_model
+class Build:
+    """One run of the scenarios, built once and reused.
 
-        router = router_with_model(args.model, provider=args.provider)
-    return render(collect(args.pack, router=router))
+    Rebuilding per request was the original design, so that editing a pack and
+    reloading showed the rules move. With a real model behind the router that
+    turned every browser request — including the one Safari makes for a
+    favicon — into another full set of model calls, serialised behind the
+    single-threaded server. Observed: twelve minutes to first paint.
+
+    So: build once, reuse, and rebuild only when explicitly asked.
+    """
+
+    def __init__(self, args):
+        self.args = args
+        self.lock = threading.Lock()
+        self.html: str | None = None
+        self.error: str | None = None
+        self.progress: list[dict] = []
+        self.done = 0
+        self.total = 0
+        self.started_at = 0.0
+        self.thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        with self.lock:
+            if self.thread and self.thread.is_alive():
+                return
+            self.html = None
+            self.error = None
+            self.progress = []
+            self.done = 0
+            self.total = 0
+            self.started_at = time.time()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _note(self, done, total, title, outcome) -> None:
+        with self.lock:
+            self.done, self.total = done, total
+            self.progress.append({"title": title, "outcome": str(outcome)})
+        print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
+
+    def _run(self) -> None:
+        try:
+            router = None
+            if self.args.live:
+                load_env()
+                from service.router.router import router_with_model
+
+                router = router_with_model(self.args.model, provider=self.args.provider)
+            data = collect(self.args.pack, router=router, on_progress=self._note)
+            page = render(data)
+        except Exception as exc:  # noqa: BLE001 - a broken pack must be visible
+            with self.lock:
+                self.error = f"{type(exc).__name__}: {exc}"
+            print(f"  build failed: {self.error}", flush=True)
+            return
+        with self.lock:
+            self.html = page
+        print(f"  ready in {time.time() - self.started_at:.0f}s", flush=True)
+
+    def status(self) -> dict:
+        with self.lock:
+            return {
+                "ready": self.html is not None,
+                "error": self.error,
+                "done": self.done,
+                "total": self.total,
+                "elapsed": round(time.time() - self.started_at),
+                "progress": list(self.progress),
+                "live": bool(self.args.live),
+            }
+
+
+_LOADING = """<!doctype html><html><head><meta charset="utf-8">
+<title>AI clinician — building</title><style>
+:root{--bg:#f5f6f8;--panel:#fff;--ink:#14171a;--muted:#5f6871;--line:#dfe3e8;--accent:#1c4fd8;--code:#eef1f4}
+@media (prefers-color-scheme:dark){:root{--bg:#131619;--panel:#1b1f23;--ink:#e8eaed;--muted:#9aa4ae;--line:#2b3137;--accent:#7da2ff;--code:#22272c}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+display:flex;align-items:center;justify-content:center;min-height:100vh}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:26px 30px;max-width:620px;width:92%}
+h1{margin:0 0 6px;font-size:17px}
+p{color:var(--muted);font-size:13.5px;margin:0 0 18px}
+.bar{height:6px;background:var(--code);border-radius:4px;overflow:hidden;margin-bottom:14px}
+.fill{height:100%;background:var(--accent);width:0;transition:width .4s}
+li{font-size:13px;margin-bottom:5px;list-style:none}
+ul{padding:0;margin:0}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted)}
+.err{color:#b3261e}
+</style></head><body><div class="box">
+<h1>Running the scenarios</h1>
+<p id="sub">Each visit is one call to a real model. On a free tier this can take a couple of
+minutes, and a rate-limited model is retried before the next one is tried.</p>
+<div class="bar"><div class="fill" id="fill"></div></div>
+<ul id="log"></ul>
+<div class="mono" id="t"></div>
+</div><script>
+async function tick(){
+  const s = await (await fetch("/status")).json();
+  if (s.ready) { location.reload(); return; }
+  if (s.error) { document.getElementById("log").innerHTML =
+    `<li class="err">Build failed: ${s.error}</li>`; return; }
+  document.getElementById("fill").style.width = s.total ? (100*s.done/s.total)+"%" : "6%";
+  document.getElementById("log").innerHTML =
+    s.progress.map(p=>`<li>&#10003; ${p.title} <span class="mono">&rarr; ${p.outcome}</span></li>`).join("");
+  document.getElementById("t").textContent =
+    `${s.done} of ${s.total||"?"} done &middot; ${s.elapsed}s elapsed`.replace("&middot;","·");
+  if (!s.live) document.getElementById("sub").textContent =
+    "Running the scenarios through the rule-following reasoner. This should be quick.";
+  setTimeout(tick, 700);
+}
+tick();
+</script></body></html>"""
 
 
 def main() -> int:
@@ -47,42 +161,84 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.export:
+        router = None
+        if args.live:
+            load_env()
+            from service.router.router import router_with_model
+
+            router = router_with_model(args.model, provider=args.provider)
+
+        def note(done, total, title, outcome):
+            print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
+
         path = Path(args.export)
-        path.write_text(_build(args), encoding="utf-8")
-        size = path.stat().st_size / 1024
-        print(f"\n  Wrote {path} ({size:.0f} KB, self-contained — no network, no CDN).")
+        path.write_text(render(collect(args.pack, router=router, on_progress=note)),
+                        encoding="utf-8")
+        print(f"\n  Wrote {path} ({path.stat().st_size / 1024:.0f} KB, self-contained).")
         print("  Open it anywhere, or send it to someone who will not run make.\n")
         return 0
 
+    build = Build(args)
+    build.start()
+
     class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - stdlib naming
-            # Rebuilt per request, so editing a pack and refreshing shows the
-            # change. That is also the fastest way to demonstrate that the rules
-            # are data: edit the YAML, reload, watch the verdict move.
+        def _send(self, body: bytes, content_type: str, code: int = 200) -> None:
             try:
-                body = _build(args).encode("utf-8")
-            except Exception as exc:  # noqa: BLE001 - a broken pack should be visible
-                body = f"<pre>{type(exc).__name__}: {exc}</pre>".encode("utf-8")
-            try:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_response(code)
+                self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(body)
             except (BrokenPipeError, ConnectionResetError):
-                # The browser gave up while we were building the page — likely
-                # a reload during a slow live run. Nothing to report.
-                pass
+                pass  # the browser hung up; nothing to report
+
+        def do_GET(self):  # noqa: N802 - stdlib naming
+            path = self.path.split("?", 1)[0]
+
+            # Anything that is not the page must never trigger a rebuild. A
+            # favicon request used to cost a full set of model calls.
+            if path == "/favicon.ico":
+                self._send(b"", "image/x-icon", 204)
+                return
+            if path == "/status":
+                self._send(json.dumps(build.status()).encode(), "application/json")
+                return
+            if path == "/rerun":
+                build.start()
+                self._send(_LOADING.encode(), "text/html; charset=utf-8")
+                return
+            if path != "/":
+                self._send(b"not found", "text/plain", 404)
+                return
+
+            status = build.status()
+            if status["error"]:
+                self._send(
+                    f"<pre>{html_lib.escape(status['error'])}</pre>".encode(),
+                    "text/html; charset=utf-8", 500,
+                )
+            elif status["ready"]:
+                self._send(build.html.encode("utf-8"), "text/html; charset=utf-8")
+            else:
+                self._send(_LOADING.encode(), "text/html; charset=utf-8")
 
         def log_message(self, *a):  # quiet
             pass
 
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", args.port), Handler) as httpd:
+    # Threaded, so polling /status is not queued behind anything.
+    class Server(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
+        daemon_threads = True
+
+    with Server(("127.0.0.1", args.port), Handler) as httpd:
         url = f"http://127.0.0.1:{args.port}/"
         print(f"\n  Serving the clinician surface at {url}")
-        print("  Bound to localhost only. Rebuilt on every reload, so editing a")
-        print("  pack file and refreshing shows the rules moving.  Ctrl-C to stop.\n")
+        print("  Bound to localhost only. The page answers straight away and shows")
+        print("  progress while the scenarios run.")
+        if args.live:
+            print("  Live mode: one model call per scenario, built once and reused.")
+        print("  Visit /rerun to run them again.  Ctrl-C to stop.\n")
         if not args.no_open:
             webbrowser.open(url)
         try:
