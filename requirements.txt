@@ -8,3 +8,9 @@ certifi>=2024.0
 
 # Dev
 pytest>=8.0
+
+# Postgres. Optional at runtime: with no database reachable the store falls
+# back to append-only files and says so. Installed by default because the
+# fallback should be a deployment's choice, not an accident of what was
+# available on the machine.
+psycopg[binary]>=3.1

@@ -80,7 +80,7 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
 - **Khanza in Docker.** It is the real system, it is open source, and it already has a `src/bridging/` package doing BPJS and Dukcapil integrations. We are not guessing at what a hospital system looks like — we are running one.
 - **Model behind a router.** Start with a hosted API for iteration speed. Swap to local open weights (MedGemma 4B or a Qwen-class model) before the demo, to prove the data-residency story works. Never hard-code a model name anywhere except the router config.
 - **The gate is not a model.** Plain Python, a rules table, a formulary table, a drug interaction table. It must be readable by a doctor and diffable in git. If a lawyer or a regulator asks "why did it say that," the answer has to be a file, not a prompt.
-- **Postgres for our state, MySQL stays Khanza's.** Don't fight the legacy schema; read from it, write our own.
+- **Postgres for our state, MySQL stays Khanza's.** Don't fight the legacy schema; read from it, write our own. *(Built: `docker-compose.yml` and `db/migrations/`. Optional at runtime — the store falls back to append-only files and says so, because one facility in twelve lacks 24-hour power and a system that will not start without a database is a system that does not start.)*
 
 
 ### Do we use an agent framework?
@@ -97,16 +97,20 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
 > provide, and the argument that justifies one — durable execution across days —
 > belongs to the between-visit loop, whose patient-facing channel is V1.5.
 >
-> Durability itself is built: `FileRuntime` keeps checkpoints, the audit log
-> keeps signatures, and the outbound queue keeps writes — three append-only
-> files under `.store/`, inspectable with `make store`. What is absent is only
-> the orchestration library, not the persistence it was wanted for.
+> Durability itself is built, twice: Postgres when a database is reachable and
+> three append-only JSONL files when it is not, keeping checkpoints, signatures
+> and the outbound queue either way. `python -m tools.store` reads back
+> whichever was used, and the clinician surface persists every encounter it
+> runs. What is absent is only the orchestration library, not the persistence it
+> was wanted for.
 >
-> `tests/test_runtime_contract.py` is a conformance suite: parametrise it with a
-> LangGraph- or Postgres-backed runtime and it either passes or "swapping the
-> backend is one module's work" was never true. The CI rule confining
-> orchestration imports to `/service/graph` stands either way, and is cheap now
-> and impossible to retrofit.
+> `tests/test_runtime_contract.py` is a conformance suite, and the Postgres
+> backend was the first thing to be run through it — the same tests, not a
+> suite per backend. That is the claim "swapping the backend is one module's
+> work" being discharged rather than asserted; a LangGraph-backed runtime would
+> join the same parametrisation. The CI rule confining orchestration imports to
+> `/service/graph` stands either way, and is cheap now and impossible to
+> retrofit.
 
 Is this an agent? Partly. The intake interview is genuinely multi-turn and stateful, and the reasoning step does retrieval and tool calls. But the rest — the gate, coding, FHIR emission — is a pipeline, and deliberately so. Roughly a third of this system is a graph. Two-thirds is boring deterministic code that gains nothing from one. That ratio is correct for something clinical.
 

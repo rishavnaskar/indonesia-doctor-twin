@@ -8,6 +8,7 @@ exactly the audience that will ask.
 
 from __future__ import annotations
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 from dataclasses import asdict, is_dataclass
@@ -15,7 +16,7 @@ from datetime import date, datetime
 from typing import Any
 
 from service.gate.checks import catalogue as check_catalogue
-from service.graph.runtime import InMemoryRuntime
+
 from service.graph.workflow import Outcome, run_encounter
 from service.packs.loader import load_pack
 from service.gate.types import Severity
@@ -29,6 +30,27 @@ NOW = datetime(2026, 8, 29, 10, 0)
 # Free tiers are shared pools, so this stays small: the point is to overlap the
 # waiting, not to win a race against everyone else on the internet.
 MAX_CONCURRENT_ENCOUNTERS = 3
+
+_STORE = None
+_STORE_LOCK = threading.Lock()
+
+
+def store():
+    """The deployment's durable store — Postgres if one is reachable, else files.
+
+    Opened once per process and shared, because the connection is the expensive
+    part. The objects built *from* it are per-encounter: three encounters run
+    concurrently, and a queue shared between threads has a read-then-write in
+    `enqueue` that nothing here would notice going wrong. Rebuilding costs a
+    reload of a table that a demo keeps small.
+    """
+    global _STORE
+    with _STORE_LOCK:
+        if _STORE is None:
+            from service.store import Store
+
+            _STORE = Store()
+    return _STORE
 
 
 def _plain(value: Any) -> Any:
@@ -343,7 +365,18 @@ def _failed_shell(scenario, rules) -> dict:
 
 
 def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
-    audit_log = AuditLog()
+    # The surface used to run every encounter through an in-memory runtime and
+    # an unbacked audit log, so a demo produced nothing that outlived the tab.
+    # That made the persistence story a claim in a document rather than
+    # something you could restart the process and go looking for.
+    durable = store()
+    runtime = durable.runtime()
+    audit_log = durable.audit_log()
+    queue = durable.outbound()
+
+    # How many signatures existed before this encounter, so the view below reads
+    # this encounter's record rather than the last one anybody wrote.
+    signed_before = len(audit_log.records)
     practitioner = scenario.site["practitioners"][0]["practitioner_id"]
 
     # A tampering scenario used to swap router.propose in place and swap it back
@@ -354,10 +387,10 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
 
     try:
         result = run_encounter(
-            scenario.state, rules, scenario.site, effective, InMemoryRuntime(),
+            scenario.state, rules, scenario.site, effective, runtime,
             thread_id=f"DEMO-{scenario.key}-{uuid4().hex[:8]}",
             signer=Signer(practitioner, True),
-            audit=audit_log, now=NOW, on_step=on_step,
+            audit=audit_log, queue=queue, now=NOW, on_step=on_step,
         )
     except Exception as exc:  # noqa: BLE001
         # A model that returns unparseable output, refuses, gets rate-limited or
@@ -377,7 +410,7 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
     )
 
     signature = None
-    if audit_log.records:
+    if len(audit_log.records) > signed_before:
         record = audit_log.records[-1]
         signature = {
             "practitioner_id": record.practitioner_id,
@@ -693,6 +726,10 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "as_of": NOW.isoformat(),
+        # Read after the encounters ran, so the counts include them. The page
+        # states where this deployment keeps its state, because "durable" is
+        # the kind of claim that should be checkable from the thing itself.
+        "store": store().summary(),
         "pack": {
             "pack_id": rules.pack_id,
             "version": rules.version,

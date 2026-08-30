@@ -95,3 +95,17 @@ def test_one_bad_draft_does_not_take_down_the_page():
     assert data["declined"] == 0
     assert all(e["error"] for e in data["encounters"])
     assert render(data)
+
+
+def test_the_page_states_where_this_deployment_keeps_its_state():
+    """"Durable" is the kind of claim that should be checkable from the thing
+    itself. The page carries the backend, its location and what it holds, so a
+    reader can restart the process and watch the counts survive."""
+    page = collect()
+    facts = page["store"]
+
+    assert facts["backend"] in ("postgres", "files")
+    assert facts["location"]
+    assert facts["encounters_checkpointed"] >= len(page["encounters"]), (
+        "every encounter the page shows must have been checkpointed"
+    )

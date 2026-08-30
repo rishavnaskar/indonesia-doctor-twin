@@ -180,7 +180,13 @@ function meta(){
   document.getElementById("meta").innerHTML = [
     ["Rules pack", p.pack_id+" "+p.version], ["Clinical sign-off", p.review_status.replace(/_/g," ")],
     ["Drugs on the approved list", p.molecule_count], ["Hospitals modelled", p.site_count],
-    ["Patient-facing language", p.language], ["Run at", DATA.generated_at]
+    ["Patient-facing language", p.language], ["Run at", DATA.generated_at],
+    // What this run kept, and where. A prototype that claims durable state
+    // should say so on the page rather than in a document — every encounter
+    // below was checkpointed, and the count survives restarting the process.
+    ["State kept in", (DATA.store||{}).location || "memory only"],
+    ["Encounters on record", (DATA.store||{}).encounters_checkpointed],
+    ["Signatures on record", (DATA.store||{}).signatures]
   ].map(([k,v])=>`${esc(k)}: <b>${esc(v)}</b>`).join("");
   document.getElementById("drafter").innerHTML =
     `<b>Drafts written by:</b> <span class="mono">${esc(DATA.reasoner)}</span>` +
@@ -191,7 +197,7 @@ function meta(){
           the default on purpose: it is free, instant, and gives the identical answer every time,
           so a change in behaviour is a real change rather than the model having a different day.
           The AI model plugs into the same interface and nothing downstream moves.
-          Run <span class="mono">make surface-live</span> to see it drafted by an actual model.`);
+          Run <span class="mono">make live</span> to see it drafted by an actual model.`);
   const fails = DATA.drafter_failures || 0;
   document.getElementById("stat").innerHTML =
     `<b>${DATA.declined} of the ${DATA.total} visits below ended with no recommendation reaching the doctor.</b>

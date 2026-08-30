@@ -185,7 +185,7 @@ class HostedChatBackend:
         raise RateLimited(
             "every model in the chain is rate-limited upstream "
             f"({', '.join(busy)}). These are shared free pools, so this is "
-            "load, not a bad key. Run `make free` to see what is answering "
+            "load, not a bad key. Run `python -m tools.live --list-free` to see what is answering "
             "now and pass --model, or retry in a minute."
         )
 

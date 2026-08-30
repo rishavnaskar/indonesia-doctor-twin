@@ -1,6 +1,7 @@
 """Run the official HL7 validator over the bundles this system emits.
 
-    make fhir                       # after downloading the validator once
+    python -m tools.validate_fhir --download    # once: ~190 MB into .tools/
+    python -m tools.validate_fhir               # run it (also runs inside `make`)
     python -m tools.validate_fhir --jar path/to/validator_cli.jar
 
 The validator is a ~190 MB Java distribution, so it is not vendored and not a
@@ -11,9 +12,6 @@ one missed things the real validator caught, and one of the things it caught was
 a bug the hand-written one had *introduced*. Approximating a specification is
 not the same as checking against it.
 
-    Download once:
-      curl -L -o validator_cli.jar \\
-        https://github.com/hapifhir/org.hl7.fhir.core/releases/latest/download/validator_cli.jar
 """
 
 from __future__ import annotations
@@ -36,13 +34,35 @@ from service.rules import pathways
 
 RESULT = re.compile(r"(?:Success|\*FAILURE\*): (\d+) errors?, (\d+) warnings?")
 
-# Where `make fhir-setup` puts it. Gitignored: 190 MB does not belong in a
-# repository, and it is the same file for everyone.
+# Gitignored: 190 MB does not belong in a repository, and it is the same file
+# for everyone.
 DEFAULT_JAR = Path(__file__).resolve().parents[1] / ".tools" / "validator_cli.jar"
+JAR_URL = ("https://github.com/hapifhir/org.hl7.fhir.core/releases/latest/"
+           "download/validator_cli.jar")
+
+
+def download(destination: Path = DEFAULT_JAR) -> int:
+    """Fetch the validator. Separate command because it is 190 MB.
+
+    Deliberately not done automatically by the run: a build that silently pulls
+    a fifth of a gigabyte the first time somebody types `make` is a build that
+    has decided something on their behalf.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    print(f"\n  Downloading the HL7 FHIR validator (~190 MB) to {destination} ...")
+    result = subprocess.run(
+        ["curl", "-L", "--progress-bar", "-o", str(destination), JAR_URL]
+    )
+    if result.returncode != 0:
+        print("  Download failed. It is a plain file — fetch it by hand from:")
+        print(f"      {JAR_URL}\n")
+        return 1
+    print("  Done. It will be used automatically from now on.\n")
+    return 0
 
 
 def _find_jar(explicit: str | None) -> Path | None:
-    """--jar, then FHIR_VALIDATOR_JAR, then the location make fhir-setup uses."""
+    """--jar, then FHIR_VALIDATOR_JAR, then where --download puts it."""
     for candidate in (explicit, os.environ.get("FHIR_VALIDATOR_JAR"), DEFAULT_JAR):
         if candidate and Path(candidate).exists():
             return Path(candidate)
@@ -87,17 +107,22 @@ def validate(jar: Path, payload: dict, name: str) -> tuple[int, int, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate emitted bundles against HL7 R4.")
     parser.add_argument("--jar", default=None)
+    parser.add_argument("--download", action="store_true",
+                        help="fetch the validator once (~190 MB, gitignored)")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+
+    if args.download:
+        return download()
 
     jar = _find_jar(args.jar)
     if jar is None:
         # Not a failure. A missing optional tool is a missing prerequisite, and
-        # exiting non-zero here made `make fhir` print "Error 2" underneath the
+        # exiting non-zero here made the runner print "Error 2" underneath the
         # instructions — which reads as something broken rather than something
         # not yet downloaded.
         print("\n  The HL7 validator is not here yet. One command, once:\n")
-        print("      make fhir-setup\n")
+        print("      python -m tools.validate_fhir --download\n")
         print(f"  It downloads ~190 MB to {DEFAULT_JAR.parent}/ (gitignored), which is")
         print("  why it is neither vendored nor a dependency. FHIR_VALIDATOR_JAR")
         print("  overrides the location if you already have one.\n")

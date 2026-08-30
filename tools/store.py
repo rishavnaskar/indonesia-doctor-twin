@@ -1,11 +1,14 @@
 """What a deployment has actually kept.
 
-    make store            # a summary
-    python -m tools.store --thread LIVE-0    # replay one encounter, step by step
+    python -m tools.store                    # a summary
+    python -m tools.store --signatures       # who signed what
+    python -m tools.store --thread DEMO-x    # replay one encounter, step by step
 
 The point of a durable checkpoint is that somebody can ask, later and from
 outside the process, what the system saw when it produced an output. This is
-that question, answered from the files on disk.
+that question, asked from outside the process — against Postgres or against the
+files, whichever the deployment is using. It should not be possible to tell
+which from the answers.
 """
 
 from __future__ import annotations
@@ -24,13 +27,13 @@ def main() -> int:
     args = parser.parse_args()
 
     store = Store(args.dir)
-    if not store.dir.exists():
+    facts = store.summary()
+    if store.backend == "files" and not store.dir.exists():
         print(f"\n  Nothing stored yet at {store.dir}/.")
-        print("  Run `make live` — it persists by default.\n")
+        print("  Run `make` — the clinician surface persists every encounter.\n")
         return 0
 
-    facts = store.summary()
-    print(f"\n  {facts['directory']}/")
+    print(f"\n  {facts['backend']}  {facts['location']}")
     print("  " + "-" * 52)
     print(f"  encounters checkpointed   {facts['encounters_checkpointed']}")
     print(f"  signatures on record      {facts['signatures']}")

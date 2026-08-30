@@ -9,12 +9,22 @@ Short answer: **yes.** The brief asks for 60–70% of what a doctor *does* — a
 ## If you have fifteen minutes
 
 ```bash
-make install && make all      # architecture rules, tests, scorecard, pressure suite  (~1 min)
-make surface                  # the clinician surface — open /clinic from the header link
+make          # everything, then the clinician surface opens in a browser
 ```
 
-Everything above runs offline and needs no key. `make live` and `make
-surface-live` put a real model behind the router; both default to a free one.
+One command. It creates the virtualenv, starts Postgres if this machine has
+Docker, runs the architecture rules, the test suite, the scorecard, the pressure
+suite and the FHIR bundles against the official HL7 validator, narrates one
+encounter per outcome, and then serves the surface — open `/clinic` from the
+header link. Roughly two minutes, offline, no key required.
+
+```bash
+make live     # the same, with a real model drafting
+```
+
+`make live` needs `OPENROUTER_API_KEY` in `.env` and defaults to a free model.
+Nothing else is optional-but-required: no Docker, no validator jar and no API
+key each degrade to a named skip rather than a failure.
 
 Then, in order:
 
@@ -59,7 +69,7 @@ The safety gate, the Indonesian rule packs, eligibility routing, the signature l
 
 A real model now sits behind the router and changed nothing downstream, which is the architectural claim discharged rather than asserted. **A second pathway — type 2 diabetes follow-up — was added as two pack files and no engine code**, which is the other claim discharged. Building it found places where that claim had been false — the target contract was blood-pressure-shaped, refusal routing had learned one pack's rule-numbering convention, the claim coder produced no primary diagnosis for a second disease, and the FHIR emitter shipped a diabetes encounter without its HbA1c. All fixed and tested; the finding is more useful than the feature.
 
-The outbound bundles validate with **0 errors against the official HL7 FHIR R4 validator** (`make fhir-setup` once, then `make fhir`). It found nine errors that a hand-written conformance test had missed, one of which that test had itself introduced.
+The outbound bundles validate with **0 errors against the official HL7 FHIR R4 validator** (downloaded once by `python -m tools.validate_fhir --help`; the run says so if it is absent). It found nine errors that a hand-written conformance test had missed, one of which that test had itself introduced.
 
 This has been through six drafts and four adversarial review passes, the last a full independent review by a second model. Twenty-three claims were found wrong, overstated or internally inconsistent and corrected — the full list, including the ones that were mine, is in [RESEARCH.md § Corrections log](docs/RESEARCH.md#corrections). If you are reviewing this, start there; it is the fastest way to find the parts of the argument that have already moved.
 

@@ -1,21 +1,21 @@
-"""The durable-runtime contract, as a suite any implementation must pass.
+"""The durable-runtime contract, as a suite every implementation must pass.
 
-BUILD.md argues at length for putting an orchestration library behind this
-interface. **No such library is used today** — `InMemoryRuntime` is the only
-implementation, and the workflow exercises the full contract against it:
-start, checkpoint, interrupt, resume, replay.
-
-That is a deliberate position rather than an omission. The interface is the
-commitment; the backend is not. Adding a dependency now would buy nothing the
-in-memory implementation does not already provide, and durable execution across
-days — the argument that actually justifies one — belongs to the between-visit
-loop, whose patient-facing channel is V1.5 by design.
+BUILD.md argues for putting an orchestration library behind this interface. No
+such library is used today, and that is a deliberate position rather than an
+omission: the interface is the commitment, the backend is not.
 
 The point of this file is to stop that being an assertion. "Swapping the
 backend is one module's work" is only true if there is a definition of what a
-backend has to do, and these tests are it. Parametrise `implementations()` with
-a LangGraph- or Postgres-backed runtime and it either passes or the claim was
-false.
+backend has to do, and these tests are it. Three implementations run against
+them — in memory, append-only files, and Postgres — and they are the same
+tests, not a suite per backend. A durable backend that quietly differs in
+semantics is worse than no durable backend, because what runs in a clinic then
+behaves unlike what ran in the test.
+
+The Postgres parameter skips rather than fails when no database is listening.
+That is not laziness about coverage: the database is optional by design, and a
+suite that could not run without a container would contradict the thing it is
+testing.
 """
 
 from __future__ import annotations
@@ -26,13 +26,8 @@ from service.graph.runtime import Checkpoint, InMemoryRuntime, Interrupted
 
 
 def implementations():
-    """Every runtime that claims to satisfy the contract.
-
-    FileRuntime is here because a durable backend that quietly differs in
-    semantics is worse than none: the whole argument for an interface is that
-    what runs in a clinic behaves like what runs in a test.
-    """
-    return [InMemoryRuntime, _file_runtime_factory]
+    """Every runtime that claims to satisfy the contract."""
+    return [InMemoryRuntime, _file_runtime_factory, _postgres_runtime_factory]
 
 
 def _file_runtime_factory():
@@ -41,15 +36,37 @@ def _file_runtime_factory():
 
     from service.graph.runtime import FileRuntime
 
-    return FileRuntime(path=Path(tempfile.mkdtemp()) / "cp.jsonl")
+    return FileRuntime(path=Path(tempfile.mkdtemp()) / "cp.jsonl"), None
 
 
 _file_runtime_factory.__name__ = "FileRuntime"
 
 
+def _postgres_runtime_factory():
+    from service.db import PostgresRuntime
+    from tests.pgfixture import connection
+
+    conn = connection()
+    if conn is None:
+        pytest.skip("no database reachable — `docker compose up -d` to run this")
+    return PostgresRuntime(conn=conn), conn
+
+
+_postgres_runtime_factory.__name__ = "PostgresRuntime"
+
+
 @pytest.fixture(params=implementations(), ids=lambda c: c.__name__)
 def runtime(request):
-    return request.param()
+    made = request.param()
+    # InMemoryRuntime is a class; the others are factories returning a
+    # (runtime, resource) pair. Normalising here keeps every test below
+    # ignorant of which backend it is exercising, which is the point.
+    instance, resource = made if isinstance(made, tuple) else (made, None)
+    yield instance
+    if resource is not None:
+        from tests.pgfixture import drop
+
+        drop(resource)
 
 
 def test_a_thread_can_be_started_and_checkpointed(runtime):

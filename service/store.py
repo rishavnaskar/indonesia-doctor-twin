@@ -1,14 +1,26 @@
 """Where a run persists.
 
-Three append-only JSONL files under one directory: the checkpoints, the
-signature log, and the outbound queue. Deliberately not a database — a file
-that can be read with `cat`, copied off a machine and diffed is the right
-weight for a prototype, and every one of them is behind an interface a
-Postgres or LangGraph backend would implement instead.
+Two backends behind one object. Postgres when a database is reachable, three
+append-only JSONL files when it is not, and `backend` says which was chosen —
+silently degrading to files would make "did that signature persist" a question
+nobody thought to ask.
 
-They are separate files because they answer different questions and have
-different lifetimes. The queue is drained and its items become sent; the audit
-log is never drained, because a signature is not a task.
+The fallback is not a convenience. About one facility in twelve lacks 24-hour
+power and one in five has unreliable connectivity, so a clinical system that
+refuses to start without a database is a clinical system that does not start.
+Files also remain the right weight for a laptop: readable with `cat`, copied
+with `scp`, diffed in a review.
+
+What the database adds, and the reason it is preferred where it exists:
+
+  * an audit log the application itself cannot rewrite — the migration installs
+    a trigger that raises on UPDATE and DELETE
+  * two clinicians on one deployment, without interleaved writes to one file
+  * "which encounters are still unsent" as a statement rather than a scan
+
+Both satisfy the same three interfaces, and the conformance suite runs against
+both. That is what makes the choice an implementation detail rather than a
+fork in the system's behaviour.
 """
 
 from __future__ import annotations
@@ -18,12 +30,36 @@ from pathlib import Path
 
 DEFAULT_DIR = Path(os.environ.get("CLINICIAN_STORE", ".store"))
 
+def _forced_to_files() -> bool:
+    """CLINICIAN_STORE_BACKEND=files stays on disk with a database running.
+
+    Read on each call rather than once at import, because the test suite sets it
+    in conftest and a module-level constant would depend on import order. The
+    suite sets it so that a developer with a container up and a developer
+    without one run the same tests — and, more to the point, so that no test can
+    write into a real deployment's tables by accident.
+    """
+    return os.environ.get("CLINICIAN_STORE_BACKEND", "").lower() == "files"
+
 
 class Store:
     """The durable side of one deployment."""
 
-    def __init__(self, directory: Path | str | None = None):
+    def __init__(self, directory: Path | str | None = None, *, connection=None):
         self.dir = Path(directory or DEFAULT_DIR)
+        self._conn = connection
+        if self._conn is None and not _forced_to_files():
+            from service import db
+
+            self._conn = db.connect()
+            if self._conn is not None:
+                db.migrate(self._conn)
+
+    @property
+    def backend(self) -> str:
+        return "postgres" if self._conn is not None else "files"
+
+    # --------------------------------------------------------------- on disk
 
     @property
     def checkpoints(self) -> Path:
@@ -37,31 +73,58 @@ class Store:
     def queue(self) -> Path:
         return self.dir / "outbound.jsonl"
 
+    # -------------------------------------------------------------- backends
+
     def runtime(self):
+        if self._conn is not None:
+            from service.db import PostgresRuntime
+
+            return PostgresRuntime(conn=self._conn)
         from service.graph.runtime import FileRuntime
 
         return FileRuntime(path=self.checkpoints)
 
     def audit_log(self):
+        if self._conn is not None:
+            from service.db import PostgresAuditLog
+
+            return PostgresAuditLog(conn=self._conn)
         from service.signing import AuditLog
 
         return AuditLog(path=self.audit)
 
     def outbound(self):
+        if self._conn is not None:
+            from service.db import PostgresQueue
+
+            return PostgresQueue(conn=self._conn)
         from service.emit.queue import OutboundQueue
 
         return OutboundQueue(self.queue)
 
-    def summary(self) -> dict:
-        from service.emit.queue import OutboundQueue
+    # ---------------------------------------------------------------- facts
 
-        runtime, log = self.runtime(), self.audit_log()
-        queue = OutboundQueue(self.queue)
+    def summary(self) -> dict:
+        runtime, log, queue = self.runtime(), self.audit_log(), self.outbound()
+        # Only the file backend can have damaged lines: a truncated final line
+        # is what a power cut leaves in a JSONL file, and is precisely the class
+        # of problem a transactional write does not have.
+        damaged = sum(len(getattr(o, "damaged", []) or []) for o in (runtime, log, queue))
         return {
-            "directory": str(self.dir),
+            "backend": self.backend,
+            "location": self._location(),
             "encounters_checkpointed": len(runtime.threads()),
             "signatures": len(log.records),
             "queued": len(queue.pending()),
             "sent": len(queue) - len(queue.pending()),
-            "damaged_lines": len(runtime.damaged) + len(log.damaged) + len(queue.damaged),
+            "damaged_lines": damaged,
         }
+
+    def _location(self) -> str:
+        if self._conn is None:
+            return str(self.dir)
+        from service.db import dsn
+
+        # The password is in the environment, not in anything we print.
+        url = dsn()
+        return url.split("@")[-1] if "@" in url else url

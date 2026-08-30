@@ -4,28 +4,39 @@ The code that implements [SPEC-V1.md](SPEC-V1.md). Start here if you are
 building; start at [README.md](../README.md) if you are deciding.
 
 ```bash
-make install       # venv + two runtime dependencies
-make all           # checks, tests, scorecard, pressure suite — what CI runs
-make e2e           # all of the above, then the walkthrough and live encounters
-
-make demo          # the scripted encounters in the terminal, plus the network dropping
-make surface       # the clinician surface in a browser; /clinic is the interactive one
-make page          # one self-contained HTML file you can send to someone
-
-make pressure      # the Bahasa Indonesian pressure suite
-make concordance   # plan concordance (SPEC §8.2) — reported, never gated
-make prompt        # print the exact prompt sent to a model (no key, no spend)
-make free          # which models cost nothing right now
-make live          # encounters through a real model (needs a key; free by default)
-make surface-live  # the surface, drafted by a real model
+make          # everything, offline, then the clinician surface in a browser
+make live     # the same, with a real model drafting instead of the reference reasoner
 ```
+
+That is the whole interface. There used to be fourteen targets, which is
+fourteen ways to run a subset and one way to think you ran all of it; `make`
+now runs the lot in order and stops at the first thing that fails, so "it
+passed" means the same thing every time. What it runs, in order:
+
+| | |
+|---|---|
+| Architecture rules | no country, payer, drug or guideline named in the engine |
+| Test suite | every safety property, across all three storage backends |
+| Scorecard | the seven gates that decide whether this is allowed to run |
+| Pressure suite | hostile input, in Indonesian, against the deterministic gate |
+| FHIR conformance | the official HL7 validator over the emitted bundles |
+| Walkthrough | one narrated encounter per outcome |
+| *(`make live` only)* | five encounters through a real model |
+| Clinician surface | `localhost:8000`; `/clinic` is the interactive one |
+
+The pieces are still individually runnable when you are working on one of them
+— `python -m eval.scorecard`, `python -m eval.pressure`, `python -m
+tools.concordance`, `python -m tools.store`, `python -m tools.live
+--show-prompt`, `python -m tools.live --list-free`, `python -m tools.demo
+--export demo.html`. `python -m tools.run --ci` is what CI runs: the gates
+only, no walkthrough, no browser, no model.
 
 ### Running against a real model
 
 ```bash
 echo 'OPENROUTER_API_KEY=sk-or-...' >> .env    # .env is gitignored
-make free                                      # what costs nothing right now
-make live                                      # 5 encounters, free model
+python -m tools.live --list-free               # what costs nothing right now
+make live                                      # everything, drafted by a real model
 ```
 
 **This runs for free.** The default backend is a free model, and the free list
@@ -86,9 +97,9 @@ hand-built state cannot be exported by accident.
 ## Demoing it
 
 ```bash
-make surface                      # the clinician surface, localhost
-make page                         # one self-contained file you can send
-python -m tools.demo --live       # drive the same scenarios with a real model
+make                              # everything, then the clinician surface
+python -m tools.demo               # just the surface, when the gates already passed
+python -m tools.demo --export demo.html   # one self-contained file you can send
 ```
 
 There are two pages. `/` is the scripted scenarios — a record of a run across
@@ -136,14 +147,14 @@ There is a test for that, and a test that it reaches nothing outside itself — 
 demo that phones out to a CDN while the document argues for data residency is an
 own goal in front of exactly the audience that will notice.
 
-`make surface` re-reads the packs on every request, so editing a pack file and
+The surface re-reads the packs on every request, so editing a pack file and
 refreshing shows the verdict move — the fastest way to demonstrate that the rules
 are data rather than code. Python modules are imported once, so a change to
 `/service` or `/datagen` needs a restart.
 
 The surface defaults to the **reference reasoner, not a model**: free, instant,
 and identical every run, so a change in behaviour is a real change rather than
-the model having a different day. `make surface-live` drafts with an actual
+the model having a different day. `make live` drafts with an actual
 model through the same interface, and nothing downstream moves.
 
 Findings render in English with the deployment language beneath, and none of
@@ -265,7 +276,7 @@ will not take it. It is worth having and it is not a defence: asked for a strict
 schema, one free model accepted the request and returned a structure of its own
 invention. The strict parser remains the thing that actually holds.
 
-**Whether these help is a question, not an assumption.** `make concordance`
+**Whether these help is a question, not an assumption.** `python -m tools.concordance`
 splits its result by whether the samples agreed, so if unstable drafts are no
 likelier to be wrong than stable ones the report says so and recommends dropping
 the technique.
@@ -334,8 +345,8 @@ The deterministic core, end to end, on synthetic patients:
 | Eligibility routing — the 7 hard exclusions | Working |
 | The nine-check gate | Working |
 | Signature line — roster and licence enforced | Working |
-| Durable runtime — interrupt / resume / replay | Working, file-backed. Survives restart; conformance suite runs against both implementations |
-| Persisted state — checkpoints, signatures, outbound queue | Working — `make store` |
+| Durable runtime — interrupt / resume / replay | Working. Postgres or files; conformance suite runs against all three implementations |
+| Persisted state — checkpoints, signatures, outbound queue | Working — `python -m tools.store`; the surface persists every encounter it runs |
 | Encounter workflow — the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
@@ -358,8 +369,8 @@ The deterministic core, end to end, on synthetic patients:
 | Capability evidence — proof each service was actually delivered | Working |
 | Live transport to the national exchange | Bundles build and queue; transmission is blocked on credentials, sandbox only |
 
-**The deterministic core runs with no model involved at all** — `make checks
-test score pressure` never makes an API call. That ordering was on purpose: the
+**The deterministic core runs with no model involved at all** — every stage of
+`make` except the last one under `make live` never makes an API call. That ordering was on purpose: the
 gate is the part that has to be right, it needs nothing else running, and
 building it first meant the model arrived into a system that already refused bad
 output.
@@ -372,7 +383,7 @@ varies between runs is neither.
 
 ## The walkthrough
 
-`make demo` runs every scripted encounter end to end, across both pathways. A
+`make` runs every scripted encounter end to end, across both pathways. A
 majority end without a recommendation reaching the doctor, and that ratio is the
 point rather than an embarrassment. A demo where the assistant always has an
 answer is a demo of a system nobody should deploy.
@@ -467,16 +478,54 @@ Indonesian physicians. The scorecard prints this caveat on every run.
 ## What survives the process ending
 
 ```bash
-make live                                  # persists by default, to .store/
-make store                                 # what it kept
+python -m tools.store                      # what this deployment kept
 python -m tools.store --thread <id>        # replay one encounter, step by step
 python -m tools.store --signatures         # who signed what, and which draft
 ```
 
-Three append-only JSONL files: the checkpoints, the signature log, and the
-outbound queue. Deliberately not a database — a file that can be read with
-`cat`, copied off a machine and diffed is the right weight here, and each sits
-behind an interface a Postgres or LangGraph backend would implement instead.
+Three things persist — the checkpoints, the signature log and the outbound
+queue — and there are two backends behind them. `make` starts Postgres if this
+machine has Docker; with nothing reachable the same code writes three
+append-only JSONL files under `.store/`. The clinician surface says which one
+it used, in its own header, next to the counts.
+
+Both satisfy the same three interfaces and
+[`tests/test_runtime_contract.py`](../tests/test_runtime_contract.py) runs the
+same tests against all three implementations — in memory, files, Postgres. That
+is what makes the choice an implementation detail rather than a fork in the
+system's behaviour, and it is the whole reason the interface was written before
+either backend existed.
+
+**Why a database, given the files already survive a power cut.** One reason
+that matters more than the others: append-only stops being a convention and
+becomes a constraint. A JSONL audit log is append-only because everyone agrees
+not to edit it — any text editor rewrites a signature and nothing records that
+it happened. The migration installs a trigger that raises on `UPDATE` and
+`DELETE`, so the rule holds against the application, against a migration script
+and against somebody at a `psql` prompt. It raises rather than silently
+discarding the write, because an ignored `UPDATE` looks to the caller exactly
+like a successful one. The other two: two clinicians on one deployment are two
+processes appending to one file, and "which encounters are still unsent" is one
+statement rather than a full scan.
+
+**Why the files stay.** About one facility in twelve lacks 24-hour power and
+one in five has unreliable connectivity. A clinical system that will not start
+without a database is a clinical system that does not start. `Store` prefers
+Postgres, falls back, and *says which* — silently degrading would make "did that
+signature persist" a question nobody thought to ask.
+
+The schema is in [`db/migrations/`](../db/migrations), numbered and applied in
+filename order against a `schema_migrations` tracking table. Postgres also runs
+that same directory itself on a fresh container, so the first `docker compose
+up` and a later application start converge on the same schema by two different
+paths — which is why every statement in a migration is written to be safe to run
+twice, and why there is a test for that.
+
+The queue is a log of state transitions rather than a row per item: enqueue
+writes `pending`, a drain writes the outcome, and the current state of an item
+is its newest row. An operator at a site with one bar of signal asks how many
+times a bundle failed and with what error, and a queue that overwrites its own
+rows cannot say.
 
 This was missing, and its absence made two claims false rather than merely
 incomplete. A checkpoint is supposed to be a recovery point for *service
@@ -503,13 +552,13 @@ worse than no record.
 ## Conformance
 
 ```bash
-make fhir-setup   # once: downloads the validator (~190 MB) into .tools/
-make fhir         # the official HL7 validator over the emitted bundles
+python -m tools.validate_fhir --download   # once: ~190 MB into .tools/
+python -m tools.validate_fhir              # also runs as a stage of `make`
 ```
 
 The validator is a Java distribution, so it is gitignored rather than vendored
 — it is the same file for everyone and does not belong in a repository. A
-missing validator is a missing prerequisite, not a failure: `make fhir` says
+missing validator is a missing prerequisite, not a failure: the stage says
 which command to run and exits cleanly. `FHIR_VALIDATOR_JAR` overrides the
 location. Four bundles — both pathways, controlled and uncontrolled, three
 different sites — validate with **0 errors** against FHIR R4.

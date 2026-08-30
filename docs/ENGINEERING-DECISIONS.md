@@ -325,3 +325,76 @@ checking against it.
 
 **Overturned if:** never. Keep both: the approximation for every commit, the
 real one before anything is submitted.
+
+---
+
+### D26 — The audit log's append-only rule is enforced by the database, not by the application
+
+**Why.** Three JSONL files already survived a power cut, which is most of what
+durability means here, so the case for a database had to be more than "real
+systems use one". It is this: append-only was a convention, and a convention is
+not a control. Any text editor rewrites a signature in a JSONL file and nothing
+in the file records that it happened — and the signature is the artefact that
+makes an output lawful. The migration installs a trigger that raises on `UPDATE`
+and `DELETE` for all three tables, so the rule holds against this application,
+against a later migration script, and against somebody at a `psql` prompt.
+
+It raises rather than discarding the write. Postgres will happily let a rule
+swallow an `UPDATE` instead, and that is worse than no protection: an ignored
+`UPDATE` is indistinguishable from a successful one to the caller, on a table
+whose entire job is being trustworthy.
+
+Two smaller reasons that would not have justified it alone: two clinicians at
+one site are two processes appending to one file, and "which encounters are
+still unsent" is one statement rather than a scan of everything ever written.
+
+**Overturned if:** never, while a signature is the thing that makes an output
+lawful. If the store moves to something without triggers, the equivalent
+control — revoked `UPDATE`/`DELETE` grants, an immutable log service — has to
+arrive in the same change, not after it.
+
+---
+
+### D27 — Postgres is preferred and optional, and the system says which one it chose
+
+**Why.** About one facility in twelve lacks 24-hour power and one in five has
+unreliable connectivity. A clinical system that will not start without a
+database is a clinical system that does not start, and the sites where it would
+fail are exactly the remote ones the programme exists to serve. So `Store`
+prefers Postgres, falls back to files, and reports `backend` on every summary
+and in the clinician surface's own header.
+
+The reporting is the load-bearing half. A silent fallback turns "did that
+signature persist" into a question nobody thinks to ask, which is the failure
+mode where the record is missing precisely when someone asks for it.
+
+Both backends satisfy the same three interfaces and
+`tests/test_runtime_contract.py` runs the *same* tests against all three
+implementations rather than a suite per backend. A durable backend that quietly
+differs in semantics is worse than none, because what runs in a clinic then
+behaves unlike what ran in the test.
+
+**Overturned if:** a deployment can guarantee a database, and losing the file
+backend is what buys something real. Note that removing it means deleting a
+tested implementation, not deleting dead code.
+
+---
+
+### D28 — Migrations are numbered SQL, applied by both the container and the application
+
+**Why.** Postgres runs `/docker-entrypoint-initdb.d` once, on an empty data
+directory. That covers a fresh `docker compose up` and nothing else: an existing
+database gets no migrations that way, and neither does a deployment pointed at a
+Postgres somebody else operates. So the same directory is also applied at
+startup against a `schema_migrations` tracking table.
+
+The consequence is that the first application start after a fresh container
+always re-applies files the container has already run — the tables exist, the
+tracking table is empty. Rather than making the two paths exclusive and having
+to reason about which one ran, every statement in a migration is written to be
+safe to run twice and the two paths are allowed to converge. There is a test
+that re-running against an existing schema does not raise.
+
+**Overturned if:** a real migration cannot be made idempotent — a destructive
+column rewrite, say. At that point the tracking table becomes authoritative and
+the initdb mount goes away, which is a one-line change to `docker-compose.yml`.

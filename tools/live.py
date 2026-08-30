@@ -251,7 +251,7 @@ def main() -> int:
     print(f"  queued for submission: {len(queue)}")
     if store:
         facts = store.summary()
-        print(f"  persisted to {facts['directory']}/ — "
+        print(f"  persisted to {facts['backend']} ({facts['location']}) — "
               f"{facts['encounters_checkpointed']} encounter(s) checkpointed, "
               f"{facts['signatures']} signature(s), {facts['queued']} queued")
     if parse_failures:

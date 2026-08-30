@@ -1,0 +1,43 @@
+# Postgres for this system's own state: checkpoints, signatures, outbound queue.
+#
+# Only the database is containerised. The service itself runs on the host, so a
+# code change is visible on the next reload instead of after an image rebuild —
+# during a demo that difference is the whole experience. Nothing here is
+# required to run the system: with no database reachable the same code falls
+# back to append-only files, and says which one it chose.
+#
+# The port is deliberately not 5432. A developer machine usually already has
+# something on it, and a silent connection to the wrong database is a worse
+# failure than a refused one.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clinician-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clinician
+      POSTGRES_PASSWORD: clinician
+      POSTGRES_DB: clinician
+    ports:
+      - "5544:5432"
+    volumes:
+      # Named volume: the point of moving off files was that state survives, and
+      # a bind mount into the repo would put patient state in the working tree.
+      - clinician-data:/var/lib/postgresql/data
+      # Postgres runs everything in here once, on an empty data directory. The
+      # application also applies these same files at startup against an existing
+      # database, so the two paths converge — which is why every statement in
+      # them is written to be safe to run twice.
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Gates `docker compose up --wait`. Without it the first connection races
+      # the server's own startup and fails on a database that is fine.
+      test: ["CMD-SHELL", "pg_isready -U clinician -d clinician"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  clinician-data:
