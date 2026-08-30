@@ -13,3 +13,6 @@ docs/DEMO.md
 
 # The HL7 validator, fetched by `make fhir-setup`. 190 MB.
 .tools/
+
+# Durable state from a run: checkpoints, signatures, outbound queue.
+.store/

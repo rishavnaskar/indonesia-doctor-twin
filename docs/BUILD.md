@@ -97,6 +97,11 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
 > provide, and the argument that justifies one — durable execution across days —
 > belongs to the between-visit loop, whose patient-facing channel is V1.5.
 >
+> Durability itself is built: `FileRuntime` keeps checkpoints, the audit log
+> keeps signatures, and the outbound queue keeps writes — three append-only
+> files under `.store/`, inspectable with `make store`. What is absent is only
+> the orchestration library, not the persistence it was wanted for.
+>
 > `tests/test_runtime_contract.py` is a conformance suite: parametrise it with a
 > LangGraph- or Postgres-backed runtime and it either passes or "swapping the
 > backend is one module's work" was never true. The CI rule confining

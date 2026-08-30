@@ -26,8 +26,25 @@ from service.graph.runtime import Checkpoint, InMemoryRuntime, Interrupted
 
 
 def implementations():
-    """Every runtime that claims to satisfy the contract."""
-    return [InMemoryRuntime]
+    """Every runtime that claims to satisfy the contract.
+
+    FileRuntime is here because a durable backend that quietly differs in
+    semantics is worse than none: the whole argument for an interface is that
+    what runs in a clinic behaves like what runs in a test.
+    """
+    return [InMemoryRuntime, _file_runtime_factory]
+
+
+def _file_runtime_factory():
+    import tempfile
+    from pathlib import Path
+
+    from service.graph.runtime import FileRuntime
+
+    return FileRuntime(path=Path(tempfile.mkdtemp()) / "cp.jsonl")
+
+
+_file_runtime_factory.__name__ = "FileRuntime"
 
 
 @pytest.fixture(params=implementations(), ids=lambda c: c.__name__)

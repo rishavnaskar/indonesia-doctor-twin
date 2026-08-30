@@ -334,7 +334,8 @@ The deterministic core, end to end, on synthetic patients:
 | Eligibility routing — the 7 hard exclusions | Working |
 | The nine-check gate | Working |
 | Signature line — roster and licence enforced | Working |
-| Durable runtime — interrupt / resume / replay | Contract defined and exercised; in-memory implementation, no orchestration library. Conformance suite in `tests/test_runtime_contract.py` |
+| Durable runtime — interrupt / resume / replay | Working, file-backed. Survives restart; conformance suite runs against both implementations |
+| Persisted state — checkpoints, signatures, outbound queue | Working — `make store` |
 | Encounter workflow — the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
@@ -462,6 +463,42 @@ clinical.** Sets A and B are generated from the same guideline the gate checks
 against, so a high score is close to tautological. The number that means
 something comes from Set C — real retrospective visits, blind-scored by
 Indonesian physicians. The scorecard prints this caveat on every run.
+
+## What survives the process ending
+
+```bash
+make live                                  # persists by default, to .store/
+make store                                 # what it kept
+python -m tools.store --thread <id>        # replay one encounter, step by step
+python -m tools.store --signatures         # who signed what, and which draft
+```
+
+Three append-only JSONL files: the checkpoints, the signature log, and the
+outbound queue. Deliberately not a database — a file that can be read with
+`cat`, copied off a machine and diffed is the right weight here, and each sits
+behind an interface a Postgres or LangGraph backend would implement instead.
+
+This was missing, and its absence made two claims false rather than merely
+incomplete. A checkpoint is supposed to be a recovery point for *service
+restart*, and about one facility in twelve lacks 24-hour power, so the process
+dying is the ordinary case. And replay is supposed to be the answer when a
+regulator asks why the system said something — which needs the record to
+outlive the process that made it. The signature is the artefact that makes an
+output lawful and it was the least durable thing in the system.
+
+A signature now carries its provenance to disk, so the question "which model,
+which prompt, which rule set did this person put their licence behind" has an
+answer months later:
+
+```
+2026-08-29 10:00:00  PRAC-A-001 (internist)  accepted
+  signed a draft from minimax/minimax-m3:free@GMICloud | htn-followup@0.2.0 | id-htn-2026-08@1
+```
+
+Turning persistence on immediately found a bug that was invisible without it:
+thread ids were built from a position in a run, so two runs both used `LIVE-0`
+and appended two different encounters to one audit trail. A corrupted record is
+worse than no record.
 
 ## Conformance
 

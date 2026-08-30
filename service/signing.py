@@ -17,6 +17,9 @@ which is to say, makes it useless precisely when someone asks.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -46,10 +49,66 @@ class SignatureRecord:
 
 @dataclass
 class AuditLog:
+    """Who signed what, and when.
+
+    Give it a `path` and it outlives the process. That is not a nicety: the
+    signature is the artefact that makes an output lawful, and a record of it
+    that disappears when the service restarts is not a record. About one
+    facility in twelve lacks 24-hour power, so "the process died" is the
+    ordinary case.
+
+    Append-only JSONL, the same shape as the outbound queue and the durable
+    runtime — readable with `cat`, and a truncated final line from a power cut
+    is skipped rather than fatal.
+    """
+
     records: list[SignatureRecord] = field(default_factory=list)
+    path: Path | None = None
+    damaged: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.path is not None and Path(self.path).exists():
+            self._load()
 
     def append(self, record: SignatureRecord) -> None:
         self.records.append(record)
+        self._write(record)
+
+    def _write(self, record: SignatureRecord) -> None:
+        if self.path is None:
+            return
+        path = Path(self.path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "practitioner_id": record.practitioner_id,
+                "role": record.role,
+                "licence_expires": record.licence_expires.isoformat(),
+                "decision": record.decision,
+                "proposal_provenance": list(record.proposal_provenance),
+                "signed_at": record.signed_at.isoformat(),
+                "rejection_reason": record.rejection_reason,
+                "edit_diff": record.edit_diff,
+            }, default=str) + "\n")
+
+    def _load(self) -> None:
+        for line in Path(self.path).read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+                self.records.append(SignatureRecord(
+                    practitioner_id=row["practitioner_id"],
+                    role=row["role"],
+                    licence_expires=date.fromisoformat(row["licence_expires"]),
+                    decision=row["decision"],
+                    proposal_provenance=tuple(row["proposal_provenance"]),
+                    signed_at=datetime.fromisoformat(row["signed_at"]),
+                    rejection_reason=row.get("rejection_reason"),
+                    edit_diff=row.get("edit_diff"),
+                ))
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                self.damaged.append(line[:200])
 
 
 def verify_signer(site: dict[str, Any], signer: Signer, when: date) -> dict[str, Any]:

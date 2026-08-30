@@ -9,6 +9,7 @@ exactly the audience that will ask.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from typing import Any
@@ -354,7 +355,7 @@ def _encounter(scenario, rules, labels, router, on_step=None) -> dict:
     try:
         result = run_encounter(
             scenario.state, rules, scenario.site, effective, InMemoryRuntime(),
-            thread_id=f"DEMO-{scenario.key}",
+            thread_id=f"DEMO-{scenario.key}-{uuid4().hex[:8]}",
             signer=Signer(practitioner, True),
             audit=audit_log, now=NOW, on_step=on_step,
         )

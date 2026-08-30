@@ -37,6 +37,10 @@ fhir-setup:
 fhir:
 	$(PY) -m tools.validate_fhir
 
+# What a deployment has actually kept: checkpoints, signatures, outbound queue.
+store:
+	$(PY) -m tools.store
+
 # What CI runs. A bad commit fails here. Never calls a model: a test suite that
 # costs money per run and varies between runs is neither a test suite nor a
 # suite.

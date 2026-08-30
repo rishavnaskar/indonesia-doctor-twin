@@ -78,6 +78,9 @@ def main() -> int:
                              "them as the confidence, instead of the model's own "
                              "opinion of itself (costs one call per sample)")
     parser.add_argument("--pack", default="id")
+    parser.add_argument("--store", default=None,
+                        help="directory for checkpoints, signatures and the outbound "
+                             "queue (default .store; --store '' disables persistence)")
     parser.add_argument("--site", default="SITE-A")
     parser.add_argument("--show-prompt", action="store_true")
     args = parser.parse_args()
@@ -120,7 +123,11 @@ def main() -> int:
     router = router_with_model(args.model, provider=args.provider,
                                samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow, **kwargs)
     backend = router.get("model").backend
-    queue = OutboundQueue()
+    from service.store import Store
+
+    store = Store(args.store) if args.store != "" else None
+    queue = store.outbound() if store else OutboundQueue()
+    audit = store.audit_log() if store else AuditLog()
     now = datetime(2026, 8, 29, 10, 0)
 
     if not args.show_prompt:
@@ -168,6 +175,7 @@ def main() -> int:
         )
         return 2
 
+    run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
     tally: dict[str, int] = {}
     parse_failures = 0
     requested = backend.version()
@@ -177,10 +185,17 @@ def main() -> int:
         label = "controlled" if index % 2 == 0 else "uncontrolled"
         try:
             result = run_encounter(
-                state, rules, site, router, InMemoryRuntime(),
-                thread_id=f"LIVE-{index}",
+                state, rules, site, router,
+                (store.runtime() if store else InMemoryRuntime()),
+                # Unique per encounter, not per position in a run. Two runs
+                # both used LIVE-0 and, once checkpoints persisted, appended two
+                # different encounters to one audit trail — which is exactly the
+                # thing an audit trail must never do. In memory it was
+                # invisible.
+                thread_id=f"{state.patient_id}-{run_id}-{index}",
                 signer=Signer(site["practitioners"][0]["practitioner_id"], True),
-                audit=AuditLog(), now=now, queue=queue,
+                audit=audit, now=now, queue=queue,
+
             )
         except ProposalParseError as exc:
             parse_failures += 1
@@ -234,6 +249,11 @@ def main() -> int:
     print(f"\n{RULE}")
     print("  " + " · ".join(f"{k}: {v}" for k, v in sorted(tally.items())))
     print(f"  queued for submission: {len(queue)}")
+    if store:
+        facts = store.summary()
+        print(f"  persisted to {facts['directory']}/ — "
+              f"{facts['encounters_checkpointed']} encounter(s) checkpointed, "
+              f"{facts['signatures']} signature(s), {facts['queued']} queued")
     if parse_failures:
         print(f"  {parse_failures} response(s) did not parse. That is a gate failure by")
         print("  design, not a retry — a malformed clinical output is not made correct")
