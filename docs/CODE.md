@@ -476,8 +476,8 @@ ship patient data offshore.
 Rules 5 and 6 are a writing convention rather than an architectural one, and
 rule 6 exists because checking by eye failed. A first pass over the markdown
 left the em-dashes in every string literal, every pack value the surface
-renders, and every `&mdash;` entity, which a grep for the character does not
-find at all. A check that reads what ships is the only version of this that
+renders, and every em-dash written as an HTML entity, which a grep for the
+character does not find at all. A check that reads what ships is the only version of this that
 stays true a month from now.
 
 ## What the scorecard does and does not say
