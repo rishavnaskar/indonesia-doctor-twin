@@ -284,6 +284,10 @@ def main() -> int:
     build.start()
 
     class Handler(http.server.BaseHTTPRequestHandler):
+        # HEAD sets this, so the routing below runs unchanged and only the body
+        # is withheld. See do_HEAD.
+        head_only = False
+
         def _send(self, body: bytes, content_type: str, code: int = 200) -> None:
             try:
                 self.send_response(code)
@@ -291,7 +295,8 @@ def main() -> int:
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
-                self.wfile.write(body)
+                if not self.head_only:
+                    self.wfile.write(body)
             except (BrokenPipeError, ConnectionResetError):
                 pass  # the browser hung up; nothing to report
 
@@ -364,6 +369,25 @@ def main() -> int:
                 return
 
             self._json({"error": "not found"}, 404)
+
+        def do_HEAD(self):  # noqa: N802 - stdlib naming
+            """Same status and headers as GET, no body.
+
+            Without this, BaseHTTPRequestHandler answers every HEAD with 501.
+            That is not a cosmetic gap: health checks, uptime monitors and
+            proxies routinely probe with HEAD, and a 501 reads as unhealthy —
+            which is a restart, and then another, with the application working
+            perfectly the entire time.
+
+            Routing is not duplicated. The GET handler runs exactly as it would
+            otherwise and `_send` withholds the body, so the two can never
+            disagree about what a path returns.
+            """
+            self.head_only = True
+            try:
+                self.do_GET()
+            finally:
+                self.head_only = False
 
         def do_GET(self):  # noqa: N802 - stdlib naming
             path = self.path.split("?", 1)[0]
