@@ -189,7 +189,7 @@ button.act[disabled]{ background:transparent; color:var(--graphite); border-colo
   <div class="hin">
     <div class="htop">
       <div>
-        <p class="eyebrow">Adult hypertension &middot; follow-up visits</p>
+        <p class="eyebrow" id="eyebrow"></p>
         <h1>A doctor&rsquo;s assistant.<br>Not a doctor.</h1>
         <p class="lede">It drafts the plan for a return visit. A licensed doctor signs every
           one. Nine checks sit in between &mdash; plain code, no model &mdash; and any one of
@@ -216,6 +216,10 @@ const row = (k,v) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`;
 
 function meta(){
   const p = DATA.pack, st = DATA.store || {};
+  // Named by the pack, so adding a third pathway changes this line without
+  // anyone editing the surface.
+  document.getElementById("eyebrow").textContent =
+    (DATA.pathways || []).map(x => x.label).join("  \u00b7  ") + "  \u00b7  follow-up visits";
   // Facts as hairline rows, not a filled panel. Everything here is read off a
   // real run — the drafter's name included, so a page claiming a model wrote
   // something is a page the model actually wrote.

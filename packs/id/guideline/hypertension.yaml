@@ -32,6 +32,11 @@ review:
 # When this pathway claims a patient. Read by the pathway router before
 # eligibility runs — "is this the right pathway" comes before "is this patient
 # suitable for it".
+# What to call this pathway on a screen. Here rather than in the surface,
+# for the same reason every other national fact is: naming it in code makes the
+# code know which disease it is running.
+label: "Adult hypertension"
+
 applies_to:
   any_of:
     - {diagnosis_prefix: "I10"}

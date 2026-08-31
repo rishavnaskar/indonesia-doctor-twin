@@ -961,6 +961,13 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         # being run again. On a second `make live` this is the whole page, and
         # zero model calls.
         "resumed": sum(1 for e in encounters if e.get("resumed")),
+        # Every pathway the pack carries, named by the pack. The surface used to
+        # hard-code "adult hypertension", which was the first of two and became
+        # wrong the moment a second one shipped — above four diabetes encounters.
+        "pathways": [
+            {"name": name, "label": (rules.pathways[name] or {}).get("label") or name}
+            for name in (rules.pathway_order or list(rules.pathways))
+        ],
         "pack": {
             "pack_id": rules.pack_id,
             "version": rules.version,

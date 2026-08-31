@@ -32,6 +32,11 @@ sources:
 review:
   status: awaiting_clinical_signoff
 
+# What to call this pathway on a screen. Here rather than in the surface,
+# for the same reason every other national fact is: naming it in code makes the
+# code know which disease it is running.
+label: "Type 2 diabetes"
+
 applies_to:
   any_of:
     - {diagnosis_prefix: "E11"}
