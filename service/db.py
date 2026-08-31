@@ -114,8 +114,15 @@ def reset(conn) -> dict[str, int]:
     clinical audit trail, which in a real deployment would be unlawful. It
     exists because a prototype's store fills with synthetic demo runs and
     starting a recording from a clean slate is a real need. `/clinic`'s own
-    clear button does *not* do this — it writes a marker forward and deletes
+    *Clear this list* does not do this: it writes a marker forward and deletes
     nothing, which is what the product does. This is the operator's hammer.
+
+    `/clinic` also carries a *Delete everything* button that does reach this,
+    which weakens the "a person has to type it" protection this used to rely on.
+    So the protection moved rather than went: the route refuses without an
+    explicit confirmation, and `reset_allowed()` switches it off by default
+    wherever the deployment is public, because a wipe button on a link anyone
+    can open is one misclick from emptying the store under whoever is reading.
     """
     counts = {}
     with conn.cursor() as cur:

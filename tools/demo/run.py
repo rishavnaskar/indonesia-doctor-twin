@@ -379,7 +379,7 @@ def _proposal(proposal, rules) -> dict | None:
             _plain(proposal.recommendation), ""),
         "assessment_plain": (glossary.get("assessments") or {}).get(
             _plain(proposal.assessment), ""),
-        "patient_instructions_gloss": gloss,
+        "patient_instructions_gloss": proposal.patient_instructions_en or gloss,
         "concerns": [
             {"text": c.text, "urgency": c.urgency.value, "citation": c.citation}
             for c in proposal.concerns
@@ -886,6 +886,7 @@ def vocabulary(pack_id: str = "id") -> dict:
         ],
         "diagnoses": glossary.get("diagnoses") or {},
         "hosted": os.environ.get("CLINICIAN_HOSTED", "") == "1",
+        "reset_allowed": reset_allowed(),
         # Grouped, because a flat list of fifteen gives no sense of which ones
         # are supposed to produce a draft and which are supposed to refuse.
         "profiles": [
@@ -960,6 +961,7 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         # nobody asks. The answer is that every record here is synthetic and the
         # residency guard structurally refuses anything else.
         "hosted": os.environ.get("CLINICIAN_HOSTED", "") == "1",
+        "reset_allowed": reset_allowed(),
         # How many of the encounters below came back from the store rather than
         # being run again. On a second `make live` this is the whole page, and
         # zero model calls.
@@ -990,6 +992,43 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         "drafter_failures": sum(1 for e in encounters if e.get("error")),
         "total": len(encounters),
     }
+
+
+def reset_allowed() -> bool:
+    """Whether the surface is permitted to destroy the store.
+
+    Off on a hosted deployment unless explicitly switched on, because the public
+    demo is a link anyone can open and a wipe button on it is one misclick away
+    from emptying the store under whoever is reading at the time. Locally it is
+    on, since that is the machine whose data it is.
+
+    Set CLINICIAN_ALLOW_RESET=1 to enable it anywhere, or =0 to refuse it
+    everywhere including locally.
+    """
+    explicit = os.environ.get("CLINICIAN_ALLOW_RESET")
+    if explicit is not None:
+        return explicit == "1"
+    return os.environ.get("CLINICIAN_HOSTED", "") != "1"
+
+
+def reset_everything() -> dict:
+    """Destroy the store and drop every cache built from it.
+
+    Resetting the store alone would leave this process serving encounters that
+    no longer exist anywhere, which looks like the reset silently failed. The
+    runtime is cached per process and the scripted page is cached in the build,
+    so both have to go with it.
+    """
+    global _RUNTIME, _STORE
+
+    counts = store().reset()
+    with _STORE_LOCK:
+        # Both are process-cached and both are built from what was just
+        # destroyed. A runtime holding a connection to an emptied database is
+        # fine; one holding checkpoints that no longer exist is not.
+        _RUNTIME = None
+        _STORE = None
+    return counts
 
 
 def _can_sign(site, practitioner, when, Signer, verify_signer, SignatureRefused) -> str | None:

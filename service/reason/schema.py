@@ -84,6 +84,7 @@ def proposal_schema(rules=None) -> dict[str, Any]:
                 },
             },
             "patient_instructions": {"type": "string"},
+            "patient_instructions_en": {"type": "string"},
             "follow_up_interval_days": {"type": "integer"},
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "uncertainty_notes": {"type": "string"},

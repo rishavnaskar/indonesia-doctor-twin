@@ -97,6 +97,13 @@ demonstration of the guard, not an exception to it. Production runs in-country
 on sovereign infrastructure; that is a hosting decision, and the architecture
 does not change.
 
+**The reset button is off here, deliberately.** `/clinic` has a *Delete
+everything* control that destroys the store. On a hosted deployment it is hidden
+and the route refuses, because a public link plus a wipe button is one misclick
+away from emptying the demo under whoever is reading it. Set
+`CLINICIAN_ALLOW_RESET=1` in the service environment if you want it live, and
+remember you will need to re-seed afterwards.
+
 **A public /clinic accepts pasted records**, so the page carries a banner
 telling visitors not to paste a real one. The guard is still the actual control.
 The banner is just so the situation mostly doesn't come up.

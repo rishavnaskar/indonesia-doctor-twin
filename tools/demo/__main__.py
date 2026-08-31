@@ -347,6 +347,27 @@ def main() -> int:
                     ))
                     return
 
+                if path == "/api/reset":
+                    # Destroys the audit trail. Distinct from /api/history/clear,
+                    # which deletes nothing and only moves the page's start
+                    # marker forward. Guarded rather than hidden: a button the
+                    # server refuses is better than a button that is not there,
+                    # because the refusal says why.
+                    from tools.demo.run import reset_allowed, reset_everything
+
+                    if not reset_allowed():
+                        self._json({"error": "Reset is switched off on this "
+                                             "deployment. Set CLINICIAN_ALLOW_RESET=1 "
+                                             "to enable it."}, 403)
+                        return
+                    if body.get("confirm") != "DELETE":
+                        self._json({"error": "confirmation missing"}, 400)
+                        return
+                    counts = reset_everything()
+                    build.start()  # the scripted page was built from what just went
+                    self._json({"destroyed": counts})
+                    return
+
                 if path == "/api/history/clear":
                     from tools.demo.run import clear_clinic_history
 

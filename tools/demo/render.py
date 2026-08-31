@@ -374,9 +374,12 @@ function draftCard(e){
       ${row("Confidence", `${(d.confidence*100).toFixed(0)}%`)}
     </table>
     ${d.patient_instructions?`<h3>What the patient is told</h3>
-      <div>${esc(d.patient_instructions_gloss || d.patient_instructions)}</div>
-      ${d.patient_instructions_gloss?`<div class="gloss">${esc(d.patient_instructions)}
-        <span class="tag">as sent, in ${esc(DATA.pack.language)}</span></div>`:""}`:""}
+      ${d.patient_instructions_gloss
+        ? `<div>${esc(d.patient_instructions_gloss)}</div>
+           <div class="gloss">${esc(d.patient_instructions)}
+             <span class="tag">as given to the patient, in ${esc(DATA.pack.language)}</span></div>`
+        : `<div>${esc(d.patient_instructions)}
+             <span class="tag">in ${esc(DATA.pack.language)}; no English version was supplied</span></div>`}`:""}
     ${e.signature?`<h3>Signature</h3><table>
       ${row("Signed by", `${esc(e.signature.practitioner_id)} · ${esc(e.signature.role)}`)}
       ${row("Licence valid until", esc(e.signature.licence_expires))}

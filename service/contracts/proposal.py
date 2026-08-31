@@ -149,6 +149,12 @@ class Proposal:
     investigations: list[str] = field(default_factory=list)
     assertions: list[Assertion] = field(default_factory=list)
     patient_instructions: str = ""
+    # The same instructions in English. The patient gets the local-language
+    # version; this is for the reviewing clinician and for anyone reading an
+    # audit trail who does not read it. Pack-written instructions get their
+    # English from the pack's own gloss table, so this field is how a
+    # model-written one supplies the same thing.
+    patient_instructions_en: str = ""
     follow_up_interval_days: int | None = None
     uncertainty_notes: str = ""
 

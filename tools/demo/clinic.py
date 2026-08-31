@@ -61,6 +61,8 @@ border:1px solid var(--ember);background:var(--ember);color:#fff;cursor:pointer}
 button:hover{background:var(--ember-deep);border-color:var(--ember-deep)}
 button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 button.ghost:hover{background:var(--paper-warm);border-color:var(--ash)}
+button.ghost.danger{color:var(--red);border-color:var(--line)}
+button.ghost.danger:hover{background:var(--red-bg);border-color:var(--red)}
 button[disabled],button[disabled]:hover{opacity:.45;cursor:default;background:transparent;
 color:var(--ash);border-color:var(--line)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
@@ -173,6 +175,7 @@ the patient to a hospital that cannot run the test, the answer changes, and it s
  "diagnoses":["I10"],"flags":{"on_antihypertensive_treatment":true}}]'></textarea>
   <button class="ghost" id="load" style="margin-top:8px">Load these</button>
 </details>
+<div id="danger"></div>
 </main>
 <script>
 let V = null, patients = [], results = {};
@@ -190,6 +193,7 @@ function setObs(p, code, value, ageDays){
 
 async function boot(){
   V = await (await fetch("/api/vocabulary")).json();
+  renderDanger();
   // On a public URL this page is a route by which a real patient record could
   // arrive, because it accepts pasted JSON. Say so before that happens rather
   // than relying on the guard alone. The guard fails closed, but a record that
@@ -229,6 +233,7 @@ async function restore(){
     These are the patients and verdicts from earlier sessions. Edit and re-run any of them.
     <button class="ghost" id="forget" style="margin-left:10px">Clear this list</button>
     </div>`;
+
   $("forget").onclick = async ()=>{
     // Nothing is deleted. The store refuses UPDATE and DELETE, so clearing
     // writes a marker forward and the page starts after it, so the visits stay on
@@ -239,6 +244,48 @@ async function restore(){
     $("restored").innerHTML = `<div class="stat">List cleared from this page. Nothing was
       deleted, because the store is append-only, so every visit is still on the record and still
       replayable with <span class="mono">python -m tools.store</span>.</div>`;
+    draw();
+  };
+}
+
+// Two buttons that sound alike and are opposites, which is the whole design.
+// "Clear this list" deletes nothing: the store refuses UPDATE and DELETE, so it
+// writes a marker forward and the page starts after it. This one destroys the
+// audit trail. In a real deployment that would be unlawful, so it says so, asks
+// twice, and is switched off by default wherever the deployment is public.
+function renderDanger(){
+  if (!V.reset_allowed) return;
+  $("danger").innerHTML = `<div class="fineprint" style="margin-top:26px;
+      padding-top:14px;border-top:1px solid var(--line)">
+    <b>Start from nothing.</b> Destroys every checkpoint, signature and queued item in
+    the store, then rebuilds the scripted page from scratch. This is not the
+    <i>Clear this list</i> button above, which deletes nothing. It is the operator's
+    hammer, and it is off by default on a public deployment.
+    <button class="ghost danger" id="wipe" style="margin-left:8px">Delete everything</button>
+  </div>`;
+  $("wipe").onclick = async ()=>{
+    if (!confirm("This destroys every checkpoint, signature and queued item in the store.\n\n" +
+                 "In a real deployment, deleting a clinical audit trail would be unlawful.\n\n" +
+                 "Continue?")) return;
+    $("wipe").disabled = true;
+    $("msg").innerHTML = `<div class="stat">Destroying the store...</div>`;
+    let r, j;
+    try {
+      r = await fetch("/api/reset", {method:"POST", body: JSON.stringify({confirm:"DELETE"})});
+      j = await r.json();
+    } catch (e) {
+      $("msg").innerHTML = `<div class="err">The reset request did not complete: ${esc(e.message)}</div>`;
+      $("wipe").disabled = false; return;
+    }
+    $("wipe").disabled = false;
+    if (!r.ok) { $("msg").innerHTML = `<div class="err">${esc(j.error||"Refused.")}</div>`; return; }
+    const d = j.destroyed || {};
+    patients = []; results = {}; $("restored").innerHTML = "";
+    $("msg").innerHTML = `<div class="stat"><b>Store destroyed.</b>
+      ${esc(d.checkpoints ?? 0)} checkpoints, ${esc(d.signatures ?? 0)} signatures and
+      ${esc(d.outbound ?? 0)} queued items gone from
+      <span class="mono">${esc(d.backend||"")}</span>. The scripted page is rebuilding, so
+      the next visit to it runs from scratch.</div>`;
     draw();
   };
 }

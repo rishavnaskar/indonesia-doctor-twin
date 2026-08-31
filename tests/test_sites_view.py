@@ -84,3 +84,42 @@ def test_the_route_serves_it():
     src = demo.__file__
     text = open(src).read()
     assert '"/sites"' in text and '"/api/sites"' in text
+
+
+def test_reset_is_off_by_default_on_a_public_deployment(monkeypatch):
+    """A wipe button on a public URL is one misclick from an empty demo."""
+    from tools.demo.run import reset_allowed
+
+    monkeypatch.delenv("CLINICIAN_ALLOW_RESET", raising=False)
+    monkeypatch.setenv("CLINICIAN_HOSTED", "1")
+    assert reset_allowed() is False
+
+    monkeypatch.setenv("CLINICIAN_ALLOW_RESET", "1")
+    assert reset_allowed() is True, "the operator can still switch it on"
+
+    monkeypatch.delenv("CLINICIAN_HOSTED", raising=False)
+    monkeypatch.setenv("CLINICIAN_ALLOW_RESET", "0")
+    assert reset_allowed() is False, "and can switch it off locally too"
+
+
+def test_reset_is_available_locally_by_default(monkeypatch):
+    from tools.demo.run import reset_allowed
+
+    monkeypatch.delenv("CLINICIAN_ALLOW_RESET", raising=False)
+    monkeypatch.delenv("CLINICIAN_HOSTED", raising=False)
+    assert reset_allowed() is True
+
+
+def test_the_english_instructions_survive_the_contract():
+    """The reviewer reads English; the patient reads the local language."""
+    from service.contracts.proposal import Provenance
+    from service.reason.parse import to_proposal
+
+    raw = {"assessment": "uncontrolled", "recommendation": "continue",
+           "patient_instructions": "Minum obat setiap hari.",
+           "patient_instructions_en": "Take your medicine every day.",
+           "confidence": 0.8, "medication_changes": [], "investigations": [],
+           "assertions": [], "follow_up_interval_days": 28}
+    p = to_proposal(raw, Provenance(model="m@v", prompt_template="t@v", corpus="c@v"))
+    assert p.patient_instructions_en == "Take your medicine every day."
+    assert p.patient_instructions == "Minum obat setiap hari."

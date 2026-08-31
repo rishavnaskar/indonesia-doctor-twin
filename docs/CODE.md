@@ -388,6 +388,7 @@ The deterministic core, end to end, on synthetic patients:
 | Clinician presentation layer: the traffic light (SPEC §5.8) | Working |
 | Demo surface: clinician view and audit view, from a real run | Working |
 | Interactive surface: build/edit patients, 19 profiles, compare across hospitals | Working |
+| Reset from the browser (`/clinic`, `POST /api/reset`) | Working. off by default on a public deployment; `CLINICIAN_ALLOW_RESET=1` enables it |
 | Site capability page (`/sites`, `/api/sites`) | Working. renders the registry check 9 reads, including the evidence gaps and the lapsed licence |
 | Between-visit loop (SPEC §5.11) | Schema, provenance and escalation working; patient-facing channel is V1.5 by design |
 | Plan-concordance metric (SPEC §8.2) | Working. reported, not gated; needs Set C to mean anything |

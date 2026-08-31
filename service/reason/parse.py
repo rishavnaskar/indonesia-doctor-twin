@@ -175,6 +175,7 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
         investigations=[str(i) for i in raw.get("investigations") or []],
         assertions=assertions,
         patient_instructions=str(raw.get("patient_instructions", "")),
+        patient_instructions_en=str(raw.get("patient_instructions_en", "")),
         follow_up_interval_days=_integer(raw.get("follow_up_interval_days")),
         uncertainty_notes=str(raw.get("uncertainty_notes", "")),
         concerns=concerns,
