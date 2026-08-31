@@ -43,6 +43,32 @@ _DISPENSING_ACTIONS = (
 )
 
 
+def evidence_gap(site: dict, code: str, *, max_age: int | None,
+                 today: date | None) -> str | None:
+    """Why this site's claim to deliver `code` is not currently backed, or None.
+
+    Module level rather than a closure inside the check, because the surface
+    renders the same verdict on the sites page. Two implementations of one rule
+    is how a page ends up telling a reviewer something the gate disagrees with,
+    and this rule is small enough that the duplicate would look correct.
+    """
+    evidence = {row.get("service"): row for row in (site.get("evidence_ref") or [])}
+    row = evidence.get(code)
+    if row is None:
+        return "no delivery evidence on file"
+    last = row.get("last_performed")
+    if not last:
+        return "listed but never recorded as performed"
+    if max_age and today:
+        try:
+            age = (today - date.fromisoformat(str(last))).days
+        except ValueError:
+            return f"unreadable evidence date {last!r}"
+        if age > max_age:
+            return f"last performed {age} days ago, beyond the {max_age}-day policy"
+    return None
+
+
 def run(ctx: GateContext) -> list[Finding]:
     site = ctx.site
     if site is None:
@@ -100,25 +126,11 @@ def run(ctx: GateContext) -> list[Finding]:
     # well happen — the registry is what is doubtful, not the medicine — so the
     # clinician gets a line and keeps the draft. Blocking on a records problem
     # would deny care over paperwork.
-    evidence = {row.get("service"): row for row in (site.get("evidence_ref") or [])}
     max_age = (getattr(ctx.rules, "evidence_policy", {}) or {}).get("max_age_days")
     today = ctx.state.as_of if isinstance(getattr(ctx.state, "as_of", None), date) else None
 
     def unevidenced(code: str) -> str | None:
-        row = evidence.get(code)
-        if row is None:
-            return "no delivery evidence on file"
-        last = row.get("last_performed")
-        if not last:
-            return "listed but never recorded as performed"
-        if max_age and today:
-            try:
-                age = (today - date.fromisoformat(str(last))).days
-            except ValueError:
-                return f"unreadable evidence date {last!r}"
-            if age > max_age:
-                return f"last performed {age} days ago, beyond the {max_age}-day policy"
-        return None
+        return evidence_gap(site, code, max_age=max_age, today=today)
 
     catalogue = getattr(ctx.rules, "investigations", {}) or {}
     for investigation in ctx.proposal.investigations:

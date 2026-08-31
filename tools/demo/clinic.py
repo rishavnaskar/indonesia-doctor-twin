@@ -142,7 +142,8 @@ padding:16px 18px;margin-bottom:16px}
 <h1>Change the patient.<br>Watch the verdict move.</h1>
 <div class="lede">Same pipeline as the <a href="/">scripted run</a>. Same nine checks, same
 gate, same signature rule. Raise a blood pressure, push an HbA1c up, add a symptom, or send
-the patient to a hospital that cannot run the test, the answer changes, and it says why.</div>
+the patient to a hospital that cannot run the test, the answer changes, and it says why.
+<br><a href="/sites">See what each hospital actually has</a>, which is the record the answer is read from.</div>
 </header>
 <main>
 <div class="bar">

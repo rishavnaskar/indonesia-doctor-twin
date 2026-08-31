@@ -22,7 +22,7 @@ passed" means the same thing every time. What it runs, in order:
 | FHIR conformance | the official HL7 validator over the emitted bundles |
 | Walkthrough | one narrated encounter per outcome |
 | *(`make live` only)* | five encounters through a real model |
-| Clinician surface | `localhost:8000`; `/clinic` is the interactive one |
+| Clinician surface | `localhost:8000`; `/clinic` is interactive, `/sites` is the capability registry |
 
 The pieces are still individually runnable when you're working on one of them:
 `python -m eval.scorecard`, `python -m eval.pressure`, `python -m
@@ -103,12 +103,31 @@ python -m tools.demo               # just the surface, when the gates already pa
 python -m tools.demo --export demo.html   # one self-contained file you can send
 ```
 
-There are two pages. `/` is the scripted scenarios, i.e. a record of a run
+There are three pages. `/` is the scripted scenarios, i.e. a record of a run
 across both pathways, chosen so that a majority of them refuse. `/clinic` is the
 interactive one: generate patients, edit anything about them, paste in a record,
 then run the clinician and watch the verdict move. Both drive the identical
 pipeline, since a demo whose interactive mode took a different path through the
 system would be demonstrating something other than the system.
+
+`/sites` is the capability registry, and it exists because check 9 was the least
+legible thing here. A reader watching SITE-C turn a correct plan into a referral
+was told the site cannot run the assay and had no way to check it, so the most
+interesting refusal in the demo read as an assertion. The page puts the three
+sites side by side against the whole investigation catalogue and the whole
+prescribable formulary, so the absences are visible rather than implied, and
+`/api/sites` returns the same thing as JSON.
+
+Two details on it are worth more than the tables. SITE-A lists urine protein and
+has never recorded performing one; SITE-B claims HbA1c and last ran one 455 days
+ago, past the 180-day policy. Both say so on the page, and check 9 warns without
+blocking on them, because the plan may well be right and the registry is what is
+doubtful, so refusing care over a records problem would be the wrong trade. And
+SITE-A carries a practitioner whose licence lapsed in February, shown as unable
+to sign. None of those verdicts are computed by the page: it calls the gate's own
+`evidence_gap` and the signature line's own `verify_signer`, because two
+implementations of one rule is how a page ends up contradicting the system it
+is describing. Tests assert the agreement rather than the rendering.
 
 The clearest thing to show on `/clinic`: take a patient on maximum first-line
 therapy with no recent potassium, run it at SITE-A, then run the same patient at
@@ -369,6 +388,7 @@ The deterministic core, end to end, on synthetic patients:
 | Clinician presentation layer: the traffic light (SPEC §5.8) | Working |
 | Demo surface: clinician view and audit view, from a real run | Working |
 | Interactive surface: build/edit patients, 19 profiles, compare across hospitals | Working |
+| Site capability page (`/sites`, `/api/sites`) | Working. renders the registry check 9 reads, including the evidence gaps and the lapsed licence |
 | Between-visit loop (SPEC §5.11) | Schema, provenance and escalation working; patient-facing channel is V1.5 by design |
 | Plan-concordance metric (SPEC §8.2) | Working. reported, not gated; needs Set C to mean anything |
 | Capability evidence: proof each service was actually delivered | Working |

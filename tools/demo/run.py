@@ -990,3 +990,83 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         "drafter_failures": sum(1 for e in encounters if e.get("error")),
         "total": len(encounters),
     }
+
+
+def _can_sign(site, practitioner, when, Signer, verify_signer, SignatureRefused) -> str | None:
+    """None if this practitioner could sign here today, else why not."""
+    try:
+        verify_signer(site, Signer(practitioner_id=practitioner["practitioner_id"],
+                                   authenticated=True), when)
+    except SignatureRefused as refusal:
+        return str(refusal)
+    return None
+
+
+def sites_view(pack_id: str = "id") -> dict:
+    """Every site the registry knows, and what each can actually do.
+
+    Exists because gate check 9 is the least legible thing the demo does. A
+    reader watching SITE-C refuse a plan is told the site cannot run the assay,
+    and has no way to see that for themselves, so the most interesting refusal
+    in the system reads as an assertion rather than a consequence.
+
+    Everything here is read from the pack. The staleness verdicts come from the
+    gate's own `evidence_gap`, so the page cannot tell a reviewer something the
+    check disagrees with.
+    """
+    from datetime import date
+
+    from service.gate.checks.c9_executable import evidence_gap
+    from service.signing import SignatureRefused, Signer, verify_signer
+
+    rules = load_pack(pack_id)
+    catalogue = rules.investigations or {}
+    prescribable = sorted(rules.molecules)
+    max_age = (rules.evidence_policy or {}).get("max_age_days")
+    today = date.today()
+
+    sites = []
+    for site in rules.sites.values():
+        labs = set(site.get("labs_available") or [])
+        stocked = set(site.get("stocked_molecules") or [])
+        sites.append({
+            "site_id": site["site_id"],
+            "label": site.get("label", ""),
+            "tier": site.get("tier", ""),
+            "service_group": site.get("service_group", ""),
+            "continuous_24h": bool((site.get("hours") or {}).get("continuous_24h")),
+            "as_of": site.get("as_of", ""),
+            "diagnoses": list(site.get("diagnoses") or []),
+            # Asked of the signature line itself rather than by comparing dates
+            # here. SITE-A carries a practitioner whose licence lapsed in
+            # February, and a page that lists them as though they could sign
+            # would contradict the one rule this system enforces hardest.
+            "practitioners": [
+                {**p, "can_sign": _can_sign(site, p, today,
+                                            Signer, verify_signer, SignatureRefused)}
+                for p in (site.get("practitioners") or [])
+            ],
+            "equipment": list(site.get("equipment") or []),
+            # Both lists are rendered against the full vocabulary rather than
+            # alone, because "SITE-C runs creatinine" is a fact and "SITE-C runs
+            # creatinine and nothing else" is the one that explains a referral.
+            "labs": [
+                {"code": code, "label": label, "available": code in labs,
+                 "gap": evidence_gap(site, code, max_age=max_age, today=today)
+                        if code in labs else None}
+                for code, label in sorted(catalogue.items())
+            ],
+            "molecules": [
+                {"molecule": m, "stocked": m in stocked} for m in prescribable
+            ],
+        })
+
+    sites.sort(key=lambda s: s["site_id"])
+    return {
+        "pack": f"{rules.pack_id}@{rules.version}",
+        "evidence_max_age_days": max_age,
+        "investigations": [{"code": c, "label": label}
+                           for c, label in sorted(catalogue.items())],
+        "molecules": prescribable,
+        "sites": sites,
+    }

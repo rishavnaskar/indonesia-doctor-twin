@@ -47,7 +47,7 @@ Then, in order:
 
 1. **[DECISION.md](docs/DECISION.md) § The reframe**, on why "60–70% of what a doctor does" is buildable and "60–70% of what a doctor decides" probably isn't.
 2. **On the demo's scripted page**, click *Hypertensive emergency* and *Remote basic-tier site*. Usually five or six of the nine visits end with no recommendation reaching the doctor. That ratio is sort of the product.
-3. **On `/clinic`**, delete a patient's potassium result and run them at SITE-A, then at SITE-C. Same patient, same gap, two different right answers. One asks for the test and the other refers, because only one of those hospitals can run it.
+3. **On `/clinic`**, delete a patient's potassium result and run them at SITE-A, then at SITE-C. Same patient, same gap, two different right answers. One asks for the test and the other refers, because only one of those hospitals can run it. **`/sites`** is the record that answer is read from, so you can check the claim rather than take it.
 4. **[CODE.md](docs/CODE.md) § Making the drafter better**, which is the measurement that says whether self-consistency earns its cost. It includes the run where it didn't, and the instrument that turned out to be measuring itself.
 
 If you have four, read **[DECISION.md](docs/DECISION.md)** and stop.

@@ -404,6 +404,21 @@ def main() -> int:
             if path == "/clinic":
                 self._send(CLINIC_HTML.encode("utf-8"), "text/html; charset=utf-8")
                 return
+            if path == "/sites":
+                # Built per request rather than cached with the scripted page:
+                # it reads the pack and nothing else, so it costs a file read
+                # and can never be stale against an edited guideline.
+                from tools.demo.run import sites_view
+                from tools.demo.sites import render_sites
+
+                self._send(render_sites(sites_view(args.pack)).encode("utf-8"),
+                           "text/html; charset=utf-8")
+                return
+            if path == "/api/sites":
+                from tools.demo.run import sites_view
+
+                self._json(sites_view(args.pack))
+                return
             if path.startswith("/api/job"):
                 job_id = ""
                 if "?" in self.path:

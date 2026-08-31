@@ -195,6 +195,7 @@ button.act[disabled]{ background:transparent; color:var(--graphite); border-colo
           one. Nine checks sit in between (plain code, no model) and any one of
           them stops the draft before anyone sees it. Nothing on this page was written by hand.</p>
         <a class="cta" href="/clinic">Build your own patient and run it &rarr;</a>
+        <p class="lede" style="margin-top:10px;font-size:13.5px">When a refusal says this hospital cannot run a test, <a href="/sites">the site capability records</a> are where that comes from.</p>
       </div>
       <div class="facts" id="facts"></div>
     </div>
