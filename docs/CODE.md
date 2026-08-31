@@ -57,9 +57,9 @@ corrupt the experiment that naming one is usually for; `--no-fallback` does the
 same when you want the failure loud.
 
 **Provenance pins `model@served_by`, and is built after the answer, never
-before.** Both halves are load-bearing. Building it before the call would record
-what we intended to ask rather than what ran — wrong whenever the chain falls
-back or an alias resolves to a snapshot. And the upstream provider belongs in
+before.** Both halves matter. Building it before the call would record what we
+intended to ask rather than what actually ran, which is wrong whenever the chain
+falls back or an alias resolves to a snapshot. And the upstream provider belongs in
 the pin because the same slug on two serving stacks can differ in quantisation
 and sampling defaults. Before any call `version()` returns a bare slug with no
 `@`, so the gate's provenance check rejects a proposal assembled without a real
@@ -67,15 +67,15 @@ answer behind it rather than accepting a placeholder that looks like a pin.
 
 **Truncation is reported as ours, not the model's.** A reasoning model spends
 the output budget on thinking before it writes a word, and that spend counts
-against the same ceiling — measured here at ~1,900 tokens of reasoning on a
-routine follow-up. A budget of 2,000 left ~80 for the answer and truncated it
-mid-JSON, which reaches a strict parser looking exactly like a model that cannot
-follow the contract. It is now caught at the backend as `TruncatedResponse` and
-tallied separately. Misattributing our config bug to model quality is the class
-of wrong conclusion this prototype exists to prevent.
+against the same ceiling, measured here at around 1,900 tokens of reasoning on a
+routine follow-up. A budget of 2,000 left roughly 80 for the answer and
+truncated it mid-JSON, which reaches a strict parser looking much like a model
+that can't follow the contract. It's now caught at the backend as
+`TruncatedResponse` and tallied separately. Blaming our own config bug on model
+quality is the kind of wrong conclusion this prototype is meant to prevent.
 
-Two backends exist, and that is the point rather than indecision — a router
-with one implementation is a claim, not an architecture:
+There are two backends, which is deliberate rather than indecision. A router
+with one implementation behind it is closer to a claim than an architecture:
 
 | Provider | Flag | Notes |
 |---|---|---|
@@ -84,15 +84,16 @@ with one implementation is a claim, not an architecture:
 
 Everything downstream is identical across them. Swapping is a flag.
 
-The deterministic reasoner stays the default, and CI never calls a model — a
-test suite that costs money per run and varies between runs is neither.
+The deterministic reasoner stays the default and CI never calls a model, since a
+test suite that costs money per run and varies between runs isn't much of a test
+suite.
 
 **The residency guard is the part to look at.** Health data must be processed
 in-country and a hosted endpoint is outside that boundary, so the backend
 refuses to send any record not marked synthetic, and refuses *before* the
-request is built. `is_synthetic` defaults to `False`: real-until-proven-
-otherwise is the safe direction for that particular flag. There is a test that a
-hand-built state cannot be exported by accident.
+request is built. `is_synthetic` defaults to `False`, i.e. real until proven otherwise, which
+seems like the safe direction for that particular flag. There's a test that a
+hand-built state can't get exported by accident.
 
 ## Demoing it
 
@@ -185,22 +186,22 @@ instructions, and its own confidence. That is the clinical plan, not prose.
 
 **And on this pathway the rule engine gets most of it right too.** Measured over
 six patients, the reference reasoner and a real model chose the same
-recommendation four times. That is not a failure of the model; it is why adult
-hypertension follow-up was chosen as V1 — it is protocol-dense, and the
-escalation ladder *is* the algorithm. The gap shows in what a lookup cannot
-produce: on the same six patients the model wrote eight supporting assertions
+recommendation four times. That isn't a failure of the model. It's part of why
+adult hypertension follow-up got chosen as V1: it's protocol-dense, and the
+escalation ladder more or less *is* the algorithm. The gap shows up in what a
+lookup can't produce: on the same six patients the model wrote eight supporting assertions
 where the rule engine wrote one, gave a reason a clinician can argue with
 ("already at the maximum dihydropyridine dose per formulary, further titration
 in this class is not permitted") rather than a template, and raised seven
 concerns to the rule engine's zero. On the two where they diverged, one was the
 model proposing `titrate_down` where the ladder said `continue`.
 
-Say that plainly rather than overclaiming: **for a protocol-dense follow-up
-pathway, a rule engine is a serious competitor for the decision, and the model
-earns its place on the parts that are not a lookup** — the reasoning, the
-patient's own words, and noticing what nobody enumerated. A pathway with
-diagnostic entropy is where that balance changes, and this system does not have
-one yet.
+Worth saying plainly rather than overclaiming: **for a protocol-dense follow-up
+pathway, a rule engine is a serious competitor for the decision itself, and the
+model is more useful on the parts that aren't a lookup**, i.e. the reasoning,
+the patient's own words, and noticing things nobody enumerated. A pathway with
+more diagnostic entropy is probably where that balance changes, and this system
+doesn't have one yet.
 
 **The rules decide whether that is allowed.** The nine checks, the exclusions,
 the red flags. They never choose a plan; they refuse one.
@@ -208,12 +209,12 @@ the red flags. They never choose a plan; they refuse one.
 **Escalation is deterministic on purpose.** Red-flag recall is the one number
 where a miss can kill someone, and "systolic ≥ 180 with chest pain → alert" is a
 lookup with perfect recall on the pattern it names. A model doing that job at
-ninety-nine percent is strictly worse, and there is nothing to gain by making a
-lookup probabilistic.
+ninety-nine percent is worse, and there isn't much to gain from making a lookup
+probabilistic.
 
 **But a rule only catches what somebody enumerated.** Seven red flags is seven
-patterns. A patient whose problem is not one of them gets no flag from the
-rules — while the model, having read the whole record, may well have noticed.
+patterns. A patient whose problem isn't one of them gets no flag from the rules,
+while the model, having read the whole record, may well have noticed something.
 `concerns` is the channel for that:
 
 ```
@@ -221,28 +222,28 @@ rules — while the model, having read the whole record, may well have noticed.
 ```
 
 R5 fires on a 30% fall between two readings. Four steps of roughly ten percent
-each never trip it, and the rule is not wrong — it is a threshold, and that is
-what thresholds do. The model saw the shape.
+each never trip it, and the rule isn't wrong. It's a threshold, and that's what
+thresholds do. The model saw the shape.
 
-**A concern can only add.** It raises the band — mention to amber, escalate to
-red — and can never lower one, clear an acknowledgement the rules demanded, turn
-a refusal into a draft, or mark a patient as fine. That asymmetry is what makes
-it safe to let a model speak here at all: the worst a wrong concern costs is a
-clinician's attention. There are tests for each direction.
+**A concern can only add.** It can raise the band (mention to amber, escalate to
+red) and it can never lower one, clear an acknowledgement the rules demanded,
+turn a refusal into a draft, or mark a patient as fine. That asymmetry is mostly
+what makes it safe to let a model speak here at all, since the worst a wrong
+concern costs is a clinician's attention. There are tests for each direction.
 
-Making that work needed a fix that mattered more than the feature. The model was
-being sent one reading per measurement and then asked to summarise a trend and
-notice what the rules do not check for — both impossible from a single point.
-This system describes itself as a longitudinal patient model rather than a
-conversation, and the longitudinal part was the part the model never saw. It now
-receives the recent series per measurement and the prior visits with their
-decisions.
+Making that work needed a fix that turned out to matter more than the feature.
+The model was being sent one reading per measurement and then asked to summarise
+a trend and notice what the rules don't check for, neither of which is possible
+from a single point. This system describes itself as a longitudinal patient
+model rather than a conversation, and the longitudinal part was the part the
+model never saw. It now gets the recent series per measurement, plus the prior
+visits with their decisions.
 
 ## Making the drafter better
 
 Three levers, all off by default, all composing through the router as reasoners
-wrapping reasoners. Nothing downstream — the gate least of all — knows they are
-there.
+wrapping reasoners. Nothing downstream knows they're there, the gate least of
+all.
 
 ```bash
 python -m tools.live --samples 3     # draft it k times, use the agreement
@@ -250,25 +251,26 @@ python -m tools.live --critic        # a second model reviews each draft
 ```
 
 **Self-consistency** (`--samples k`) replaces the model's opinion of itself with
-a measurement of its behaviour. Agreement is on the plan, not the prose — two
-samples that both say titrate up to different doses have not agreed about
-anything a patient would notice. Confidence becomes the minimum of stated and
-observed, never a blend, so neither signal can rescue the other.
+a measurement of its behaviour. Agreement is on the plan rather than the prose,
+since two samples that both say titrate up to different doses haven't agreed
+about anything a patient would notice. Confidence becomes the minimum of stated
+and observed rather than a blend, so neither signal can rescue the other.
 
-**The critic** (`--critic`) catches what rules cannot: a draft that breaks no
-rule and is still poor. It may only *lower* confidence. A critic that could
-raise it would hold a veto over the abstention floor, which is the one authority
-nothing here may have. If it fails, the draft continues and is marked
-unreviewed — an advisory component being down is not a reason to deny care, but
-an unreviewed draft must never look like a reviewed one.
+**The critic** (`--critic`) catches things rules can't, e.g. a draft that breaks
+no rule and is still poor. It may only *lower* confidence. A critic that could
+raise it would hold a veto over the abstention floor, which is probably the one
+authority nothing here should have. If it fails, the draft continues and gets
+marked unreviewed, because an advisory component being down isn't a reason to
+deny care, though an unreviewed draft shouldn't look like a reviewed one
+either.
 
 **Read-only tools** (`--tools`) let the drafter request what it needs instead of
 being handed everything, and record what it asked for. That only works if the
-prompt stops pre-loading it: with tools on and the full context still supplied,
+prompt stops pre-loading it. With tools on and the full context still supplied,
 a live run requested nothing at all, because there was nothing left to ask for.
 Withholding the tool-served material halves the prompt, and the same model then
-makes nine to twelve lookups per encounter — and runs slightly faster, because
-the prompt is half the size. What a model asks for is evidence: one that
+makes nine to twelve lookups per encounter (and runs slightly faster, since the
+prompt is half the size). What a model asks for is itself evidence: one that
 titrates a RAAS-acting drug without ever requesting a potassium has told you
 something its output never would.
 
@@ -286,10 +288,11 @@ Getting an answer took three runs and one corrected mistake.
 
 - **n=30, applied.** Abstention rose from 10% to 23.3%; concordance among
   surviving drafts stayed at 100% either way. It looked like pure cost.
-- **The split meant to settle it was unanswerable.** 23 stable drafts, *zero*
-  unstable ones — because agreement feeds the confidence, low agreement falls
-  below the abstention floor, and check 8 removes exactly the cases the
-  measurement needs. Any conclusion from that run would have been circular.
+- **The split meant to settle it turned out to be unanswerable.** 23 stable
+  drafts and *zero* unstable ones, because agreement feeds the confidence, low
+  agreement falls below the abstention floor, and check 8 removes exactly the
+  cases the measurement needs. Any conclusion from that run would have been
+  circular.
 - **n=30, shadow.** Agreement measured but not applied, so unstable drafts
   proceed and can be scored:
 
@@ -304,35 +307,36 @@ Getting an answer took three runs and one corrected mistake.
   100% concordant; unstable 6 drafts, 83.3%. The single error was again
   unstable.
 
-Pooled over both runs — 58 drafts, 4 errors:
+Pooled over both runs (58 drafts, 4 errors):
 
 | | drafts | errors |
 |---|---|---|
 | samples agreed | 42 | **0** |
 | samples disagreed | 16 | **4** |
 
-Every error was unstable; no stable draft was wrong. As a detector, instability
-had **100% recall at 25% precision**. If instability were unrelated to error,
-the chance of all four landing in the unstable group is **p = 0.0043**, so this
-is not noise.
+Every error was unstable, and no stable draft was wrong. As a detector,
+instability had **100% recall at 25% precision**. If instability were unrelated
+to error, the chance of all four landing in the unstable group is **p =
+0.0043**, so it's probably not noise.
 
 ```bash
 python -m tools.concordance --n 30 --live --samples 3 --shadow            # run 1
 python -m tools.concordance --n 30 --seed 2000 --live --samples 3 --shadow # run 2
 ```
 
-That trade is the one this system is built to take: abstaining on instability
-removes every error at the cost of twelve unnecessary abstentions, and a wrong
-draft costs more than no draft where the reviewing doctor may have nobody to
-ask.
+That's the trade this system is generally built to take. Abstaining on
+instability removed every error at the cost of twelve unnecessary abstentions,
+and a wrong draft costs more than no draft in a place where the reviewing doctor
+may have nobody to ask.
 
-**What this does not show.** The labels come from the reference reasoner, so
-what is demonstrated is that instability predicts *divergence from our own rule
-engine* — not that it predicts clinical error. Those coincide only to the extent
-the rule engine is right, which is the question Set C exists to answer and this
-cannot. For the same reason self-consistency stays **off by default**: the
-evidence is real but it is not the kind of evidence that should change a default
-which triples the API calls. Re-run it on Set C before promoting it.
+**What this doesn't show.** The labels come from the reference reasoner, so what
+it demonstrates is that instability predicts *divergence from our own rule
+engine*, which isn't the same as predicting clinical error. Those only coincide
+to the extent the rule engine is right, and that's the question Set C exists to
+answer rather than this one. For the same reason self-consistency stays **off by
+default**. The evidence is real, but it probably isn't the kind that should
+change a default which triples the API calls. Worth re-running on Set C before
+promoting it.
 
 ## What exists today
 
@@ -340,44 +344,44 @@ The deterministic core, end to end, on synthetic patients:
 
 | Piece | State |
 |---|---|
-| Indonesia pack — formulary, interactions, guideline, ladder, sites, payer | Real rules, awaiting clinical sign-off |
+| Indonesia pack: formulary, interactions, guideline, ladder, sites, payer | Real rules, awaiting clinical sign-off |
 | Patient state with mandatory provenance | Working |
 | Predicate evaluator (fails closed) | Working |
-| Eligibility routing — the 7 hard exclusions | Working |
+| Eligibility routing: the 7 hard exclusions | Working |
 | The nine-check gate | Working |
-| Signature line — roster and licence enforced | Working |
-| Durable runtime — interrupt / resume / replay | Working. Postgres or files; conformance suite runs against all three implementations |
-| Persisted state — checkpoints, signatures, outbound queue | Working — `python -m tools.store`. Both surfaces persist every encounter; `/clinic` restores its patients and verdicts across restarts, and a second run replays rather than re-running |
-| Encounter workflow — the full state machine | Working |
+| Signature line: roster and licence enforced | Working |
+| Durable runtime: interrupt / resume / replay | Working. Postgres or files; conformance suite runs against all three implementations |
+| Persisted state: checkpoints, signatures, outbound queue | Working. `python -m tools.store`. Both surfaces persist every encounter; `/clinic` restores its patients and verdicts across restarts, and a second run replays rather than re-running |
+| Encounter workflow: the full state machine | Working |
 | Model router | Interface + deterministic reference reasoner |
 | Coding, with evidence on every secondary code | Working |
-| FHIR R4 bundle construction | Working — validates clean against the official HL7 R4 validator; builds, does not transmit |
+| FHIR R4 bundle construction | Working. validates clean against the official HL7 R4 validator; builds, does not transmit |
 | Offline-first outbound queue, idempotent, file-backed | Working |
-| Referral-back draft — the payer's own 3B criteria | Working |
-| Synthetic cohort — both pathways, 19 profiles, 19 planted-error mutations | Working |
+| Referral-back draft: the payer's own 3B criteria | Working |
+| Synthetic cohort: both pathways, 19 profiles, 19 planted-error mutations | Working |
 | Scorecard | 7/7 bars |
 | EMR adapter | Port defined. Writing one needs access to a real hospital system; the sequencing is BUILD.md Phase 0 |
 | Bounded intake interview, in Bahasa Indonesia | Working |
-| Pressure suite — 6 patterns x 5 turns, with a control | Working |
-| Model-backed reasoner behind the router | Working — needs an API key |
+| Pressure suite: 6 patterns x 5 turns, with a control | Working |
+| Model-backed reasoner behind the router | Working. needs an API key |
 | Residency guard: only synthetic records may leave | Working |
 | Medication reconciliation (SPEC §5.3) | Deterministic half working; free-text drug matching still needs a model |
-| Clinician presentation layer — the traffic light (SPEC §5.8) | Working |
-| Demo surface — clinician view and audit view, from a real run | Working |
-| Interactive surface — build/edit patients, 19 profiles, compare across hospitals | Working |
+| Clinician presentation layer: the traffic light (SPEC §5.8) | Working |
+| Demo surface: clinician view and audit view, from a real run | Working |
+| Interactive surface: build/edit patients, 19 profiles, compare across hospitals | Working |
 | Between-visit loop (SPEC §5.11) | Schema, provenance and escalation working; patient-facing channel is V1.5 by design |
-| Plan-concordance metric (SPEC §8.2) | Working — reported, not gated; needs Set C to mean anything |
-| Capability evidence — proof each service was actually delivered | Working |
+| Plan-concordance metric (SPEC §8.2) | Working. reported, not gated; needs Set C to mean anything |
+| Capability evidence: proof each service was actually delivered | Working |
 | Live transport to the national exchange | Bundles build and queue; transmission is blocked on credentials, sandbox only |
 
-**The deterministic core runs with no model involved at all** — every stage of
+**The deterministic core runs with no model involved at all.** Every stage of
 `make` except the last one under `make live` never makes an API call. That ordering was on purpose: the
 gate is the part that has to be right, it needs nothing else running, and
 building it first meant the model arrived into a system that already refused bad
 output.
 
 A real model now sits behind the router (`make live`) and changed nothing
-downstream — same three-argument signature, same gate, same signature line. That
+downstream: same three-argument signature, same gate, same signature line. That
 is the architectural claim discharged rather than asserted. The deterministic
 reasoner remains the default, because a test suite that costs money per run and
 varies between runs is neither.
@@ -395,7 +399,7 @@ duplicating. At a site with unreliable power and connectivity that is the normal
 case rather than the edge case.
 
 The one worth reading closely is the basic-tier site: a patient who
-needs an ACE inhibitor added. Three layers fire at once and agree — the drug
+needs an ACE inhibitor added. Three layers fire at once and agree: the drug
 rule wants potassium and eGFR, the sufficiency check says both are absent, and
 the capability registry says this hospital cannot run either test. The output is
 a referral, not an order nobody can fill.
@@ -416,7 +420,7 @@ suite also runs a **deliberately sycophantic control**, which it catches folding
 at turn 3 on every case. A safety test that cannot fail is not a safety test.
 
 And the 0% is honest about what it is: the interviewer scores zero *by
-construction*, because it has no clinical voice to be argued out of — not
+construction*, because it has no clinical voice to be argued out of, rather than
 because it was prompted well. The day a model touches patient-facing text it
 runs the same suite without that structural advantage.
 
@@ -429,7 +433,7 @@ packs/id/      the country. Rules as data, versioned, with citations.
 service/
   state/       longitudinal patient state, provenance mandatory
   rules/       predicates, target resolution, eligibility, pathway routing
-  contracts/   the Proposal — shared vocabulary, owned by neither side
+  contracts/   the Proposal: shared vocabulary, owned by neither side
   gate/        the nine checks. stdlib only. no model, ever
   intake/      the bounded interview. structured, never a conversation
   reason/      drafting: prompt, strict parser, schema, reference reasoner,
@@ -453,7 +457,7 @@ docs/          every document, including this one
 
 ## The four rules CI enforces
 
-1. Nothing under `/service` names a country, payer, drug or guideline — the
+1. Nothing under `/service` names a country, payer, drug or guideline. The
    banned vocabulary is read from the packs, so adding a drug automatically
    forbids hard-coding it.
 2. `/service/gate` imports no orchestration library, no YAML, and nothing from
@@ -473,7 +477,7 @@ exclusion cases, and fails the build below any bar.
 It proves the pipeline runs and the gate mechanics hold. **It proves nothing
 clinical.** Sets A and B are generated from the same guideline the gate checks
 against, so a high score is close to tautological. The number that means
-something comes from Set C — real retrospective visits, blind-scored by
+something comes from Set C (real retrospective visits, blind-scored by
 Indonesian physicians. The scorecard prints this caveat on every run.
 
 ## What survives the process ending
@@ -585,14 +589,14 @@ otherwise hides.
 *Resuming* would mean pressing Run and getting an earlier answer back. It does
 not do that. The scripted page is a *report* of a run, so serving a stored one
 is right; a patient you built and ran with a button is an *action*, and an
-action that silently hands back an earlier answer looks broken — especially on
+action that silently hands back an earlier answer looks broken, especially on
 camera, with a live model that was expected to visibly think. Two runs of the
 same record at different times are also genuinely two encounters, so they get
 two thread ids rather than one overwriting the other.
 
 *Restoring* is what happens when you open the page. Everything run there in
-earlier sessions comes back — the patients as editable records, with their
-verdicts, signatures and codes — read from the store by `/api/history`. This
+earlier sessions comes back (the patients as editable records, with their
+verdicts, signatures and codes), read from the store by `/api/history`. This
 was the one part of the system that kept nothing: results lived in a dict in
 the server process and patients lived in the browser tab, so closing either one
 lost the work. They had been written to the store the whole time; nothing was
@@ -604,7 +608,7 @@ record and stays replayable with `python -m tools.store --thread <id>`.
 
 **Clearing the list deletes nothing.** The store refuses `UPDATE` and `DELETE`,
 so "Clear this list" writes a marker forward and the page starts after it. An
-audit log with a working clear button would not be an audit log — and this is
+audit log with a working clear button wouldn't be much of an audit log, and this is
 the append-only constraint being designed around rather than fought, which is
 the more useful thing to show someone than the trigger itself.
 
@@ -623,7 +627,7 @@ doctor put their name to" are the same keystroke here.
 It is **not** what `/clinic`'s *Clear this list* does. That writes a marker
 forward and destroys nothing, which is the behaviour the product has. `--reset`
 is the operator's hammer, and it exists because a prototype's store fills with
-synthetic demo runs. In a real deployment it would not ship — destroying a
+synthetic demo runs. In a real deployment I don't think it would ship, since destroying a
 clinical audit trail is unlawful, not merely inadvisable.
 
 It works on both backends, so a developer on files does not learn a different
@@ -645,7 +649,7 @@ Deriving the key was the fiddly part, and two versions of it were wrong:
   hosted backend rewrites that string to `model@served_by` once it has an
   answer, so the first encounter of a run and the second had different keys.
 - Falling back to `"reference"` when the router could not name a backend put
-  two different drafters in one bucket — that string is how the reference
+  two different drafters in one bucket, since that string is how the reference
   reasoner reports itself, so a router that raised for an unrelated reason
   (one that fails every draft, in the test that caught it) replayed the
   reference reasoner's *successful* results and the page reported zero
@@ -656,7 +660,7 @@ This was missing, and its absence made two claims false rather than merely
 incomplete. A checkpoint is supposed to be a recovery point for *service
 restart*, and about one facility in twelve lacks 24-hour power, so the process
 dying is the ordinary case. And replay is supposed to be the answer when a
-regulator asks why the system said something — which needs the record to
+regulator asks why the system said something, which needs the record to
 outlive the process that made it. The signature is the artefact that makes an
 output lawful and it was the least durable thing in the system.
 
@@ -682,11 +686,11 @@ python -m tools.validate_fhir              # also runs as a stage of `make`
 ```
 
 The validator is a Java distribution, so it is gitignored rather than vendored
-— it is the same file for everyone and does not belong in a repository. A
+since it's the same file for everyone and doesn't belong in a repository. A
 missing validator is a missing prerequisite, not a failure: the stage says
 which command to run and exits cleanly. `FHIR_VALIDATOR_JAR` overrides the
-location. Four bundles — both pathways, controlled and uncontrolled, three
-different sites — validate with **0 errors** against FHIR R4.
+location. Four bundles (both pathways, controlled and uncontrolled, three
+different sites) validate with **0 errors** against FHIR R4.
 
 There is also a hand-written conformance test that runs in CI with no download.
 It is worth having and it is not a substitute: the real validator found nine
@@ -699,13 +703,13 @@ caught:
   must use the urn once `fullUrl` is one
 - two codes carried a `display` that was not the code's registered name
 - a blood pressure was emitted as two Observations, when the FHIR blood-pressure
-  profile requires one panel with two components — six errors from one mistake
+  profile wants one panel with two components, so six errors came from one mistake
 - `Observation.category` was missing the vital-signs slice the profile requires
 - the generator produced `E11.65`, which is ICD-10-CM (US) and does not exist in
   the WHO ICD-10 that Indonesia codes against
 
-Remaining warnings are best-practice recommendations — narrative text, UCUM
-annotations — not conformance failures.
+Remaining warnings are best-practice recommendations (narrative text, UCUM
+annotations) rather than conformance failures.
 
 ## What is left, and none of it is code
 
@@ -718,7 +722,7 @@ for any of it.
    targets are missing today and the system correctly abstains on those
    subgroups until they exist. Nothing here is clinically active while
    `review.status` reads `awaiting_clinical_signoff`.
-2. **Set C** — 300 real visits, physician-adjudicated. Every number this
+2. **Set C**, i.e. 300 real visits, physician-adjudicated. Every number this
    repository produces is caveated on it. The loader and the metric are
    finished, so scoring it is a command; obtaining it is a clinical and legal
    exercise.
@@ -728,7 +732,7 @@ for any of it.
 4. **A pharmacist** to verify 200 formulary rows against the decree, resolving
    A4.
 
-The honest summary: the engineering question — can a system draft safely,
-refuse well, and stay pathway- and country-agnostic — has been answered as far
+The honest summary is that the engineering question (can a system draft safely,
+refuse well, and stay pathway- and country-agnostic) has been answered as far
 as synthetic patients can answer it. The clinical question has not been
 touched, and asking a repository to answer it would be a category error.
