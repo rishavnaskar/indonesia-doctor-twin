@@ -179,23 +179,27 @@ class Build:
 
 _LOADING = """<!doctype html><html><head><meta charset="utf-8">
 <title>AI clinician — building</title><style>
-:root{--bg:#f5f6f8;--panel:#fff;--ink:#14171a;--muted:#5f6871;--line:#dfe3e8;--accent:#1c4fd8;--code:#eef1f4}
-@media (prefers-color-scheme:dark){:root{--bg:#131619;--panel:#1b1f23;--ink:#e8eaed;--muted:#9aa4ae;--line:#2b3137;--accent:#7da2ff;--code:#22272c}}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+:root{color-scheme:light;--bg:#f7f6f8;--panel:#fff;--ink:#0b0b0c;--muted:#4c4c52;
+--ash:#68686f;--line:#e2ded7;--accent:#f0521c;--code:#f1efea}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+font:15px/1.6 "DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 display:flex;align-items:center;justify-content:center;min-height:100vh}
-.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:26px 30px;max-width:620px;width:92%}
-h1{margin:0 0 6px;font-size:17px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:30px 32px;max-width:620px;width:92%}
+.eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+letter-spacing:.16em;text-transform:uppercase;color:var(--ash);margin:0 0 12px}
+h1{margin:0 0 8px;font-size:1.6rem;font-weight:500;letter-spacing:-.03em;line-height:1.05}
 p{color:var(--muted);font-size:13.5px;margin:0 0 18px}
-.bar{height:6px;background:var(--code);border-radius:4px;overflow:hidden;margin-bottom:14px}
+.bar{height:3px;background:var(--code);border-radius:2px;overflow:hidden;margin-bottom:14px}
 .fill{height:100%;background:var(--accent);width:0;transition:width .4s}
 li{font-size:13px;margin-bottom:5px;list-style:none}
 ul{padding:0;margin:0}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted)}
 .err{color:#b3261e}
 </style></head><body><div class="box">
-<h1>Running the scenarios</h1>
-<p id="sub">Each visit is one call to a real model. On a free tier this can take a couple of
-minutes, and a rate-limited model is retried before the next one is tried.</p>
+<p class="eyebrow">Working</p>
+<h1>Running the visits</h1>
+<p id="sub">Each visit is one call to a real model. On a free tier that takes a couple of
+minutes. If a model is rate-limited it gets retried, then the next one is tried.</p>
 <div class="bar"><div class="fill" id="fill"></div></div>
 <ul id="log"></ul>
 <div class="mono" id="t"></div>
@@ -211,7 +215,7 @@ async function tick(){
   document.getElementById("t").textContent =
     `${s.done} of ${s.total||"?"} done &middot; ${s.elapsed}s elapsed`.replace("&middot;","·");
   if (!s.live) document.getElementById("sub").textContent =
-    "Running the scenarios through the rule-following reasoner. This should be quick.";
+    "Running through the rule-following reasoner. This should take a second.";
   setTimeout(tick, 700);
 }
 tick();
