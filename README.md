@@ -1,4 +1,4 @@
-# AI Clinician — Indonesia
+# AI Clinician, Indonesia
 
 **Can a 50-hospital Indonesian group build "a digital twin of a doctor that does 60–70% of the job"?**
 

@@ -88,12 +88,12 @@ Sourced from the **PRB formulary** under Fornas (Kepmenkes HK.01.07/MENKES/1199/
 | Amlodipine | 5 mg, 10 mg | Start at lowest dose |
 | Nifedipine | 30 mg ER | Alternative CCB |
 | Captopril | 12.5 mg, 25 mg | **Max 3 × 25 mg daily** |
-| Lisinopril | 5 mg, 10 mg | — |
-| Ramipril | 2.5 mg, 5 mg, 10 mg | — |
+| Lisinopril | 5 mg, 10 mg | |
+| Ramipril | 2.5 mg, 5 mg, 10 mg | |
 | Candesartan | 8 mg, 16 mg | **Only on documented ACE-inhibitor intolerance of ≥ 1 month** |
 | Valsartan | 80 mg, 160 mg | Requires verification in e-Fornas |
 | Bisoprolol | 2.5 mg, 5 mg | **Restricted to compensated chronic heart failure** |
-| Hydrochlorothiazide | 25 mg | — |
+| Hydrochlorothiazide | 25 mg | |
 | Furosemide | 40 mg | Fluid-retention indications |
 
 Adjacent cardiovascular items available on PRB and relevant to comorbid patients: aspirin 80/100 mg, clopidogrel, simvastatin, atorvastatin (ASCVD, LDL target ≤ 70 mg/dL), carvedilol, spironolactone (NYHA-restricted), digoxin, ISDN, ISMN.
