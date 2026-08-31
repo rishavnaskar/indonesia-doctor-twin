@@ -39,9 +39,14 @@ _RUNTIME = None
 _STORE_LOCK = threading.Lock()
 
 # Bump when the shape of an encounter dict changes. It is part of the thread id,
-# so a stored view built by older code is simply never found — the encounter
+# so a stored view built by older code is simply never found: the encounter
 # re-runs rather than being handed to a renderer that no longer understands it.
-VIEW_VERSION = 1
+#
+# 2: the draft carries English patient instructions alongside the local-language
+#    ones. Encounters stored under version 1 were drafted before that field
+#    existed, so replaying them would render a page with no English on it and
+#    look like the change had not shipped.
+VIEW_VERSION = 2
 
 def _forced_fresh() -> bool:
     from service.store import forced_fresh
