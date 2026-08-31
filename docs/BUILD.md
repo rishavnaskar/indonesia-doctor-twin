@@ -16,7 +16,7 @@ What matters is being precise about which parts are fake. Most of the system is 
 
 | Component | Real or synthetic | Notes |
 |---|---|---|
-| Hospital system (SIMRS) | **Real** | SIMRS Khanza is open source. We run the actual software Indonesian hospitals use. |
+| Hospital system (SIMRS) | **Real, in the plan. Absent from the prototype** | SIMRS Khanza is open source, so a real deployment is available to build against rather than guess at. Nothing in the prototype runs it: see the status note in §2. |
 | National formulary (Fornas) | **Real** | Published as a ministerial decree. We parse it. |
 | Clinical guidelines (PNPK / PPK) | **Real** | Published by Kemenkes and IDI. |
 | ICD-10 / ICD-9-CM | **Real** | Standard. |
@@ -96,7 +96,7 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
 
 **Choices worth defending:**
 
-- **Khanza in Docker.** It is the real system, it is open source, and it already has a `src/bridging/` package doing BPJS and Dukcapil integrations. We aren't guessing at what a hospital system looks like, we're running one.
+- **Khanza in Docker.** It is the real system, it is open source, and it already has a `src/bridging/` package doing BPJS and Dukcapil integrations, so the first adapter is written against software we can actually read rather than against a guess. *(Not built. This is Phase 0 and it needs a real deployment to read from. The prototype has the port at `adapters/base.py` and no implementations behind it, so nothing here is running a hospital system today.)*
 - **Model behind a router.** Start with a hosted API for iteration speed. Swap to local open weights (MedGemma 4B or a Qwen-class model) before the demo, to prove the data-residency story works. Never hard-code a model name anywhere except the router config. *(Built: `service/router/`, with two hosted backends so the swap is demonstrated rather than asserted. The local-weights half has not been done. `HostedChatBackend` takes a `base_url` and speaks OpenAI-compatible chat completions, so pointing it at a self-hosted vLLM is a config change, but I have not actually run one, and an untested config change is not a proof of residency.)*
 - **The gate is not a model.** Plain Python, a rules table, a formulary table, a drug interaction table. It must be readable by a doctor and diffable in git. If a lawyer or a regulator asks "why did it say that," the answer has to be a file, not a prompt.
 - **Postgres for our state, MySQL stays Khanza's.** Don't fight the legacy schema; read from it, write our own. *(Built: `docker-compose.yml` and `db/migrations/`. Optional at runtime, since the store falls back to append-only files and says so. Roughly one facility in twelve doesn't have power around the clock, and a system that won't start without a database is one that often doesn't start.)*
