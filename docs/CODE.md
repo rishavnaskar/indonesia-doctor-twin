@@ -24,12 +24,12 @@ passed" means the same thing every time. What it runs, in order:
 | *(`make live` only)* | five encounters through a real model |
 | Clinician surface | `localhost:8000`; `/clinic` is the interactive one |
 
-The pieces are still individually runnable when you are working on one of them
-— `python -m eval.scorecard`, `python -m eval.pressure`, `python -m
+The pieces are still individually runnable when you're working on one of them:
+`python -m eval.scorecard`, `python -m eval.pressure`, `python -m
 tools.concordance`, `python -m tools.store`, `python -m tools.live
 --show-prompt`, `python -m tools.live --list-free`, `python -m tools.demo
---export demo.html`. `python -m tools.run --ci` is what CI runs: the gates
-only, no walkthrough, no browser, no model.
+--export demo.html`, etc. `python -m tools.run --ci` is what CI runs, i.e. the
+gates only, with no walkthrough, no browser and no model.
 
 ### Running against a real model
 
@@ -40,13 +40,13 @@ make live                                      # everything, drafted by a real m
 ```
 
 **This runs for free.** The default backend is a free model, and the free list
-is queried live rather than hard-coded — availability changes, and a stale slug
-in a source file fails at demo time with a confusing 404.
+gets queried live rather than hard-coded, because availability changes and a
+stale slug in a source file tends to fail at demo time with a confusing 404.
 
-Free models are weaker and rate-limited. For this prototype that is closer to a
-feature than a problem: a weak model exercises the strict parser and the gate
-instead of flattering them, and the whole architectural claim is that the system
-stays safe when the model is not good.
+Free models are weaker and rate-limited. For this prototype that's arguably
+useful rather than a problem, since a weak model exercises the strict parser and
+the gate instead of flattering them. The architectural claim is mostly that the
+system stays safe when the model isn't good.
 
 **Rate limits are load, not breakage.** Free tiers are shared pools, so any one
 model returns 429 at random times of day with no bearing on your key. The
@@ -102,32 +102,33 @@ python -m tools.demo               # just the surface, when the gates already pa
 python -m tools.demo --export demo.html   # one self-contained file you can send
 ```
 
-There are two pages. `/` is the scripted scenarios — a record of a run across
-both pathways, chosen so that a majority of them refuse. `/clinic` is interactive: generate
-patients, edit anything about them, paste in a record, then run the clinician
-and watch the verdict move. Both drive the identical pipeline; a demo whose
-interactive mode took a different path through the system would be
-demonstrating something other than the system.
+There are two pages. `/` is the scripted scenarios, i.e. a record of a run
+across both pathways, chosen so that a majority of them refuse. `/clinic` is the
+interactive one: generate patients, edit anything about them, paste in a record,
+then run the clinician and watch the verdict move. Both drive the identical
+pipeline, since a demo whose interactive mode took a different path through the
+system would be demonstrating something other than the system.
 
 The clearest thing to show on `/clinic`: take a patient on maximum first-line
 therapy with no recent potassium, run it at SITE-A, then run the same patient at
 SITE-C. SITE-A asks for the test. SITE-C refers, because it cannot run one. Same
-patient, same gap, two right answers — that is gate check 9 earning its place.
+patient, same gap, two right answers, which is gate check 9 earning its place.
 
-While a run is in flight the whole form is locked — really disabled, not just
-pointer-events, since CSS stops a mouse but not a keystroke or an autofill. A
-result must describe exactly what was submitted, and a page that lets you edit
-a patient mid-run is quietly lying about which patient produced the verdict.
+While a run is in flight the whole form is locked, and properly disabled rather
+than just pointer-events, since CSS stops a mouse but not a keystroke or an
+autofill. A result has to describe exactly what was submitted, and a page that
+lets you edit a patient mid-run is quietly lying about which patient produced
+the verdict.
 
-Each patient shows the phase it is actually in, reported by the workflow's own
-`on_step` callback rather than animated: ELIGIBLE, INTAKE, RECONCILE, PROPOSE —
-which is where a live run spends its time — then GATE, PRESENT, SIGNED, COMMIT.
-`on_step` says what is starting; `trail` says what finished, and the two are
+Each patient shows the phase it's in, reported by the workflow's own `on_step`
+callback rather than animated: ELIGIBLE, INTAKE, RECONCILE, PROPOSE (which is
+where a live run spends most of its time), then GATE, PRESENT, SIGNED, COMMIT.
+`on_step` says what's starting and `trail` says what finished. The two are
 deliberately not merged, because conflating them would make a crashed encounter
 look like a completed one.
 
-Every result carries its own audit panel — the nine checks with ticks, the path
-taken, what the hospital can do, the three provenance pins and the signature —
+Every result carries its own audit panel (the nine checks with ticks, the path
+taken, what the hospital can do, the three provenance pins and the signature),
 so "how do I know it actually checked?" is answerable without leaving the page.
 
 **The residency guard is visible there too.** A record is not synthetic unless it
@@ -143,31 +144,31 @@ clinician sees** is the consultation surface: on a green visit, no alert at all.
 and citation, the three provenance pins, and the signature record.
 
 The page is generated from a real run and nothing on it is written by hand.
-There is a test for that, and a test that it reaches nothing outside itself — a
-demo that phones out to a CDN while the document argues for data residency is an
-own goal in front of exactly the audience that will notice.
+There's a test for that, and another test that it reaches nothing outside
+itself. A demo that phones out to a CDN while the document argues for data
+residency is the sort of thing this particular audience would notice.
 
 The surface re-reads the packs on every request, so editing a pack file and
-refreshing shows the verdict move — the fastest way to demonstrate that the rules
-are data rather than code. Python modules are imported once, so a change to
+refreshing shows the verdict move. That's usually the quickest way to show that
+the rules are data rather than code. Python modules are imported once, so a change to
 `/service` or `/datagen` needs a restart.
 
-The surface defaults to the **reference reasoner, not a model**: free, instant,
-and identical every run, so a change in behaviour is a real change rather than
-the model having a different day. `make live` drafts with an actual
+The surface defaults to the **reference reasoner rather than a model**, since
+it's free, instant, and identical every run, so a change in behaviour is a real
+change rather than the model having a different day. `make live` drafts with an actual
 model through the same interface, and nothing downstream moves.
 
 Findings render in English with the deployment language beneath, and none of
-that text lives under `/service` — the same rule that keeps a drug name
-out of the engine, applied to the words a doctor reads. Pack-authored messages
+that text lives under `/service`. It's the same rule that keeps a drug name out
+of the engine, applied to the words a doctor reads. Pack-authored messages
 carry a translation directly; messages the engine composes from numbers it
 worked out use a pack template with placeholders. Every red flag on both
 pathways is translated. A rule with no template shows the engine's English and
 an empty second line, which is a visible gap rather than a silent fallback
 nobody notices for a year.
 
-Which language leads is one flag, `Labels.english_first`, and it is a display
-choice — both strings are always carried and no rule reads either. It defaults
+Which language leads is one flag, `Labels.english_first`, and it's purely a
+display choice (both strings are always carried and no rule reads either). It defaults
 to English because the people reading this build are reviewing it, not
 practising from it. **A deployed clinic flips it:** a doctor should not read
 past a second language to reach the sentence that matters. There is a test for
@@ -484,89 +485,89 @@ python -m tools.store --signatures         # who signed what, and which draft
 python -m tools.store --reset              # destroy all of it and start clean
 ```
 
-Three things persist — the checkpoints, the signature log and the outbound
-queue — and there are two backends behind them. `make` starts Postgres if this
+Three things persist (the checkpoints, the signature log and the outbound
+queue) and there are two backends behind them. `make` starts Postgres if this
 machine has Docker; with nothing reachable the same code writes three
 append-only JSONL files under `.store/`. The clinician surface says which one
 it used, in its own header, next to the counts.
 
-Both satisfy the same three interfaces and
+Both satisfy the same three interfaces, and
 [`tests/test_runtime_contract.py`](../tests/test_runtime_contract.py) runs the
-same tests against all three implementations — in memory, files, Postgres. That
-is what makes the choice an implementation detail rather than a fork in the
-system's behaviour, and it is the whole reason the interface was written before
-either backend existed.
+same tests against all three implementations: in memory, files, and Postgres.
+That's mostly what keeps the choice an implementation detail instead of a fork
+in the system's behaviour, and it's why the interface got written before either
+backend existed.
 
-**Why a database, given the files already survive a power cut.** One reason
-that matters more than the others: append-only stops being a convention and
-becomes a constraint. A JSONL audit log is append-only because everyone agrees
-not to edit it — any text editor rewrites a signature and nothing records that
-it happened. The migration installs a trigger that raises on `UPDATE` and
-`DELETE`, so the rule holds against the application, against a migration script
-and against somebody at a `psql` prompt. It raises rather than silently
-discarding the write, because an ignored `UPDATE` looks to the caller exactly
-like a successful one. The other two: two clinicians on one deployment are two
-processes appending to one file, and "which encounters are still unsent" is one
-statement rather than a full scan.
+**Why a database, given the files already survive a power cut.** Mainly because
+append-only stops being a convention and becomes a constraint. A JSONL audit log
+is append-only because everyone agrees not to edit it, and any text editor can
+rewrite a signature without anything recording that it happened. The migration
+installs a trigger that raises on `UPDATE` and `DELETE`, so the rule holds
+against the application, against a migration script, and against somebody sitting
+at a `psql` prompt. It raises rather than quietly discarding the write, because
+an ignored `UPDATE` looks to the caller much like a successful one.
+Two smaller reasons: two clinicians on one deployment are two processes
+appending to one file, and "which encounters are still unsent" becomes one
+statement instead of a full scan.
 
-**Why the files stay.** About one facility in twelve lacks 24-hour power and
-one in five has unreliable connectivity. A clinical system that will not start
-without a database is a clinical system that does not start. `Store` prefers
-Postgres, falls back, and *says which* — silently degrading would make "did that
-signature persist" a question nobody thought to ask.
+**Why the files stay.** Roughly one facility in twelve doesn't have power around
+the clock, and one in five has unreliable connectivity, so a clinical system that
+won't start without a database is one that often doesn't start. `Store` prefers
+Postgres, falls back, and says which it picked. Degrading silently would turn
+"did that signature persist" into a question nobody thinks to ask.
 
 The schema is in [`db/migrations/`](../db/migrations), numbered and applied in
 filename order against a `schema_migrations` tracking table. Postgres also runs
 that same directory itself on a fresh container, so the first `docker compose
 up` and a later application start converge on the same schema by two different
-paths — which is why every statement in a migration is written to be safe to run
-twice, and why there is a test for that.
+paths. That's why every statement in a migration is written to be safe to run
+twice, and why there's a test for it.
 
-The queue is a log of state transitions rather than a row per item: enqueue
-writes `pending`, a drain writes the outcome, and the current state of an item
-is its newest row. An operator at a site with one bar of signal asks how many
-times a bundle failed and with what error, and a queue that overwrites its own
-rows cannot say.
+The queue is a log of state transitions rather than a row per item. Enqueue
+writes `pending`, a drain writes the outcome, and the current state of an item is
+its newest row. An operator at a site with one bar of signal will want to know
+how many times a bundle failed and with what error, and a queue that overwrites
+its own rows can't tell them.
 
 ### The second run picks up where the first stopped
 
 `make` twice does not run `make` twice. Each encounter is stored under a thread
-id derived from everything that could change its answer — the scenario, the
+id derived from everything that could change its answer (the scenario, the
 patient, the site, the pack and its version, and which drafter is behind the
-router — and a run that finds a stored result for the same id replays it
-instead of running it again. The page says how many it replayed.
+router), and a run that finds a stored result for the same id replays it instead
+of running it again. The page says how many it replayed.
 
-This is the checkpoint being load-bearing rather than decorative. Without it the
-durable runtime writes a record nothing ever reads.
+This is what makes the checkpoint do actual work. Without it the durable runtime
+writes a record that nothing ever reads back.
 
 It matters most for `make live`, where every encounter is a model call over a
-rate-limited free tier. Two of that run's stages call a model — the live runner
-and the clinician surface — and both resume:
+rate-limited free tier. Two of that run's stages call a model (the live runner
+and the clinician surface) and both resume:
 
 | | first run | second run |
 |---|---|---|
-| `make` — 9 scripted encounters | run | replayed, 0 model calls |
-| `make live` — live runner (5) + surface (9) | 14 model calls | **0** |
+| `make`, 9 scripted encounters | run | replayed, 0 model calls |
+| `make live`, live runner (5) + surface (9) | 14 model calls | **0** |
 
-Measured on the surface alone: 3m28s, then 1.1s, identical outcomes. The live
-runner replays with `[replayed from the store — no model call]` on every line
-that reports one, and a closing count of how many were replayed against how
-many calls were actually made. A replayed encounter that read like a fresh one
-would be a demo claiming an API call it did not make, which is the one thing
-that stage exists to prove.
+Measured on the surface alone: 3m28s, then 1.1s, with identical outcomes. The
+live runner marks every replayed line with `[replayed from the store, no model
+call]`, and closes with a count of how many were replayed against how many calls
+were made. A replayed encounter that read like a fresh one would be a demo
+claiming an API call it didn't make, and that stage exists mostly to show the
+model is real.
 
-**A failure is not an answer.** An encounter whose response did not parse, or
-that was rate-limited, stores nothing — so the next run calls the model for it
-again. Storing failures would replay them forever and never retry the call that
-might succeed.
+**A failure isn't an answer.** An encounter whose response didn't parse, or that
+got rate-limited, stores nothing, so the next run calls the model for it again.
+Storing failures would replay them forever and never retry the call that might
+succeed.
 
 The risk a cache introduces is showing an answer to a question nobody asked, so
 the invalidation is the part worth reading. Edit a guideline file and the pack
-version moves, so every encounter runs again — the "edit a pack, refresh, watch
-the verdict move" property is preserved rather than defeated. Swap the reference
-reasoner for a real model and everything re-runs, because a page drafted by
-plain code must never be served as though a model had written it. Build a
-different patient in `/clinic` and it is a different encounter.
+version moves, so every encounter runs again, which keeps the "edit a pack,
+refresh, watch the verdict move" property intact. Swap the reference reasoner
+for a real model and everything re-runs, because a page drafted by plain code
+shouldn't be served as though a model had written it. Build a different patient
+in `/clinic` and it's a different encounter.
 
 Two escapes, both deliberate:
 
@@ -576,7 +577,7 @@ CLINICIAN_STORE_BACKEND=files make   # ignore the database, use .store/
 ```
 
 `CLINICIAN_FRESH` exists because watching a live model disagree with itself
-across runs is a real thing to want, and it is the exact thing resumption
+across runs is a reasonable thing to want, and it's the thing resumption
 otherwise hides.
 
 **`/clinic` restores but never resumes**, and the two are different things.
