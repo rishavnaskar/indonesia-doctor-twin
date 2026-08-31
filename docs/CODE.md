@@ -455,7 +455,7 @@ docs/          every document, including this one
 ```
 
 
-## The four rules CI enforces
+## The six rules CI enforces
 
 1. Nothing under `/service` names a country, payer, drug or guideline. The
    banned vocabulary is read from the packs, so adding a drug automatically
@@ -464,10 +464,21 @@ docs/          every document, including this one
    `/service/reason`. A test asserts this by inspecting `sys.modules`.
 3. Only `/service/graph` imports an orchestration library.
 4. No hosted tracing endpoint is configured anywhere.
+5. No em-dashes in the docs.
+6. No em-dashes in text the reader actually sees: pack values, printed strings,
+   HTML. Docstrings and Python comments are exempt, since they are notes to
+   whoever maintains this rather than anything the surface renders.
 
 Rules 1 and 4 are cheap today and impossible to retrofit. Rule 4 is a compliance
 landmine, not a preference: tracing is on by default in many setups and would
 ship patient data offshore.
+
+Rules 5 and 6 are a writing convention rather than an architectural one, and
+rule 6 exists because checking by eye failed. A first pass over the markdown
+left the em-dashes in every string literal, every pack value the surface
+renders, and every `&mdash;` entity, which a grep for the character does not
+find at all. A check that reads what ships is the only version of this that
+stays true a month from now.
 
 ## What the scorecard does and does not say
 

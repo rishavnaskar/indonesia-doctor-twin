@@ -109,8 +109,8 @@ molecules:
         any_of_codes: ["I50"]
         message: >
           Restricted to compensated chronic heart failure. Recording of the
-          'compensated' qualifier is an open question for the clinical lead —
-          the code prefix alone is a weaker test than the restriction states.
+          'compensated' qualifier is an open question for the clinical lead,
+          since the code prefix alone is a weaker test than the restriction states.
     citation: "fornas-prb-2025-12-31#bisoprolol"
     confidence: verified
 

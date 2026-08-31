@@ -9,6 +9,7 @@ A pack is data and rules, not code. Swapping the pack swaps the country.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,14 @@ class RuleSet:
     pack_id: str
     version: str
     review_status: str
+    # A digest of every file in the pack directory.
+    #
+    # `version` is declared by hand in pack.yaml, which makes it good provenance
+    # (a human reads `id-2026-08-29` and knows what it means) and a poor cache
+    # key: edit a guideline and forget to bump it, and anything keyed on the
+    # version happily replays an answer the edit should have invalidated. So the
+    # displayed pin stays `version` and the thread ids key on this instead.
+    content_digest: str = ""
 
     molecules: dict[str, Molecule] = field(default_factory=dict)
     # Molecules we never prescribe but must recognise on a patient's list.
@@ -85,6 +94,19 @@ class RuleSet:
 
     def is_prescribable(self, molecule: str) -> bool:
         return molecule in self.molecules
+
+
+def _digest(base: Path) -> str:
+    """Hash every YAML file in the pack directory, path and bytes.
+
+    Paths are included so that renaming or adding a file counts as a change,
+    and the list is sorted so the digest does not depend on directory order.
+    """
+    h = hashlib.sha256()
+    for path in sorted(base.rglob("*.yaml")):
+        h.update(str(path.relative_to(base)).encode())
+        h.update(path.read_bytes())
+    return h.hexdigest()[:16]
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -163,6 +185,7 @@ def load_pack(pack_id: str = "id", root: Path | None = None) -> RuleSet:
     rs = RuleSet(
         pack_id=manifest["pack_id"],
         version=manifest["version"],
+        content_digest=_digest(base),
         review_status=(manifest.get("review") or {}).get("status", "unknown"),
         molecules=molecules,
         recognised=recognised,

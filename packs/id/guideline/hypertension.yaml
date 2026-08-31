@@ -19,7 +19,7 @@ version: "id-htn-2026-08"
 
 sources:
   - id: perki_htn_cv
-    title: "PERKI — Pedoman Tatalaksana Hipertensi pada Penyakit Kardiovaskular"
+    title: "PERKI: Pedoman Tatalaksana Hipertensi pada Penyakit Kardiovaskular"
     body: "Perhimpunan Dokter Spesialis Kardiovaskular Indonesia"
   - id: inash_2024
     title: "InaSH consensus on the management of hypertension"

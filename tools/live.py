@@ -61,7 +61,7 @@ def _thread_id(state, rules, site, model: str, args) -> str:
     material = json.dumps({
         "patient": state.patient_id,
         "age": state.age,
-        "pack": f"{rules.pack_id}@{rules.version}",
+        "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
         "site": site.get("site_id", ""),
         "model": model,
         "samples": getattr(args, "samples", 1),
@@ -140,7 +140,7 @@ def main() -> int:
 
         print("\n  Free models available right now (queried live, not hard-coded):\n")
         for model in list_free_models():
-            mark = "json" if model["structured"] else "  — "
+            mark = "json" if model["structured"] else "    "
             print(f"    [{mark}] {model['id']:<52} ctx {model['context']:,}")
         print("\n  [json] = advertises structured output. Prefer those; the others")
         print("  still work, because the strict parser does not trust either.\n")

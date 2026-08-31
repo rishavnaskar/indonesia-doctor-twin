@@ -425,9 +425,15 @@ infer it from the page loading faster. (`make live` has a second model-calling
 stage, which D33 covers. The whole run is 14 calls once, then none.)
 
 Invalidation is most of the risk, so it's derived rather than remembered.
-Editing a guideline file moves the pack version, which moves every id, which
-keeps the "edit a pack, refresh, watch the verdict move" property the surface
-exists to demonstrate. `CLINICIAN_FRESH=1` forces a re-run, because watching a
+Editing a guideline file moves a digest of the pack's contents, which moves
+every id, which keeps the "edit a pack, refresh, watch the verdict move"
+property the surface exists to demonstrate. The digest rather than the declared
+`version` string, because that string is written by hand: I edited five pack
+files without touching it, and every stored encounter would have replayed
+against the old text. `RuleSet.content_digest` hashes the pack directory, the
+ids key on it, and a test asserts an edit moves it while the version stays put.
+The version is still what gets displayed as provenance, since a human reads
+`id-2026-08-29` and a human cannot read a hash. `CLINICIAN_FRESH=1` forces a re-run, because watching a
 live model disagree with itself across runs is a reasonable thing to want, and
 it's what resumption otherwise hides.
 

@@ -23,6 +23,8 @@ import ast
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE = ROOT / "service"
 
@@ -164,11 +166,97 @@ def check_no_hosted_tracing() -> list[str]:
     return failures
 
 
+# Docs and rendered text carry an em-dash convention. It is a writing rule, not
+# an architectural one, and it is here because the alternative is checking by
+# eye: the first pass over the markdown missed every string literal, every YAML
+# value the surface renders, and every `&mdash;` entity, because a grep for the
+# character finds none of the last of those. A check that reads what actually
+# ships is the only version of this that stays true.
+#
+# Table cells use a lone em-dash to mean "no value", which is ordinary
+# typography rather than prose, so a string that is only an em-dash passes.
+EM_DASH = "\u2014"
+ENTITY_DASHES = ("&mdash;", "&#8212;", "&#x2014;")
+
+
+# `"\u2014"` as a whole quoted token is a table cell meaning "no value". Strip
+# those before looking, so a template that renders one is not mistaken for prose.
+PLACEHOLDER = f'"{EM_DASH}"'
+
+
+def _prose_dash(text: str) -> bool:
+    return EM_DASH in text.replace(PLACEHOLDER, "").strip(EM_DASH)
+
+
+def check_no_em_dashes_in_docs() -> list[str]:
+    failures = []
+    for path in sorted(ROOT.glob("docs/*.md")) + [ROOT / "README.md"]:
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if EM_DASH in line or any(e in line for e in ENTITY_DASHES):
+                failures.append(f"{path.relative_to(ROOT)}:{n}")
+    return failures
+
+
+def check_no_em_dashes_in_rendered_text() -> list[str]:
+    """Every string the user reads: pack values, and Python string literals.
+
+    Docstrings and comments are exempt. They are notes to whoever maintains
+    this, not text the surface renders.
+    """
+    failures = []
+
+    for path in sorted((ROOT / "packs").rglob("*.yaml")):
+        try:
+            data = yaml.safe_load(path.read_text())
+        except Exception:
+            continue
+
+        def walk(node, trail=""):
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    yield from walk(v, f"{trail}.{k}")
+            elif isinstance(node, list):
+                for i, v in enumerate(node):
+                    yield from walk(v, f"{trail}[{i}]")
+            elif isinstance(node, str) and _prose_dash(node):
+                yield trail
+
+        for trail in walk(data):
+            failures.append(f"{path.relative_to(ROOT)} value {trail}")
+
+    for path in sorted(ROOT.rglob("*.py")):
+        if any(part in path.parts for part in (".venv", "__pycache__", "tests")):
+            continue
+        if path.name == "ci_checks.py":
+            continue  # this file names the characters it is looking for
+        try:
+            tree = ast.parse(path.read_text())
+        except SyntaxError:
+            continue
+        exempt = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                 ast.AsyncFunctionDef)) and node.body:
+                if ast.get_docstring(node, clean=False) is not None:
+                    exempt.add(node.body[0].lineno)
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                continue
+            if node.lineno in exempt:
+                continue
+            if _prose_dash(node.value) or any(e in node.value for e in ENTITY_DASHES):
+                failures.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+    return failures
+
+
 CHECKS = [
     ("no country/payer/drug/guideline names under /service", check_no_national_names),
     ("gate imports no orchestration library, no YAML, nothing from /reason", check_gate_purity),
     ("orchestration library confined to /service/graph", check_orchestration_confined),
     ("no hosted tracing endpoint configured", check_no_hosted_tracing),
+    ("no em-dashes in the docs", check_no_em_dashes_in_docs),
+    ("no em-dashes in rendered text: pack values, printed and HTML strings",
+     check_no_em_dashes_in_rendered_text),
 ]
 
 

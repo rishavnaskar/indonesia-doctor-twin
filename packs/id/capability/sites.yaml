@@ -110,7 +110,7 @@ sites:
       - {service: hba1c,      last_performed: "2025-06-02", volume_30d: 0,   source: lab_ledger}
 
   - site_id: SITE-C
-    label: "Remote, basic tier — the hard case, in from week one"
+    label: "Remote, basic tier. The hard case, in from week one"
     service_group: rawat_jalan_umum
     tier: dasar
     hours: {continuous_24h: false}

@@ -54,7 +54,7 @@ select,input[type=number],input[type=text],textarea{font:inherit;font-size:13.5p
 border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
 input[type=number]{width:78px}
 /* One ember button per view. The accent is the loudest thing on the page, so
-   spending it on three buttons at once spends it on nothing — the eye has no
+   spending it on three buttons at once spends it on nothing, because the eye has no
    primary action to land on. Secondary actions are ink on a hairline. */
 button{font:inherit;font-size:13.5px;font-weight:500;padding:9px 17px;border-radius:4px;
 border:1px solid var(--ember);background:var(--ember);color:#fff;cursor:pointer}
@@ -142,7 +142,7 @@ padding:16px 18px;margin-bottom:16px}
 <h1>Change the patient.<br>Watch the verdict move.</h1>
 <div class="lede">Same pipeline as the <a href="/">scripted run</a>. Same nine checks, same
 gate, same signature rule. Raise a blood pressure, push an HbA1c up, add a symptom, or send
-the patient to a hospital that cannot run the test &mdash; the answer changes, and it says why.</div>
+the patient to a hospital that cannot run the test, the answer changes, and it says why.</div>
 </header>
 <main>
 <div class="bar">
@@ -191,10 +191,10 @@ async function boot(){
   V = await (await fetch("/api/vocabulary")).json();
   // On a public URL this page is a route by which a real patient record could
   // arrive, because it accepts pasted JSON. Say so before that happens rather
-  // than relying on the guard alone — the guard fails closed, but a record that
+  // than relying on the guard alone. The guard fails closed, but a record that
   // never arrives is better than one that is correctly refused.
   if (V.hosted) {
-    $("publicnote").innerHTML = `<p class="fineprint"><b>Public demo &mdash; generated patients
+    $("publicnote").innerHTML = `<p class="fineprint"><b>Public demo, generated patients
       only. Please don't paste a real record.</b> Health data has to stay in Indonesia and this
       server does not, so nothing real belongs here. A record without
       <span class="mono">"is_synthetic": true</span> is refused before the request is built,
@@ -208,7 +208,7 @@ async function boot(){
 
 // Everything run here in an earlier session, read back from the store. This
 // page used to keep its results in a dict in the server process and its
-// patients in the tab, so closing either one lost the work — while the store
+// patients in the tab, so closing either one lost the work, while the store
 // had been recording all of it and nothing ever read it back.
 async function restore(){
   let h;
@@ -230,7 +230,7 @@ async function restore(){
     </div>`;
   $("forget").onclick = async ()=>{
     // Nothing is deleted. The store refuses UPDATE and DELETE, so clearing
-    // writes a marker forward and the page starts after it — the visits stay on
+    // writes a marker forward and the page starts after it, so the visits stay on
     // the record and `python -m tools.store` still replays them. An audit log
     // with a working clear button would not be an audit log.
     await fetch("/api/history/clear", {method:"POST", body:"{}"});
@@ -467,7 +467,7 @@ $("load").onclick = ()=>{
 
   // Validate before touching what is on screen. An earlier version assigned
   // first and validated never, so pasting [1,2,3] surfaced a JavaScript
-  // internal error — a crash leaking into a place a reader reads as a
+  // internal error, i.e. a crash leaking into a place a reader reads as a
   // statement about their data.
   if (!rows.length){
     $("msg").innerHTML = `<div class="err">That JSON is empty, so there are no records to load.

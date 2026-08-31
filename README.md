@@ -33,7 +33,7 @@ behind the router. A re-run replays what's already there instead of doing it
 again. `make live` makes 14 model calls the first time and none after that. The
 surface alone measured 3m28s, then 1.1s, with identical outcomes. Replayed
 encounters say so on every line they print. Edit a guideline file and they all
-run again, because the pack version is part of the id.
+run again, because a digest of the pack's contents is part of the id.
 
 `python -m tools.store --reset` destroys the lot and starts clean.
 

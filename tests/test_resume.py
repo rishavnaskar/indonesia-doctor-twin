@@ -398,3 +398,25 @@ def test_a_surface_encounter_is_not_replayed_as_a_live_one(rules):
     runtime.start("L3", {"a": 1})
     runtime.checkpoint("L3", "rendered", {"origin": "clinic", "outcome": "committed"})
     assert live._stored(runtime, "L3") is None
+
+
+def test_pack_edit_invalidates_the_thread_id(tmp_path):
+    """A pack edit must change the id even when nobody bumps the version.
+
+    `version` is hand-written, so keying resumption on it means an edited
+    guideline can replay an answer that predates the edit. The digest is what
+    actually makes the claim in the README true.
+    """
+    import shutil
+    from service.packs.loader import PACKS_ROOT, load_pack
+
+    root = tmp_path / "packs"
+    shutil.copytree(PACKS_ROOT, root)
+    before = load_pack("id", root=root)
+
+    target = root / "id" / "glossary.yaml"
+    target.write_text(target.read_text() + "\n# an edit nobody recorded\n")
+    after = load_pack("id", root=root)
+
+    assert before.version == after.version, "the declared version is untouched"
+    assert before.content_digest != after.content_digest

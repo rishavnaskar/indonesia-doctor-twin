@@ -36,7 +36,7 @@ _TEMPLATE = r"""<!doctype html>
 <title>__TITLE__</title>
 <style>
 /* Palette and type follow the house system: warm paper, near-black ink, one
-   ember accent. Light only, deliberately — the references commit to a single
+   ember accent. Light only, deliberately, since the references commit to a single
    look rather than hedging with a dark variant that nobody tunes. */
 :root {
   color-scheme: light;
@@ -192,7 +192,7 @@ button.act[disabled]{ background:transparent; color:var(--graphite); border-colo
         <p class="eyebrow" id="eyebrow"></p>
         <h1>A doctor&rsquo;s assistant.<br>Not a doctor.</h1>
         <p class="lede">It drafts the plan for a return visit. A licensed doctor signs every
-          one. Nine checks sit in between &mdash; plain code, no model &mdash; and any one of
+          one. Nine checks sit in between (plain code, no model) and any one of
           them stops the draft before anyone sees it. Nothing on this page was written by hand.</p>
         <a class="cta" href="/clinic">Build your own patient and run it &rarr;</a>
       </div>
@@ -221,7 +221,7 @@ function meta(){
   document.getElementById("eyebrow").textContent =
     (DATA.pathways || []).map(x => x.label).join("  \u00b7  ") + "  \u00b7  follow-up visits";
   // Facts as hairline rows, not a filled panel. Everything here is read off a
-  // real run — the drafter's name included, so a page claiming a model wrote
+  // real run, the drafter's name included, so a page claiming a model wrote
   // something is a page the model actually wrote.
   const rows = [
     ["Drafted by", DATA.reasoner, true],
@@ -244,7 +244,7 @@ function meta(){
   document.getElementById("stat").innerHTML =
     `${DATA.declined} of these ${DATA.total} visits ended with no plan reaching the doctor.
      <span>That is the system working. Every refusal says why.</span>` +
-    (fails ? ` <span>${fails} more could not be drafted at all &mdash; the model returned
+    (fails ? ` <span>${fails} more could not be drafted at all, because the model returned
       something unusable. Different failure, counted separately.</span>` : "");
 
   // Quiet, not a callout. The point is that a reader who wonders about it finds
@@ -253,7 +253,7 @@ function meta(){
   if (DATA.hosted) {
     notes.push(`<b>Public demo, synthetic patients only.</b> Health data has to stay in
       Indonesia and this server does not. So nothing real is on it, and a record that is not
-      marked synthetic never leaves the machine &mdash; the check runs before the request is
+      marked synthetic never leaves the machine, because the check runs before the request is
       built, not after.`);
   }
   if (!DATA.is_model) {
@@ -417,7 +417,7 @@ function clinicianView(e){
   } else if (p.silent) {
     out += `<div class="empty"><b>The doctor sees nothing at all.</b>
       The checks refused the draft. There was nothing here to act on, so nobody is
-      interrupted to be told that. The reasons are logged either way &mdash; they are
+      interrupted to be told that. The reasons are logged either way, and they are
       under &ldquo;What the system did&rdquo;.</div>`;
   } else { out += bandBlock(e); }
   if (p.shows_draft) out += draftCard(e);

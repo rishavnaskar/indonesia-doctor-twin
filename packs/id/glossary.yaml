@@ -22,7 +22,7 @@ diagnoses:
   N18:    "Long-term kidney disease, graded by stage."
   E78:    "High cholesterol or blood fats."
   O10:    "High blood pressure in pregnancy."
-  I50:    "Heart failure — the heart is not pumping strongly enough."
+  I50:    "Heart failure. The heart is not pumping strongly enough."
 
 # What each measurement is, and why this pathway looks at it.
 observations:
@@ -38,7 +38,7 @@ observations:
     label: "Potassium"
     plain: >-
       A blood salt. Some blood-pressure drugs push it up, and too much can
-      disturb the heart rhythm — which is why this pathway checks it before
+      disturb the heart rhythm, which is why this pathway checks it before
       starting or increasing those drugs.
     unit: "mmol/L"
   egfr:
@@ -61,7 +61,7 @@ observations:
     unit: ""
   urine_protein:
     label: "Urine protein"
-    plain: "Protein leaking into the urine — an early sign of kidney damage."
+    plain: "Protein leaking into the urine, an early sign of kidney damage."
     unit: ""
 
 # The bounded interview's symptom set. Which of these are red flags is decided
@@ -73,7 +73,7 @@ symptoms:
   visual_disturbance:         "Change or blurring of vision"
   focal_neurological_deficit: "Weakness or numbness on one side of the body"
   syncope:                    "Fainting or passing out"
-  cough:                      "Dry cough — a known side effect of one drug class here"
+  cough:                      "Dry cough, a known side effect of one drug class here"
   dizziness:                  "Dizziness"
   swelling:                   "Swollen ankles or feet"
 
@@ -84,7 +84,7 @@ flags:
   has_ckd:                       "Has long-term kidney disease"
   has_lv_dysfunction:            "The heart's main pumping chamber is weakened"
   pregnancy_positive:            "Currently pregnant"
-  is_first_presentation:         "First visit for this problem — not a follow-up"
+  is_first_presentation:         "First visit for this problem, not a follow-up"
   on_dialysis:                   "On dialysis"
 
 drug_classes:
@@ -128,7 +128,7 @@ recommendations:
 assessments:
   controlled:    "Blood pressure is at or below the target for this patient."
   uncontrolled:  "Blood pressure is above the target for this patient."
-  over_treated:  "Blood pressure is lower than intended — the treatment may be too strong."
+  over_treated:  "Blood pressure is lower than intended, so the treatment may be too strong."
 
 # How the encounter ended. Four of these are successes, not failures.
 outcomes:

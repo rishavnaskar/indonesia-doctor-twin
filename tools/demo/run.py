@@ -187,7 +187,10 @@ def _thread_id(scenario, rules, router) -> str:
     Content-addressed on purpose. Re-running `make` re-uses what is already in
     the store, and the moment any input moves — a pack edited, a different site,
     a real model swapped in for the reference reasoner, a different patient —
-    the id moves with it and the encounter runs again. So the demo is fast on
+    the id moves with it and the encounter runs again. The pack enters as its
+    content digest rather than its declared version, because the version is
+    written by hand and an edit that forgets to bump it would otherwise replay a
+    stale answer. So the demo is fast on
     the second run without ever showing a result that belongs to a question
     nobody asked.
 
@@ -198,7 +201,7 @@ def _thread_id(scenario, rules, router) -> str:
     material = json.dumps({
         "view": VIEW_VERSION,
         "scenario": scenario.key,
-        "pack": f"{rules.pack_id}@{rules.version}",
+        "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
         "site": scenario.site.get("site_id", ""),
         "drafter": _drafter_identity(router),
         "tampered": bool(scenario.tamper),
