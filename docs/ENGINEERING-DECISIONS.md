@@ -85,11 +85,15 @@ mandatory and gets shown on the panel.
 
 ### D7: The orchestration library is confined to `/service/graph`
 
-**Why.** LangGraph still feels like the right choice as a library: interrupt and
-resume are the signature line, checkpointers are the offline story, and replay
-is the audit story. But the dependency stays behind a four-verb interface
-(`run`/`interrupt`/`resume`/`replay`), so swapping engines is one module's work.
-That's enforced in CI rather than by convention.
+**Why.** LangGraph still feels like the right choice *if* one is needed:
+interrupt and resume are the signature line, checkpointers are the offline
+story, and replay is the audit story. None is imported today, and the rule is
+written as a permission rather than a description for that reason. What sits
+behind the four-verb interface (`run`/`interrupt`/`resume`/`replay`) is three
+plain implementations, in memory, on files and on Postgres, run against one
+conformance suite. So the claim that swapping engines is one module's work is
+already demonstrated across three backends rather than argued from one. Enforced
+in CI rather than by convention.
 
 ---
 

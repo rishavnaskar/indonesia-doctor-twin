@@ -104,7 +104,11 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
 
 ### Do we use an agent framework?
 
-**LangGraph yes. deepagents no.**
+**Today, no. Nothing in this repository imports one.** LangGraph is not a
+dependency and is not installed. If and when one is needed, the recommendation
+below is LangGraph, and deepagents is the wrong shape at any point. The rest of
+this section is that recommendation, so read it as an argument for a choice
+rather than as a description of what runs.
 
 > **Status in the prototype: no orchestration library is used, and that is
 > deliberate.** `service/graph/runtime.py` defines the durable-runtime contract
@@ -157,9 +161,11 @@ The distinction worth internalising: *a framework as a library is fine; a framew
 
 **Why not deepagents.** It's built on LangGraph and it's good at what it does: planning, spawning sub-agents, a virtual filesystem the agent manages itself, skills, etc. That's an **open-ended autonomy** harness, and our problem wants closer to the opposite. A consultation isn't really a task to be explored, it's a bounded protocol with a fixed schema, and the sycophancy evidence in [RESEARCH.md](RESEARCH.md) §3 argues for *less* agent freedom in the patient-facing path. Unbounded sub-agent spawning also makes the audit trail non-deterministic, and we have to explain every output. deepagents is the right tool for research and coding agents. Here it would add exactly the freedom we are trying to remove.
 
-**Where the framework goes, and where it doesn't:**
+**Where a framework would go, and where it would not.** None of this is built:
+every row below currently runs as plain Python behind the durable-runtime
+interface.
 
-| Component | Framework? |
+| Component | Framework, if we adopt one |
 |---|---|
 | Intake interview (multi-turn, stateful) | LangGraph. This is the core use case |
 | Reasoning + retrieval | LangGraph node |
@@ -356,7 +362,8 @@ So we cannot buy an answer to "is this safe enough for Indonesia," and neither c
   /id            indonesia: terminology, formulary, guideline, payer,
                  interop, language, capability, regulatory
 /service
-  /graph         langgraph: intake, reasoning, interrupt/approval
+  /graph         durable runtime: intake, reasoning, interrupt/approval
+                 (planned as langgraph; built without it, see §2)
   /state         patient state model + checkpointer config
   /router        model selection + config (never LangSmith cloud)
   /reason        prompts, retrieval, output schemas
@@ -382,7 +389,7 @@ So we cannot buy an answer to "is this safe enough for Indonesia," and neither c
 Six rules that matter more than they look:
 
 - **`/gate` never imports from `/reason`, and never imports LangGraph.** The gate must be testable with nothing else running.
-- **`/service/graph` is the only module that imports the orchestration library.** LangGraph is a good library and still a dependency; behind a thin durable-runtime interface (run, interrupt, resume, replay), swapping it is one module's work instead of a rewrite. Also a grep in CI.
+- **`/service/graph` is the only module that *may* import an orchestration library.** Today none does: LangGraph is not imported, not a dependency and not installed, per the status note in §2. What lives behind the durable-runtime interface (run, interrupt, resume, replay) is an in-memory implementation, a file-backed one and a Postgres one, all three run against the same conformance suite. The rule is written as a permission rather than a fact so that adding a library later stays one module's work instead of a rewrite. Also a grep in CI.
 - **Khanza is the first EMR adapter, not the design centre.** Reads and the injected panel go through an adapter interface; hospital #51 on a commercial SIMRS is a new adapter, not a new product. The moment `/service` knows it is talking to Khanza, we have built AI-for-Khanza instead of a clinical platform.
 - **Everything in `/corpus` is versioned.** When a guideline updates, we need to know which outputs were produced against which version. This is what makes the system auditable later.
 - **Nothing under `/service` names a country, a payer, a drug or a guideline.** All of that lives in `/packs`. Enforced by a grep in CI, because it is free today and impossible later.
