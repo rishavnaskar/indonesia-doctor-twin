@@ -39,6 +39,16 @@ def default_dir() -> Path:
     """
     return Path(os.environ.get("CLINICIAN_STORE", ".store"))
 
+def forced_fresh() -> bool:
+    """CLINICIAN_FRESH=1 re-runs work even when a stored result matches.
+
+    Lives here rather than in either caller because both the clinician surface
+    and the live runner honour it, and a convention implemented twice is a
+    convention that drifts.
+    """
+    return os.environ.get("CLINICIAN_FRESH", "").lower() in ("1", "true", "yes")
+
+
 def _forced_to_files() -> bool:
     """CLINICIAN_STORE_BACKEND=files stays on disk with a database running.
 
@@ -128,6 +138,30 @@ class Store:
             "sent": len(queue) - len(queue.pending()),
             "damaged_lines": damaged,
         }
+
+    def reset(self) -> dict:
+        """Destroy everything this store holds. Returns what was destroyed.
+
+        Both backends, because a developer on files should not have to learn a
+        different command from one on Postgres — the whole point of the two
+        backends satisfying one interface is that the difference does not
+        surface.
+        """
+        if self._conn is not None:
+            from service.db import reset
+
+            return {"backend": "postgres", "location": self._location(),
+                    **reset(self._conn)}
+
+        counts = {"backend": "files", "location": str(self.dir)}
+        for name, path in (("checkpoints", self.checkpoints),
+                           ("signatures", self.audit), ("outbound", self.queue)):
+            counts[name] = (
+                sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+                if path.exists() else 0
+            )
+            path.unlink(missing_ok=True)
+        return counts
 
     def _location(self) -> str:
         if self._conn is None:

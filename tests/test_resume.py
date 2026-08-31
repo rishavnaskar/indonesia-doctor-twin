@@ -316,3 +316,85 @@ def test_a_run_after_a_clear_shows_up_again():
     _run_clinic(n=1, seed=2)
 
     assert len(demo_run.clinic_history()) == 1
+
+
+# ------------------------------------------------- the live runner, same rules
+
+
+def _live_args(**over):
+    import argparse
+
+    return argparse.Namespace(**{"samples": 1, "critic": False, "tools": False,
+                                 "shadow": False, **over})
+
+
+def test_the_live_runner_keys_on_the_same_things_the_surface_does(rules):
+    """`make live` has two stages that call a model. Both must resume, or the
+    second run still spends — which is the bug this pair of tests exists to
+    stop coming back."""
+    from datagen.synthetic import make_patient
+    from tools import live
+
+    site = rules.sites["SITE-A"]
+    state = make_patient(900, controlled=True)
+    base = live._thread_id(state, rules, site, "some/model", _live_args())
+
+    assert base == live._thread_id(state, rules, site, "some/model", _live_args())
+    assert base != live._thread_id(state, rules, site, "other/model", _live_args())
+    assert base != live._thread_id(state, rules, rules.sites["SITE-C"], "some/model",
+                                   _live_args())
+
+
+@pytest.mark.parametrize("option", ["samples", "critic", "tools", "shadow"])
+def test_a_sampling_option_is_a_different_question(rules, option):
+    """A draft agreed by three samples and checked by a critic is not the draft
+    one call produced. Serving one for the other would misreport what was run."""
+    from datagen.synthetic import make_patient
+    from tools import live
+
+    site, state = rules.sites["SITE-A"], make_patient(900, controlled=True)
+    changed = {"samples": 3} if option == "samples" else {option: True}
+
+    assert live._thread_id(state, rules, site, "m", _live_args()) != live._thread_id(
+        state, rules, site, "m", _live_args(**changed))
+
+
+def test_only_a_finished_live_encounter_is_replayable(rules):
+    """A response that did not parse is not an answer. Storing it would replay
+    a failure forever and never retry the call that might succeed."""
+    from service.graph.runtime import InMemoryRuntime
+    from tools import live
+
+    runtime = InMemoryRuntime()
+    runtime.start("L1", {"a": 1})
+    assert live._stored(runtime, "L1") is None, "only a 'rendered' entry counts"
+
+    runtime.checkpoint("L1", "rendered", {"origin": "live", "outcome": "committed",
+                                          "lines": ["      coded: I10"]})
+    assert live._stored(runtime, "L1")["outcome"] == "committed"
+
+
+def test_fresh_bypasses_the_live_runner_too(rules, monkeypatch):
+    from service.graph.runtime import InMemoryRuntime
+    from tools import live
+
+    runtime = InMemoryRuntime()
+    runtime.start("L2", {"a": 1})
+    runtime.checkpoint("L2", "rendered", {"origin": "live", "outcome": "committed",
+                                          "lines": []})
+    assert live._stored(runtime, "L2") is not None
+
+    monkeypatch.setenv("CLINICIAN_FRESH", "1")
+    assert live._stored(runtime, "L2") is None
+
+
+def test_a_surface_encounter_is_not_replayed_as_a_live_one(rules):
+    """Both write 'rendered' checkpoints. Reading one as the other would print
+    a scripted-page result under a heading claiming a real model produced it."""
+    from service.graph.runtime import InMemoryRuntime
+    from tools import live
+
+    runtime = InMemoryRuntime()
+    runtime.start("L3", {"a": 1})
+    runtime.checkpoint("L3", "rendered", {"origin": "clinic", "outcome": "committed"})
+    assert live._stored(runtime, "L3") is None

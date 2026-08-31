@@ -21,6 +21,8 @@ medicine.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import sys
 from datetime import datetime
@@ -36,6 +38,52 @@ from service.router.router import router_with_model
 from service.signing import AuditLog, Signer
 
 RULE = "─" * 74
+
+
+def _thread_id(state, rules, site, model: str, args) -> str:
+    """A thread id derived from everything that could change this answer.
+
+    Two jobs at once. It stops the collision that persistence exposed — thread
+    ids used to be a position in a run, so two runs both wrote `LIVE-0` and
+    appended two different encounters to one audit trail. And because the same
+    question now lands on the same id, a later run can find the answer and skip
+    the model call.
+
+    `model` is the *configured* identity rather than `backend.version()`, which
+    a hosted backend rewrites to `model@served_by` once it has answered — key on
+    that and the first encounter of a run and the second get different ids, so
+    nothing ever resumes.
+
+    The sampling options are in here because they change the answer: a draft
+    agreed by three samples and checked by a critic is not the draft one call
+    produced, and serving one for the other would misreport what was run.
+    """
+    material = json.dumps({
+        "patient": state.patient_id,
+        "age": state.age,
+        "pack": f"{rules.pack_id}@{rules.version}",
+        "site": site.get("site_id", ""),
+        "model": model,
+        "samples": getattr(args, "samples", 1),
+        "critic": bool(getattr(args, "critic", False)),
+        "tools": bool(getattr(args, "tools", False)),
+        "shadow": bool(getattr(args, "shadow", False)),
+    }, sort_keys=True, default=str)
+    return f"LIVE-{state.patient_id}-{hashlib.sha256(material.encode()).hexdigest()[:12]}"
+
+
+def _stored(runtime, thread_id: str) -> dict | None:
+    """The report from an earlier run of this exact encounter, if there is one."""
+    from service.store import forced_fresh
+
+    if forced_fresh():
+        return None
+    for entry in reversed(runtime.checkpoints.get(thread_id) or []):
+        if entry.step == "rendered" and isinstance(entry.state, dict):
+            state = entry.state
+            if state.get("origin") == "live" and state.get("outcome"):
+                return state
+    return None
 
 
 def load_env(path: Path = Path(".env")) -> None:
@@ -178,21 +226,41 @@ def main() -> int:
     run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
     tally: dict[str, int] = {}
     parse_failures = 0
+    replayed = 0
     requested = backend.version()
+    runtime = store.runtime() if store else InMemoryRuntime()
 
     for index in range(args.n):
         state = make_patient(900 + index, controlled=(index % 2 == 0))
         label = "controlled" if index % 2 == 0 else "uncontrolled"
+
+        # Answered this exact question before? Then answering it again costs a
+        # model call and tells nobody anything new. Content-addressed, so a
+        # different model, site, pack or sampling option runs for real.
+        thread_id = _thread_id(state, rules, site, requested, args)
+        stored = _stored(runtime, thread_id)
+        if stored is not None:
+            replayed += 1
+            tally[stored["outcome"]] = tally.get(stored["outcome"], 0) + 1
+            # Marked on every line that reports one. A replayed encounter that
+            # reads like a fresh one is a demo claiming an API call it did not
+            # make, which is the one thing this stage exists to prove.
+            print(f"\n  [{index}] {label:12s} -> {stored['outcome'].upper()}"
+                  f"  [replayed from the store — no model call]")
+            for line in stored["lines"]:
+                print(line)
+            continue
+
         try:
             result = run_encounter(
-                state, rules, site, router,
-                (store.runtime() if store else InMemoryRuntime()),
-                # Unique per encounter, not per position in a run. Two runs
-                # both used LIVE-0 and, once checkpoints persisted, appended two
-                # different encounters to one audit trail — which is exactly the
-                # thing an audit trail must never do. In memory it was
-                # invisible.
-                thread_id=f"{state.patient_id}-{run_id}-{index}",
+                state, rules, site, router, runtime,
+                # Derived from the inputs, not from a position in a run. Two
+                # runs both used LIVE-0 and, once checkpoints persisted,
+                # appended two different encounters to one audit trail — which
+                # is exactly the thing an audit trail must never do. A content
+                # address fixes that and makes the encounter findable again,
+                # which is what lets the run above skip it.
+                thread_id=thread_id,
                 signer=Signer(site["practitioners"][0]["practitioner_id"], True),
                 audit=audit, now=now, queue=queue,
 
@@ -233,21 +301,37 @@ def main() -> int:
         served = "" if answered_by == requested else f"  [served by {answered_by}]"
         print(f"\n  [{index}] {label:12s} -> {result.outcome.value.upper()}{served}")
 
+        # Built as text rather than printed directly, so a replay reproduces
+        # this report exactly instead of a second rendering of it.
+        lines: list[str] = []
         if result.proposal is not None:
             proposal = result.proposal
-            print(f"      draft: {proposal.recommendation.value}, "
-                  f"confidence {proposal.confidence:.2f}")
+            lines.append(f"      draft: {proposal.recommendation.value}, "
+                         f"confidence {proposal.confidence:.2f}")
             for change in proposal.medication_changes:
-                print(f"             {change.action.value} {change.molecule} "
-                      f"{change.mg_per_dose:g} mg x{change.doses_per_day}")
+                lines.append(f"             {change.action.value} {change.molecule} "
+                             f"{change.mg_per_dose:g} mg x{change.doses_per_day}")
         if result.decision and result.decision.blocking:
             for reason in result.decision.reasons():
-                print(f"      gate:  {reason}")
+                lines.append(f"      gate:  {reason}")
         if result.outcome is Outcome.COMMITTED and result.claim:
-            print(f"      coded: {', '.join(result.claim.codes)}")
+            lines.append(f"      coded: {', '.join(result.claim.codes)}")
+        for line in lines:
+            print(line)
+
+        runtime.checkpoint(thread_id, "rendered", {
+            "origin": "live",
+            "outcome": result.outcome.value,
+            "answered_by": answered_by,
+            "lines": lines,
+        })
 
     print(f"\n{RULE}")
     print("  " + " · ".join(f"{k}: {v}" for k, v in sorted(tally.items())))
+    if replayed:
+        print(f"  {replayed} of {args.n} replayed from the store — "
+              f"{args.n - replayed} model call(s) made.")
+        print("  CLINICIAN_FRESH=1 to call the model for every one of them.")
     print(f"  queued for submission: {len(queue)}")
     if store:
         facts = store.summary()

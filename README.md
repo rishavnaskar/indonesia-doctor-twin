@@ -30,9 +30,12 @@ key each degrade to a named skip rather than a failure.
 Postgres if this machine has Docker, append-only files otherwise — under a
 thread id derived from its inputs: patient, site, pack version, which drafter is
 behind the router. A re-run replays what is already there rather than doing it
-again. `make live` is nine model calls the first time and none after that
-(measured: 3m28s, then 1.1s, same outcomes). Edit a guideline file and they all
-run again, because the pack version is part of the id.
+again. `make live` makes 14 model calls the first time and none after that; the
+surface alone measured 3m28s, then 1.1s, with identical outcomes. Replayed
+encounters say so on every line. Edit a guideline file and they all run again,
+because the pack version is part of the id.
+
+`python -m tools.store --reset` destroys the lot and starts clean.
 
 `/clinic` keeps what you build there. Patients you generate and run come back
 the next time you open it — editable, with their verdicts, signatures and codes

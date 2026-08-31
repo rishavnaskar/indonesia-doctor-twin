@@ -106,9 +106,9 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
 >
 > The checkpoints are also read rather than merely written. An encounter's
 > thread id is derived from its inputs, so a re-run finds the stored result and
-> replays it — nine model calls the first time a live demo runs and none after
-> that, with the pack version in the id so editing a guideline still costs nine.
-> That is the difference between a checkpoint and a log entry.
+> replays it — fourteen model calls the first time `make live` runs and none
+> after that, with the pack version in the id so editing a guideline costs them
+> again. That is the difference between a checkpoint and a log entry.
 >
 > `tests/test_runtime_contract.py` is a conformance suite, and the Postgres
 > backend was the first thing to be run through it — the same tests, not a

@@ -406,15 +406,17 @@ the initdb mount goes away, which is a one-line change to `docker-compose.yml`.
 **Why.** Two problems, one answer. The durable runtime was writing checkpoints
 nothing ever read, which makes a checkpoint decoration rather than a
 mechanism. And every reload of the clinician surface re-ran nine encounters —
-nine model calls on a rate-limited free tier under `make live`, which made the
-second demo of the day slower than the first for no reason.
+nine model calls on a rate-limited free tier every time somebody reloaded the
+page, which made the second demo of the day slower than the first for no reason.
 
 The thread id is now a hash of everything that could change the answer: the
 scenario, the patient state, the site, the pack and its version, the drafter,
 and whether the scenario tampers with the router. A run that finds a stored
-result for the same id replays it. `make live` costs nine model calls once and
-zero thereafter, and the page states how many it replayed rather than leaving
-it to be inferred from the page appearing faster.
+result for the same id replays it. The scripted page costs nine model calls once
+and zero thereafter, and states how many it replayed rather than leaving it to
+be inferred from the page appearing faster. (`make live` has a second
+model-calling stage, which D33 covers — the whole run is 14 calls once, then
+none.)
 
 Invalidation is the whole risk, so it is derived rather than remembered: editing
 a guideline file moves the pack version, which moves every id, which preserves
@@ -492,3 +494,64 @@ intermittently on the ordering rather than on anything it was written to check.
 
 **Overturned if:** never. A decision that reads a variable the code has already
 overwritten is a bug whatever it decides.
+
+---
+
+### D33 — Both model-calling stages resume, and a replay says so on every line
+
+**Why.** `make live` has two stages that call a model: the live runner and the
+clinician surface. Only the surface resumed, so the claim "the second run makes
+no model calls" was false by five calls — and it was written in the README that
+way before anyone checked. The live runner is now content-addressed on the same
+basis: patient, pack and version, site, the configured model, and the sampling
+options, because a draft agreed by three samples and checked by a critic is not
+the draft one call produced.
+
+The label is the load-bearing part. That stage exists to prove a real model is
+behind the router, so a replayed encounter that reads like a fresh one is a demo
+claiming an API call it did not make. Every replayed line carries `[replayed
+from the store — no model call]`, and the run closes with how many were replayed
+against how many calls were actually made.
+
+Failures store nothing. A response that did not parse, or a request that was
+rate-limited, is not an answer — storing it would replay the failure forever and
+never retry the call that might succeed. Observed on the first run of the pair
+that verified this: one encounter failed to parse, was not stored, and correctly
+called the model again on the second run while the other two replayed.
+
+**Overturned if:** a third thing starts calling a model without going through
+one of these two paths. Then the key belongs in one place rather than
+implemented twice, which it is now — deliberately, because the two stages key on
+different inputs and a shared abstraction would have to take both.
+
+---
+
+### D34 — `--reset` is a person's command, and it is the only thing that lifts the triggers
+
+**Why.** A prototype's store fills with synthetic demo runs, and starting a
+recording from a clean slate is a real need. But the append-only triggers refuse
+`DELETE` — that is D26 working — so something has to suspend them, and the
+question is what that something is allowed to be.
+
+It is a command a person types. Not a flag on `make`, not a startup path, not
+anything a run can reach. It prints what it is about to destroy, names the
+backend, and waits for the word `yes`, because "start afresh before a recording"
+and "delete the signatures a licensed doctor put their name to" are the same
+keystroke here and only one of them is what anybody meant.
+
+It is explicitly not what `/clinic`'s *Clear this list* does. That writes a
+marker forward and destroys nothing, which is the behaviour the product has;
+this is the operator's hammer, and in a real deployment it would not ship,
+because destroying a clinical audit trail is unlawful rather than merely
+inadvisable.
+
+There is a test that it puts the triggers back. A reset that left them off would
+turn the store's central guarantee into one that held until the first time
+somebody started clean — and it would hide, because an append-only table behaves
+exactly like a mutable one right up until someone mutates it. The test inserts
+rows before checking, because a row-level trigger on an empty table fires zero
+times and an `UPDATE` against one succeeds whether the trigger is there or not.
+That is how the first version of the check fooled itself.
+
+**Overturned if:** this ever runs anywhere real, at which point deletion becomes
+a supervised operation with its own audit record and this command goes away.

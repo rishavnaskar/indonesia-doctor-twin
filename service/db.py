@@ -99,6 +99,39 @@ def migrate(conn) -> list[str]:
     return fresh
 
 
+TABLES = ("checkpoints", "signatures", "outbound")
+
+
+def reset(conn) -> dict[str, int]:
+    """Empty every table, and say how much was destroyed.
+
+    The append-only triggers refuse DELETE, which is the point of them — so
+    this disables them for the length of the statement and puts them back. That
+    is deliberately the only place in the codebase that does, and it is a
+    separate command a person has to type rather than anything a run can reach.
+
+    The honest framing: this is not "clearing a cache". It is destroying a
+    clinical audit trail, which in a real deployment would be unlawful. It
+    exists because a prototype's store fills with synthetic demo runs and
+    starting a recording from a clean slate is a real need. `/clinic`'s own
+    clear button does *not* do this — it writes a marker forward and deletes
+    nothing, which is what the product does. This is the operator's hammer.
+    """
+    counts = {}
+    with conn.cursor() as cur:
+        for table in TABLES:
+            cur.execute(f"SELECT count(*) FROM {table}")
+            counts[table] = cur.fetchone()[0]
+            # TRUNCATE would not fire row triggers, but DISABLE/ENABLE is
+            # explicit about what is being suspended and why. A reader should
+            # not have to know which statements bypass which triggers to see
+            # that a guarantee is being lifted here.
+            cur.execute(f"ALTER TABLE {table} DISABLE TRIGGER USER")
+            cur.execute(f"TRUNCATE {table} RESTART IDENTITY")
+            cur.execute(f"ALTER TABLE {table} ENABLE TRIGGER USER")
+    return counts
+
+
 # --------------------------------------------------------------- serialisation
 
 

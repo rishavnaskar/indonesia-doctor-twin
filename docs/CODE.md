@@ -481,6 +481,7 @@ Indonesian physicians. The scorecard prints this caveat on every run.
 python -m tools.store                      # what this deployment kept
 python -m tools.store --thread <id>        # replay one encounter, step by step
 python -m tools.store --signatures         # who signed what, and which draft
+python -m tools.store --reset              # destroy all of it and start clean
 ```
 
 Three things persist — the checkpoints, the signature log and the outbound
@@ -539,12 +540,25 @@ This is the checkpoint being load-bearing rather than decorative. Without it the
 durable runtime writes a record nothing ever reads.
 
 It matters most for `make live`, where every encounter is a model call over a
-rate-limited free tier:
+rate-limited free tier. Two of that run's stages call a model — the live runner
+and the clinician surface — and both resume:
 
 | | first run | second run |
 |---|---|---|
-| `make` | 9 encounters run | 9 replayed, 0 run |
-| `make live` | 9 model calls | **0 model calls** |
+| `make` — 9 scripted encounters | run | replayed, 0 model calls |
+| `make live` — live runner (5) + surface (9) | 14 model calls | **0** |
+
+Measured on the surface alone: 3m28s, then 1.1s, identical outcomes. The live
+runner replays with `[replayed from the store — no model call]` on every line
+that reports one, and a closing count of how many were replayed against how
+many calls were actually made. A replayed encounter that read like a fresh one
+would be a demo claiming an API call it did not make, which is the one thing
+that stage exists to prove.
+
+**A failure is not an answer.** An encounter whose response did not parse, or
+that was rate-limited, stores nothing — so the next run calls the model for it
+again. Storing failures would replay them forever and never retry the call that
+might succeed.
 
 The risk a cache introduces is showing an answer to a question nobody asked, so
 the invalidation is the part worth reading. Edit a guideline file and the pack
@@ -592,6 +606,31 @@ so "Clear this list" writes a marker forward and the page starts after it. An
 audit log with a working clear button would not be an audit log — and this is
 the append-only constraint being designed around rather than fought, which is
 the more useful thing to show someone than the trigger itself.
+
+### Starting completely fresh
+
+```bash
+python -m tools.store --reset     # asks first; --yes to skip the prompt
+```
+
+This is the one thing in the codebase that suspends the append-only triggers,
+and it is deliberately a command a person types rather than anything a run can
+reach. It prints what it is about to destroy and waits for you to type `yes`,
+because "start afresh before a recording" and "delete the signatures a licensed
+doctor put their name to" are the same keystroke here.
+
+It is **not** what `/clinic`'s *Clear this list* does. That writes a marker
+forward and destroys nothing, which is the behaviour the product has. `--reset`
+is the operator's hammer, and it exists because a prototype's store fills with
+synthetic demo runs. In a real deployment it would not ship — destroying a
+clinical audit trail is unlawful, not merely inadvisable.
+
+It works on both backends, so a developer on files does not learn a different
+command from one on Postgres. There is a test that it puts the triggers back
+afterwards: a reset that left them off would turn the store's central guarantee
+into something that held only until the first time somebody started clean, and
+it would hide, because an append-only table behaves exactly like a mutable one
+right up until someone mutates it.
 
 One known limit, stated rather than discovered later: the runtime loads a
 deployment's checkpoints once per process, so a store with tens of thousands of

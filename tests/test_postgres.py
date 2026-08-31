@@ -214,3 +214,61 @@ def test_the_location_never_carries_the_password(monkeypatch):
     store = Store(connection=object())
     assert "hunter2" not in store._location()
     assert "db.example:5544/clinician" == store._location()
+
+
+# --------------------------------------------------------------------- reset
+
+
+def test_reset_empties_every_table_and_reports_what_it_destroyed(conn):
+    from service.db import PostgresAuditLog, PostgresQueue, PostgresRuntime, reset
+
+    PostgresRuntime(conn=conn).start("T", {"a": 1})
+    PostgresAuditLog(conn=conn).append(_signature())
+    PostgresQueue(conn=conn).enqueue("bundle", {"a": 1}, "K1", datetime(2026, 8, 30, 10, 0))
+
+    destroyed = reset(conn)
+
+    assert destroyed == {"checkpoints": 1, "signatures": 1, "outbound": 1}
+    assert PostgresRuntime(conn=conn).threads() == []
+    assert PostgresAuditLog(conn=conn).records == []
+    assert len(PostgresQueue(conn=conn)) == 0
+
+
+@pytest.mark.parametrize("table", ["signatures", "checkpoints", "outbound"])
+def test_reset_puts_the_append_only_triggers_back(conn, table):
+    """`reset` is the only code that suspends them, and a reset that left them
+    off would turn the store's central guarantee into something that held until
+    the first time somebody started afresh — silently, because an append-only
+    table behaves identically to a mutable one right up until someone mutates it.
+    """
+    from service.db import PostgresAuditLog, PostgresQueue, PostgresRuntime, reset
+
+    reset(conn)
+
+    # Rows first. A row-level trigger on an empty table fires zero times, so an
+    # UPDATE against one succeeds whether the trigger is there or not — which is
+    # exactly how a missing trigger would hide.
+    PostgresRuntime(conn=conn).start("T", {"a": 1})
+    PostgresAuditLog(conn=conn).append(_signature())
+    PostgresQueue(conn=conn).enqueue("bundle", {"a": 1}, "K1", datetime(2026, 8, 30, 10, 0))
+
+    with pytest.raises(Exception, match="append-only"):
+        with conn.cursor() as cur:
+            cur.execute(f"UPDATE {table} SET id = id")
+
+
+def test_the_file_store_resets_too(tmp_path, monkeypatch):
+    """A developer on files should not have to learn a different command."""
+    from service.store import Store
+
+    monkeypatch.setenv("CLINICIAN_DATABASE_URL", "postgresql://x@127.0.0.1:1/none")
+    store = Store(tmp_path / "s")
+    store.audit_log().append(_signature())
+    assert store.summary()["signatures"] == 1
+
+    destroyed = store.reset()
+
+    assert destroyed["backend"] == "files"
+    assert destroyed["signatures"] == 1
+    assert store.summary()["signatures"] == 0
+    assert not store.audit.exists()

@@ -43,11 +43,10 @@ _STORE_LOCK = threading.Lock()
 # re-runs rather than being handed to a renderer that no longer understands it.
 VIEW_VERSION = 1
 
-# CLINICIAN_FRESH=1 re-runs everything even when a stored result matches. For
-# watching a live model disagree with itself across runs, which is a real thing
-# to want and the exact thing resumption otherwise hides.
 def _forced_fresh() -> bool:
-    return os.environ.get("CLINICIAN_FRESH", "").lower() in ("1", "true", "yes")
+    from service.store import forced_fresh
+
+    return forced_fresh()
 
 
 def store():
