@@ -75,7 +75,7 @@ class AnthropicBackend:
             import anthropic
         except ImportError as exc:  # pragma: no cover
             raise BackendError(
-                "the anthropic package is not installed — "
+                "the anthropic package is not installed. "
                 "pip install -r requirements-model.txt"
             ) from exc
         # Zero-arg constructor: resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN,

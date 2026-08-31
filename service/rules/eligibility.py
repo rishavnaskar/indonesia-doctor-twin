@@ -35,7 +35,7 @@ class EligibilityResult:
         if self.eligible:
             return ""
         reasons = "; ".join(e.label for e in self.exclusions)
-        return f"Not handled by the assistant — {reasons}."
+        return f"Not handled by the assistant. {reasons}."
 
 
 def check_eligibility(guideline: dict[str, Any], ctx: Context) -> EligibilityResult:

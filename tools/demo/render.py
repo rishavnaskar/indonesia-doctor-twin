@@ -21,7 +21,7 @@ from typing import Any
 BAND_ORDER = {"red": 0, "amber": 1, "green": 2}
 
 
-def render(data: dict[str, Any], *, title: str = "AI clinician — demo") -> str:
+def render(data: dict[str, Any], *, title: str = "AI clinician, demo") -> str:
     payload = json.dumps(data, ensure_ascii=False, indent=None)
     return _TEMPLATE.replace("__TITLE__", html.escape(title)).replace(
         "__DATA__", payload.replace("</", "<\\/")
@@ -287,7 +287,7 @@ function patientCard(e){
   const obs = p.observations.map(o=>`<tr>
       <th>${esc(o.label)}</th>
       <td><span class="mono">${o.value}${o.unit?" "+esc(o.unit):""}</span>
-        <span class="tag${o.stale?" stale":""}">${o.age_days===0?"today":esc(o.age_days)+" days old"}${o.stale?" — too old to rely on":""}</span>
+        <span class="tag${o.stale?" stale":""}">${o.age_days===0?"today":esc(o.age_days)+" days old"}${o.stale?", too old to rely on":""}</span>
         <div class="plain">${esc(o.plain)}</div></td></tr>`).join("");
 
   const meds = p.medications.length ? p.medications.map(m=>`<div class="bi" style="margin-bottom:10px">
@@ -313,7 +313,7 @@ function patientCard(e){
         <table>
           ${row("Record", `<span class="mono">${esc(p.patient_id)}</span>`)}
           ${row("Age and sex", `${p.age}, ${esc(p.sex)}`)}
-          ${row("Seen at", `${esc(p.site_id)} — ${esc(p.site_label)}`)}
+          ${row("Seen at", `${esc(p.site_id)} · ${esc(p.site_label)}`)}
         </table>
         <h3>Blood pressure today</h3>
         <div class="bpnow">${p.sbp?`${p.sbp}/${p.dbp} <small>mmHg</small>`:"not recorded"}</div>
@@ -331,9 +331,9 @@ function patientCard(e){
         <h3>Blood tests and readings on file</h3>
         <table>${obs}</table>
         ${p.intolerances.length?`<h3>Cannot tolerate</h3>${p.intolerances.map(i=>
-          `<div class="plain">${esc(i.molecule)} (${esc(i.class_label)}) — recorded ${esc(i.documented_at)}${i.reaction?": "+esc(i.reaction):""}</div>`).join("")}`:""}
+          `<div class="plain">${esc(i.molecule)} (${esc(i.class_label)}), recorded ${esc(i.documented_at)}${i.reaction?": "+esc(i.reaction):""}</div>`).join("")}`:""}
         ${p.allergies.length?`<h3>Allergies</h3>${p.allergies.map(a=>
-          `<div class="plain">${esc(a.substance)}${a.reaction?" — "+esc(a.reaction):""}</div>`).join("")}`:""}
+          `<div class="plain">${esc(a.substance)}${a.reaction?", "+esc(a.reaction):""}</div>`).join("")}`:""}
       </div>
     </div>
   </div>`;
@@ -345,7 +345,7 @@ function bandBlock(e){
     `<li>${esc(l.text)}${l.rule_id?` <span class="src mono">[rule ${esc(l.rule_id)}]</span>`:""}
        ${l.gloss?`<div class="gloss">${esc(l.gloss)}</div>`:""}</li>`).join("")}</ul>` : "";
   const ack = p.requires_acknowledgement ? (acked[e.key]
-      ? `<button class="act" disabled>Acknowledged — the doctor may now proceed</button>`
+      ? `<button class="act" disabled>Acknowledged. The doctor may now proceed</button>`
       : `<button class="act" data-ack="${esc(e.key)}">Saya mengerti &nbsp;/&nbsp; I understand</button>`) : "";
   return `<div class="band ${p.band}">
     <div class="lbl">${esc(p.band_label)}${p.band==="red"?" / action needed":p.band==="amber"?" / worth a look":" / nothing to flag"}</div>
@@ -362,7 +362,7 @@ function draftCard(e){
       <div class="plain">${esc(c.class_plain)}</div>
       <div class="plain">Reason given: ${esc(c.rationale)}</div></td></tr>`).join("");
   return `<div class="card">
-    <h2>The draft — for the doctor to accept, edit or reject</h2>
+    <h2>The draft, for the doctor to accept, edit or reject</h2>
     <table>
       ${row("Assessment", `${esc(d.assessment)}<div class="plain">${esc(d.assessment_plain)}</div>`)}
       ${row("Proposed action", `<b>${esc(d.recommendation.replace(/_/g," "))}</b><div class="plain">${esc(d.recommendation_plain)}</div>`)}
@@ -377,7 +377,7 @@ function draftCard(e){
       ${d.patient_instructions_gloss?`<div class="gloss">${esc(d.patient_instructions)}
         <span class="tag">as sent, in ${esc(DATA.pack.language)}</span></div>`:""}`:""}
     ${e.signature?`<h3>Signature</h3><table>
-      ${row("Signed by", `${esc(e.signature.practitioner_id)} — ${esc(e.signature.role)}`)}
+      ${row("Signed by", `${esc(e.signature.practitioner_id)} · ${esc(e.signature.role)}`)}
       ${row("Licence valid until", esc(e.signature.licence_expires))}
       ${row("Decision", esc(e.signature.decision))}</table>
       <div class="note">The signature is refused in software if the licence has lapsed or the
@@ -428,7 +428,7 @@ function discrepancyBlock(e){
   if (!e.discrepancies || !e.discrepancies.length) return "";
   return `<div class="card"><h2>What the record and the patient disagree about</h2>
     <div class="note" style="margin:0 0 10px">Surfaced, never resolved. Both sources are
-      routinely wrong in different ways — a record goes stale the moment a patient buys
+      routinely wrong in different ways. A record goes stale the moment a patient buys
       something at a pharmacy, and a patient misremembers a dose. Picking a winner would be
       guessing about what someone is currently swallowing.</div>
     ${e.discrepancies.map(d=>`<div class="finding ${d.material?"":"warn"}">
@@ -457,7 +457,7 @@ function auditView(e){
         <div class="plain">${esc(c.description)}</div></div></div>`).join("");
 
   const findings = e.findings.length ? e.findings.map(f=>`<div class="finding ${f.severity}">
-      <div class="src">Check ${f.check} — ${esc(f.check_name.replace(/_/g," "))}
+      <div class="src">Check ${f.check} · ${esc(f.check_name.replace(/_/g," "))}
         &middot; rule <span class="mono">${esc(f.rule_id||"")}</span>
         ${f.converts_to_referral?" &middot; means: send the patient elsewhere":""}</div>
       <div class="m">${esc(f.message)}</div>
@@ -471,12 +471,12 @@ function auditView(e){
   return `<div class="card">
       <h2>What happened, step by step</h2>
       <div class="trail">${trail.map(t=>`<span class="mono">${esc(t)}</span>`).join("")}</div>
-      <div class="steps">${trail.map(t=>steps[t]?`<div><b class="mono">${esc(t)}</b> — ${esc(steps[t])}</div>`:"").join("")}</div>
+      <div class="steps">${trail.map(t=>steps[t]?`<div><b class="mono">${esc(t)}</b> · ${esc(steps[t])}</div>`:"").join("")}</div>
     </div>
     <div class="card">
       <h2>The nine safety checks</h2>
       <div class="note" style="margin:0 0 10px">All nine run on every draft, in plain code with no AI
-        involved. They do not stop at the first problem — a doctor reviewing a rejected draft should
+        involved. They do not stop at the first problem, because a doctor reviewing a rejected draft should
         see everything that was wrong with it.</div>
       ${checks}
     </div>
@@ -490,14 +490,14 @@ function auditView(e){
       <div class="note" style="margin:0 0 10px">The deterministic red flags are the
         floor and catch what somebody enumerated. This is the channel for something
         those rules were never written to look for. It can only add to what the
-        clinician sees — it cannot quieten an alert or mark a patient as fine.</div>
+        clinician sees, so it cannot quieten an alert or mark a patient as fine.</div>
       ${e.proposal.concerns.map(c=>`<div class="finding ${c.urgency==="escalate"?"":"warn"}">
         <div class="src">${c.urgency === "escalate" ? "Escalate" : "Mention"}</div>
         <div class="m">${esc(c.text)}</div></div>`).join("")}</div>` : ""}
     ${e.exclusions && e.exclusions.length ? `<div class="card">
       <h2>Why this patient is out of scope</h2>
       ${e.exclusions.map(x=>`<div class="finding">
-        <div class="src">Exclusion ${esc(x.id)} — checked before any model call</div>
+        <div class="src">Exclusion ${esc(x.id)}, checked before any model call</div>
         <div class="m"><b>${esc(x.label)}</b></div>
         <div class="src">${esc(x.reason)}</div></div>`).join("")}
       <div class="note">An excluded encounter costs zero tokens. That is a nice
@@ -507,7 +507,7 @@ function auditView(e){
     <div class="card">
       <h2>What this hospital can actually do</h2>
       <table>
-        ${row("Hospital", `${esc(p.site_id)} — ${esc(p.site_label)}`)}
+        ${row("Hospital", `${esc(p.site_id)} · ${esc(p.site_label)}`)}
         ${row("Blood tests on site", `<span class="mono">${p.labs_available.map(esc).join(", ")||"none"}</span>`)}
         ${row("Drugs in stock", `<span class="mono">${p.stocked.map(esc).join(", ")||"none"}</span>`)}
         ${row("Information current as of", esc(p.site_as_of))}

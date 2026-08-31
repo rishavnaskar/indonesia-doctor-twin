@@ -179,7 +179,7 @@ def main() -> int:
     now = datetime(2026, 8, 29, 10, 0)
 
     if not args.show_prompt:
-        print(f"\n{RULE}\n  Live run — {backend.version()} — {args.n} encounters at {args.site}")
+        print(f"\n{RULE}\n  Live run · {backend.version()} · {args.n} encounters at {args.site}")
         chain = getattr(backend, "fallbacks", ())
         if chain:
             print(f"  Falling back through: {', '.join(chain)}")
@@ -213,7 +213,7 @@ def main() -> int:
     # check is real.
     if args.provider == "anthropic":
         if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-            print("  No ANTHROPIC_API_KEY in the environment — trying the SDK's own")
+            print("  No ANTHROPIC_API_KEY in the environment, trying the SDK's own")
             print("  credential chain (an `ant auth login` profile also works).\n")
     elif not os.environ.get("OPENROUTER_API_KEY"):
         print(
@@ -246,7 +246,7 @@ def main() -> int:
             # reads like a fresh one is a demo claiming an API call it did not
             # make, which is the one thing this stage exists to prove.
             print(f"\n  [{index}] {label:12s} -> {stored['outcome'].upper()}"
-                  f"  [replayed from the store — no model call]")
+                  f"  [replayed from the store, no model call]")
             for line in stored["lines"]:
                 print(line)
             continue
@@ -329,18 +329,18 @@ def main() -> int:
     print(f"\n{RULE}")
     print("  " + " · ".join(f"{k}: {v}" for k, v in sorted(tally.items())))
     if replayed:
-        print(f"  {replayed} of {args.n} replayed from the store — "
+        print(f"  {replayed} of {args.n} replayed from the store, "
               f"{args.n - replayed} model call(s) made.")
         print("  CLINICIAN_FRESH=1 to call the model for every one of them.")
     print(f"  queued for submission: {len(queue)}")
     if store:
         facts = store.summary()
-        print(f"  persisted to {facts['backend']} ({facts['location']}) — "
+        print(f"  persisted to {facts['backend']} ({facts['location']}), "
               f"{facts['encounters_checkpointed']} encounter(s) checkpointed, "
               f"{facts['signatures']} signature(s), {facts['queued']} queued")
     if parse_failures:
         print(f"  {parse_failures} response(s) did not parse. That is a gate failure by")
-        print("  design, not a retry — a malformed clinical output is not made correct")
+        print("  design, not a retry. A malformed clinical output is not made correct")
         print("  by asking again.")
     print(f"{RULE}\n")
     return 0

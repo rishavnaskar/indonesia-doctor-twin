@@ -355,7 +355,7 @@ class HostedChatBackend:
             raise TruncatedResponse(
                 f"{body.get('model', self.model)} hit the {self.max_tokens}-token "
                 f"output budget mid-answer ({spent} of it went to reasoning). "
-                "This is our budget, not the model failing the contract — raise "
+                "This is our budget, not the model failing the contract. Raise "
                 "max_tokens rather than reading it as a parse failure."
             )
 

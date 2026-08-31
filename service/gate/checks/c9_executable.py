@@ -32,7 +32,7 @@ NAME = "executable_here"
 # surface that displays it, so the two cannot drift apart.
 TITLE = 'Executable here'
 DESCRIPTION = (
-    'Can this hospital actually carry out this plan today — is the drug in stock and the test available on site?'
+    'Can this hospital actually carry out this plan today: is the drug in stock and the test available on site?'
 )
 
 _DISPENSING_ACTIONS = (

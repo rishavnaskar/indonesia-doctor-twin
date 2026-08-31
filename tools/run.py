@@ -108,7 +108,7 @@ def _database_up() -> str:
         store = Store()
         if store.backend == "postgres":
             return (f"postgres at {store.summary()['location']}"
-                    " (already running — not started by this run)")
+                    " (already running, not started by this run)")
         return f"files ({_compose_failure(started.stderr or started.stdout)})"
 
     store = Store()
@@ -125,9 +125,9 @@ def _compose_failure(output: str) -> str:
     for line in (output or "").splitlines():
         lowered = line.lower()
         if "bind" in lowered or "address already in use" in lowered:
-            return "port 5544 is already in use — set CLINICIAN_DATABASE_URL"
+            return "port 5544 is already in use. Set CLINICIAN_DATABASE_URL"
         if "permission denied" in lowered:
-            return "docker refused the request — check its permissions"
+            return "docker refused the request. Check its permissions"
     return "docker compose could not start postgres"
 
 
@@ -173,7 +173,7 @@ def main() -> int:
     if args.live and not args.ci:
         stages.append(
             ("Live encounters",
-             "real model, real refusals, real provenance — replayed once stored",
+             "real model, real refusals, real provenance, replayed once stored",
              [PY, "-m", "tools.live", "--n", "5"], False))
 
     total = len(stages) + (0 if args.ci else 1)
@@ -199,7 +199,7 @@ def main() -> int:
         return 0
 
     _heading(total, total, "Clinician surface",
-             f"http://localhost:{args.port} — ctrl-c to stop")
+             f"http://localhost:{args.port} (ctrl-c to stop)")
     _say()
     surface = [PY, "-m", "tools.demo", "--port", str(args.port)]
     if args.live:

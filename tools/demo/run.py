@@ -497,7 +497,7 @@ def _failed(scenario, rules, exc: Exception) -> dict:
         "outcome_plain": (
             "The drafter could not produce a usable proposal, so nothing reached "
             "the safety checks and nothing reached the doctor. This is a failure "
-            "of the model, not of the patient's care — the doctor proceeds as "
+            "of the model, not of the patient's care. The doctor proceeds as "
             "they would without the system."
         ),
         "error": f"{type(exc).__name__}: {exc}",
@@ -755,7 +755,7 @@ def run_patients(
         else:
             scenario = Scenario(
                 key=state.patient_id,
-                title=f"{state.patient_id} — {state.age}, {state.sex}",
+                title=f"{state.patient_id} · {state.age}, {state.sex}",
                 note=f"Built in the browser, run at {site_id}.",
                 state=state,
                 site=site,

@@ -178,7 +178,7 @@ class Build:
 
 
 _LOADING = """<!doctype html><html><head><meta charset="utf-8">
-<title>AI clinician — building</title><style>
+<title>AI clinician, building</title><style>
 :root{color-scheme:light;--bg:#f7f6f8;--panel:#fff;--ink:#0b0b0c;--muted:#4c4c52;
 --ash:#68686f;--line:#e2ded7;--accent:#f0521c;--code:#f1efea}
 body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
@@ -466,7 +466,7 @@ def main() -> int:
         # that has just spent two minutes passing every gate reads as though
         # something broke, which is the opposite of what happened.
         print(f"\n  Port {args.port} is already in use.\n")
-        print("  Something is already serving there — usually a previous run of")
+        print("  Something is already serving there, usually a previous run of")
         print("  this. Stop it, or pick another port:\n")
         print(f"      make PORT={args.port + 1}\n")
         print(f"  ({type(exc).__name__}: {exc})\n")
@@ -479,7 +479,7 @@ def main() -> int:
             print("  Bound to localhost only. The page answers straight away and shows")
             print("  progress while the scenarios run.")
         else:
-            print(f"  Bound to {args.host} — reachable from outside this machine.")
+            print(f"  Bound to {args.host}, reachable from outside this machine.")
             print("  Synthetic records only: the residency guard refuses to send")
             print("  anything else to a hosted model.")
         if args.live:

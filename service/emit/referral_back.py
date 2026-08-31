@@ -114,7 +114,7 @@ def _draft(state) -> str:
         for m in state.medications
     )
     return (
-        "SURAT RUJUK BALIK (draf — menunggu tanda tangan dokter spesialis)\n"
+        "SURAT RUJUK BALIK (draf, menunggu tanda tangan dokter spesialis)\n"
         f"Pasien: {state.patient_id}\n"
         f"Tanggal: {state.as_of.isoformat()}\n"
         "Kondisi: stabil dan terkontrol, memenuhi kriteria rujuk balik.\n"

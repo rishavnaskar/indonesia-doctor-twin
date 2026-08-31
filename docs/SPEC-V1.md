@@ -17,6 +17,8 @@ It is the narrowest workflow that still exercises **every architectural componen
 And it does that **without diagnostic entropy.** We are not asking the system to work out what is wrong with an undifferentiated patient. We are asking it to manage a known condition against a published protocol. That is the difference between a prototype that can be evaluated and one that can only be demoed.
 
 > **Explicitly deferred to V2:** type 2 diabetes, then combined cardiometabolic management. Do not build them into V1's state machine. Build the packs so they can be added without touching the graph.
+>
+> **Status in the prototype: type 2 diabetes is in the code, and the instruction above is why it went in the way it did.** It was added as an architecture test, to find out whether the engine really was pathway-agnostic, and it went in as two pack files with no engine changes. Which is the second sentence above, honoured. It has no clinical sign-off, no evaluation set and no scorecard coverage, so it changes nothing about the V1 build order: this specification is still hypertension alone, done properly.
 
 **Why hypertension specifically, in Indonesia:** it is protocol-dense and therefore scorable; it is longitudinal and therefore exercises patient state; it is high-volume; and it sits inside **PRB** (Program Rujuk Balik), BPJS's referral-back programme for stable chronic patients on a single diagnosis without complications, which gives us a defined patient cohort, a defined drug list, and a defined billing mechanism to build against.
 

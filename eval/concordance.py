@@ -175,7 +175,7 @@ def score(cases: list[Case], rules=None, router=None, source: str = "unknown",
 def report(result: Concordance) -> str:
     lines = [
         "",
-        "Plan concordance — SPEC-V1 §8.2",
+        "Plan concordance · SPEC-V1 §8.2",
         "=" * 64,
         f"  Source                       {result.source}",
         f"  Drafts that reached a doctor {result.compared}",
@@ -216,7 +216,7 @@ def report(result: Concordance) -> str:
         for pair in result.disagreements:
             tally[pair] = tally.get(pair, 0) + 1
         lines.append("")
-        lines.append("  Where it differed — doctor said / we drafted:")
+        lines.append("  Where it differed. Doctor said / we drafted:")
         for (theirs, ours), count in sorted(tally.items(), key=lambda kv: -kv[1]):
             lines.append(f"    {theirs:<14} -> {ours:<14} x{count}")
 
@@ -232,7 +232,7 @@ def report(result: Concordance) -> str:
     lines.append("  better by abstaining on everything difficult.")
     lines.append("")
     lines.append("  Real concordance needs Set C: 300 retrospective visits, blind-scored")
-    lines.append("  by Indonesian physicians. Until then the bar stays unset, by design —")
+    lines.append("  by Indonesian physicians. Until then the bar stays unset, by design:")
     lines.append("  a system tuned to agree with historical practice reproduces historical")
     lines.append("  mistakes.")
     lines.append("=" * 64)

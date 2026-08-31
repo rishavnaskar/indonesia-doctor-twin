@@ -54,7 +54,7 @@ def download(destination: Path = DEFAULT_JAR) -> int:
         ["curl", "-L", "--progress-bar", "-o", str(destination), JAR_URL]
     )
     if result.returncode != 0:
-        print("  Download failed. It is a plain file — fetch it by hand from:")
+        print("  Download failed. It is a plain file, so fetch it by hand from:")
         print(f"      {JAR_URL}\n")
         return 1
     print("  Done. It will be used automatically from now on.\n")
@@ -147,8 +147,8 @@ def main() -> int:
                 if "Error @" in line:
                     print(f"        {line.split('Error @ ')[-1][:140]}")
     print("  " + "=" * 58)
-    print("  Remaining warnings are best-practice recommendations — narrative text\n"
-          "  and UCUM annotations — not conformance failures.\n")
+    print("  Remaining warnings are best-practice recommendations (narrative text\n"
+          "  and UCUM annotations), not conformance failures.\n")
     return 1 if failed else 0
 
 

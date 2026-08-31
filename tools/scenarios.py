@@ -91,7 +91,7 @@ def build(rules) -> list[Scenario]:
             "routine", "Controlled patient, routine review",
             "The common case. Continue, code, schedule.",
             make_patient(101, controlled=True), site_a,
-            watch_for="No alert. Green is silent — the draft is simply present, "
+            watch_for="No alert. Green is silent, so the draft is simply present, "
                       "the way a prepared note would be, and the system does not "
                       "interrupt to say it found nothing. Most visits are green, "
                       "and that silence is what makes an amber worth reading.",
@@ -134,7 +134,7 @@ def build(rules) -> list[Scenario]:
             "A plan is only a plan if this hospital can actually carry it out.",
             remote, site_c,
             watch_for="The plan is correct and undeliverable here. That is a "
-                      "referral, not a recommendation — and getting this wrong "
+                      "referral, not a recommendation, and getting this wrong "
                       "is how a tool loses a clinician's trust for good.",
         ),
 
@@ -153,7 +153,7 @@ def build(rules) -> list[Scenario]:
             _diabetic(411, hba1c=8.2, mg=500, doses=2), site_a,
             watch_for="The target here is a single HbA1c, not a blood pressure. "
                       "That is what broke the Target contract when this pathway "
-                      "was added — the engine had one disease's measurement "
+                      "was added: the engine had one disease's measurement "
                       "baked into its idea of a target.",
         ),
         Scenario(

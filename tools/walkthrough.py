@@ -95,7 +95,7 @@ def show(title: str, note: str, state, rules, site, *, tamper=None) -> None:
             print(f"  coded     primary {result.claim.primary.code}"
                   + (f"; secondary {secondary}" if secondary else "; no secondary codes"))
         if result.referral_back and result.referral_back.eligible:
-            print("  referral  stability criteria met — referral-back letter drafted")
+            print("  referral  stability criteria met, referral-back letter drafted")
         print(f"  signed by {audit.records[-1].practitioner_id} "
               f"({audit.records[-1].role}), licence to "
               f"{audit.records[-1].licence_expires}")
@@ -146,7 +146,7 @@ def offline_demo(rules, site) -> None:
             audit=AuditLog(), now=NOW, queue=replay,
         )
     print(f"  same encounters replayed after recovery queue still {len(replay)} "
-          f"(was {before}) — no duplicates in the national record")
+          f"(was {before}), no duplicates in the national record")
 
 
 def main() -> None:
@@ -161,7 +161,7 @@ def main() -> None:
     """
     rules = load_pack("id")
 
-    print("\n  AI clinician — synthetic patients, no model in the loop.")
+    print("\n  AI clinician. Synthetic patients, no model in the loop.")
     print("  Every rule from the pack. Two pathways, one engine.")
 
     for index, scenario in enumerate(build_scenarios(rules), start=1):

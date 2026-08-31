@@ -55,7 +55,7 @@ def system_prompt() -> str:
         "Answer one question: would a careful clinician accept this draft as "
         "written, for this patient, given the record below?\n\n"
         "Score `acceptable_as_drafted` from 0 to 1. Use the low end freely. "
-        "A draft that breaks no explicit rule can still be poor — a rationale "
+        "A draft that breaks no explicit rule can still be poor: a rationale "
         "that does not follow from the numbers, a plan that ignores something "
         "in the history, an instruction the patient could not act on. Those are "
         "what you are looking for.\n\n"

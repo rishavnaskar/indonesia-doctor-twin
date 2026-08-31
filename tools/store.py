@@ -38,7 +38,7 @@ def main() -> int:
     facts = store.summary()
     if store.backend == "files" and not store.dir.exists():
         print(f"\n  Nothing stored yet at {store.dir}/.")
-        print("  Run `make` — the clinician surface persists every encounter.\n")
+        print("  Run `make`. The clinician surface persists every encounter.\n")
         return 0
 
     print(f"\n  {facts['backend']}  {facts['location']}")
@@ -64,7 +64,7 @@ def main() -> int:
             print(f"\n  No encounter {args.thread!r}. Known: "
                   f"{', '.join(runtime.threads()[:8]) or 'none'}\n")
             return 2
-        print(f"\n  Replay of {args.thread} — what the system saw, in order")
+        print(f"\n  Replay of {args.thread}: what the system saw, in order")
         for index in range(len(runtime.checkpoints[args.thread])):
             checkpoint = runtime.replay(args.thread, index)
             keys = sorted(checkpoint.state)[:6] if isinstance(checkpoint.state, dict) else []

@@ -45,7 +45,7 @@ def run(ctx: GateContext) -> list[Finding]:
         if age is None:
             missing.append(f"{label} (absent)")
         elif age > max_age:
-            missing.append(f"{label} — currently {age} days old")
+            missing.append(f"{label}, currently {age} days old")
 
     if missing:
         findings.append(

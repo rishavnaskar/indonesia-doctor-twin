@@ -305,7 +305,7 @@ def _route_refusal(decision: GateDecision) -> tuple[Outcome, str]:
     fired = {f.rule_id for f in decision.blocking}
 
     if decision.referral:
-        return Outcome.ABSTAIN, "Not deliverable at this site — routed as a referral."
+        return Outcome.ABSTAIN, "Not deliverable at this site, so routed as a referral."
     if _RED_FLAGS in checks:
         return Outcome.ESCALATE, "Red flag. Clinician alerted; no draft produced."
     if _SUFFICIENCY in checks:

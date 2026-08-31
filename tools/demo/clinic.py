@@ -10,7 +10,7 @@ than the system.
 CLINIC_HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI clinician — build a patient</title>
+<title>AI clinician, build a patient</title>
 <style>
 /* Same tokens as the scripted page. Two surfaces of one product that do not
    look like one product is the fastest way to make both look unfinished. */
@@ -202,7 +202,7 @@ async function boot(){
   }
   $("profile").innerHTML = V.profiles.map(p=>`<option value="${esc(p.key)}">${esc(p.label)}</option>`).join("");
   $("site").innerHTML = V.sites.map(s=>
-    `<option value="${esc(s.site_id)}">${esc(s.site_id)} — ${esc(s.label)}</option>`).join("");
+    `<option value="${esc(s.site_id)}">${esc(s.site_id)} · ${esc(s.label)}</option>`).join("");
   await restore();
 }
 
@@ -225,7 +225,7 @@ async function restore(){
   $("restored").innerHTML = `<div class="stat">
     <b>${visits.length} visit(s) restored from ${esc(h.backend)}</b>
     <span class="mono">${esc(h.location||"")}</span>. Last run ${esc(last.replace("T"," ").slice(0,19))}.
-    These are the patients and verdicts from earlier sessions — edit and re-run any of them.
+    These are the patients and verdicts from earlier sessions. Edit and re-run any of them.
     <button class="ghost" id="forget" style="margin-left:10px">Clear this list</button>
     </div>`;
   $("forget").onclick = async ()=>{
@@ -236,7 +236,7 @@ async function restore(){
     await fetch("/api/history/clear", {method:"POST", body:"{}"});
     patients = []; results = {};
     $("restored").innerHTML = `<div class="stat">List cleared from this page. Nothing was
-      deleted — the store is append-only, so every visit is still on the record and still
+      deleted, because the store is append-only, so every visit is still on the record and still
       replayable with <span class="mono">python -m tools.store</span>.</div>`;
     draw();
   };
@@ -278,9 +278,9 @@ function auditPanel(r){
   return `<details><summary>How do I know it actually checked?</summary>
     <div class="sec">Path taken</div>
     <div class="pipe">${(r.trail||[]).map(t=>`<span class="past">${esc(t)}</span>`).join("")}</div>
-    <div class="sec">The nine checks — plain code, no AI</div>${checks}
+    <div class="sec">The nine checks, plain code, no AI</div>${checks}
     <div class="sec">What this hospital can do</div>
-    <div class="kv"><b>Hospital</b><span>${esc(site.site_id)} — ${esc(site.site_label)}</span></div>
+    <div class="kv"><b>Hospital</b><span>${esc(site.site_id)} · ${esc(site.site_label)}</span></div>
     <div class="kv"><b>Labs on site</b><span class="mono">${site.labs_available.map(esc).join(", ")||"none"}</span></div>
     <div class="kv"><b>Drugs stocked</b><span class="mono">${site.stocked.map(esc).join(", ")||"none"}</span></div>
     <div class="kv"><b>Current as of</b><span>${esc(site.site_as_of)}</span></div>
@@ -299,7 +299,7 @@ function verdict(p){
   if (running) {
     const at = live_steps[p._i + 1], fin = finished_steps[p._i + 1];
     if (!fin) return `<div class="verdict"><div class="working"><span class="spin"></span>
-      ${at ? esc(at === "PROPOSE" ? "Drafting — waiting on the model" : "Working: " + at) : "Queued"}</div>
+      ${at ? esc(at === "PROPOSE" ? "Drafting, waiting on the model" : "Working: " + at) : "Queued"}</div>
       ${pipeline(p)}</div>`;
   }
   if (!r) return "";
@@ -314,7 +314,7 @@ function verdict(p){
     <span class="pill ${r.presentation.band}">${esc(r.outcome.replace(/_/g," "))}</span>
     <div class="plain" style="margin-top:6px">${esc(r.outcome_plain)}</div>
     ${d && r.presentation.shows_draft ? `<div class="sec">Draft</div>
-      <div><b>${esc(d.recommendation.replace(/_/g," "))}</b> — ${esc(d.recommendation_plain)}</div>
+      <div><b>${esc(d.recommendation.replace(/_/g," "))}</b> · ${esc(d.recommendation_plain)}</div>
       ${d.medication_changes.map(c=>`<div class="plain">${esc(c.action)} ${esc(c.molecule)} ${c.mg_per_dose}mg ×${c.doses_per_day}</div>`).join("")}
       ${r.claim?`<div class="plain">Coded: ${r.claim.codes.map(c=>esc(c.code)).join(", ")}</div>`:""}` : ""}
     ${(r.exclusions||[]).length ? `<div class="sec">Why this patient is out of scope</div>
@@ -348,7 +348,7 @@ function card(p){
       <div><label class="f">Systolic</label><input type="number" value="${sbp?sbp.value:""}" data-p="${p._i}" data-obs="sbp"${off()}></div>
       <div><label class="f">Diastolic</label><input type="number" value="${dbp?dbp.value:""}" data-p="${p._i}" data-obs="dbp"${off()}></div>
     </div>
-    <div class="sec">Blood tests — value, and how many days old</div>
+    <div class="sec">Blood tests, value and how many days old</div>
     <div class="row">
       <div><label class="f">Potassium</label><input type="number" step="0.1" value="${k?k.value:""}" data-p="${p._i}" data-obs="k"${off()}></div>
       <div><input type="number" value="${k?k.age_days:0}" style="width:64px" data-p="${p._i}" data-age="k" title="days old"${off()}></div>
@@ -365,7 +365,7 @@ function card(p){
     <div class="chips">${V.flags.map(f=>
       `<span class="chip flag${p.flags&&p.flags[f.code]?" on":""}" data-p="${p._i}" data-flag="${esc(f.code)}">${esc(f.plain)}</span>`).join("")}</div>
     ${p.is_synthetic ? "" : `<div class="plain" style="margin-top:10px;color:var(--amber)">
-      Not marked synthetic — a hosted model will refuse this record.</div>`}
+      Not marked synthetic, so a hosted model will refuse this record.</div>`}
     ${verdict(p)}</div>`;
 }
 
@@ -470,7 +470,7 @@ $("load").onclick = ()=>{
   // internal error — a crash leaking into a place a reader reads as a
   // statement about their data.
   if (!rows.length){
-    $("msg").innerHTML = `<div class="err">That JSON is empty — no records to load.
+    $("msg").innerHTML = `<div class="err">That JSON is empty, so there are no records to load.
       Nothing on screen was changed.</div>`;
     return;
   }
@@ -481,7 +481,7 @@ $("load").onclick = ()=>{
   }
   const bad = rows.findIndex(r => r === null || typeof r !== "object" || Array.isArray(r));
   if (bad !== -1){
-    $("msg").innerHTML = `<div class="err">Entry ${bad + 1} is not a patient record — each
+    $("msg").innerHTML = `<div class="err">Entry ${bad + 1} is not a patient record. Each
       one has to be an object like the example. Nothing on screen was changed.</div>`;
     return;
   }
@@ -495,7 +495,7 @@ $("load").onclick = ()=>{
   results = {};
   const unmarked = patients.filter(p => !p.is_synthetic).length;
   $("msg").innerHTML = `<div class="stat">Loaded ${patients.length} record(s).` +
-    (unmarked ? ` <b>${unmarked} not marked synthetic</b> — a hosted model will refuse
+    (unmarked ? ` <b>${unmarked} not marked synthetic</b>, so a hosted model will refuse
       those before any request is built. The rule-following reasoner runs them fine.` : "") +
     `</div>`;
   draw();
@@ -504,10 +504,10 @@ $("load").onclick = ()=>{
 function summarise(j){
   return `<div class="stat">
     <b>${j.declined} of ${j.total} ended with no recommendation reaching the doctor.</b>
-    ${j.drafter_failures?` ${j.drafter_failures} could not be drafted at all — the model
+    ${j.drafter_failures?` ${j.drafter_failures} could not be drafted at all, because the model
       returned something unusable, which is a model failure rather than a clinical one.`:""}
     ${j.residency_refused?` <b>${j.residency_refused} refused before any request was
-      built</b> — not marked synthetic, so nothing left the machine.`:""}
+      built</b>, not marked synthetic, so nothing left the machine.`:""}
     ${j.unreadable?` ${j.unreadable} record(s) could not be read at all.`:""}
     Drafted by <span class="mono">${esc(j.reasoner)}</span>.</div>`;
 }
@@ -568,7 +568,7 @@ $("compare").onclick = async ()=>{
   $("msg").innerHTML = `<div class="cmp">
     <h3>The same patients, at every hospital</h3>
     <div class="plain">${j.divergent.length} of ${j.patients.length} get a different answer
-      depending on where they are standing. That is not inconsistency — a plan is only a plan
+      depending on where they are standing. That is not inconsistency, because a plan is only a plan
       if the hospital in front of the patient can carry it out, so the right answer genuinely
       differs. Highlighted rows are the ones that diverge.</div>
     <table><tr><th>Patient</th>${head}</tr>${rows}</table>

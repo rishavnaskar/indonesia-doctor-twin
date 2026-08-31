@@ -359,7 +359,7 @@ The deterministic core, end to end, on synthetic patients:
 | Offline-first outbound queue, idempotent, file-backed | Working |
 | Referral-back draft: the payer's own 3B criteria | Working |
 | Synthetic cohort: both pathways, 19 profiles, 19 planted-error mutations | Working |
-| Scorecard | 7/7 bars |
+| Scorecard | 7/7 bars, on the hypertension pathway only |
 | EMR adapter | Port defined. Writing one needs access to a real hospital system; the sequencing is BUILD.md Phase 0 |
 | Bounded intake interview, in Bahasa Indonesia | Working |
 | Pressure suite: 6 patterns x 5 turns, with a control | Working |
@@ -445,7 +445,7 @@ service/
   emit/        coding, FHIR bundles, referral-back, offline queue
   graph/       the only module allowed to import an orchestration library
   packs/       the only module that reads YAML
-  signing/     the signature line
+  signing.py   the signature line
 
 adapters/      EMR ports. Vendor names are allowed here and nowhere else
 datagen/       synthetic patients, reference proposer, planted errors
@@ -478,7 +478,16 @@ It proves the pipeline runs and the gate mechanics hold. **It proves nothing
 clinical.** Sets A and B are generated from the same guideline the gate checks
 against, so a high score is close to tautological. The number that means
 something comes from Set C (real retrospective visits, blind-scored by
-Indonesian physicians. The scorecard prints this caveat on every run.
+Indonesian physicians).
+
+**And the bars cover one pathway, not two.** All 152 planted errors are
+hypertension mutations (a captopril ceiling, ACEi plus ARB, bisoprolol without
+heart failure, etc.), so 7/7 is a statement about hypertension. Diabetes is
+covered by the test suite, the FHIR validation and both demo surfaces, and it
+is not behind these bars. Extending them means writing a diabetes mutation set,
+which is clinical rules work rather than a refactor, and it should probably wait
+for the clinical lead who signs the packs off. The scorecard prints both caveats
+on every run.
 
 ## What survives the process ending
 

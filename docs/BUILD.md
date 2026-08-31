@@ -75,10 +75,29 @@ Nothing exotic. The interesting choices are Khanza and the split between the mod
    → SATUSEHAT sandbox       → scorecard
 ```
 
+> **Status in the prototype: the top box is not built, and neither is the
+> arrow to SATUSEHAT.** This is the plan's stack, not a picture of what runs
+> today. What runs is the middle box and the two boxes under it: intake,
+> patient state, reasoning, the gate, the traffic light, FHIR bundle
+> construction and the eval harness, on synthetic patients, with Postgres
+> holding the state.
+>
+> The hospital system is absent because standing one up needs a real
+> deployment to read from, which is Phase 0 below and the thing that resolves
+> assumption A1. In its place `adapters/base.py` defines the port every
+> hospital system goes through, with no implementations behind it, and CI
+> fails the build if anything under `/service` so much as names a vendor. So
+> the commitment is the interface, and the first adapter is still work nobody
+> has done.
+>
+> The FHIR bundles build and validate clean against the official HL7 R4
+> validator. Nothing is transmitted: that needs credentials for the national
+> exchange, which needs an organisation that has them.
+
 **Choices worth defending:**
 
 - **Khanza in Docker.** It is the real system, it is open source, and it already has a `src/bridging/` package doing BPJS and Dukcapil integrations. We aren't guessing at what a hospital system looks like, we're running one.
-- **Model behind a router.** Start with a hosted API for iteration speed. Swap to local open weights (MedGemma 4B or a Qwen-class model) before the demo, to prove the data-residency story works. Never hard-code a model name anywhere except the router config.
+- **Model behind a router.** Start with a hosted API for iteration speed. Swap to local open weights (MedGemma 4B or a Qwen-class model) before the demo, to prove the data-residency story works. Never hard-code a model name anywhere except the router config. *(Built: `service/router/`, with two hosted backends so the swap is demonstrated rather than asserted. The local-weights half has not been done. `HostedChatBackend` takes a `base_url` and speaks OpenAI-compatible chat completions, so pointing it at a self-hosted vLLM is a config change, but I have not actually run one, and an untested config change is not a proof of residency.)*
 - **The gate is not a model.** Plain Python, a rules table, a formulary table, a drug interaction table. It must be readable by a doctor and diffable in git. If a lawyer or a regulator asks "why did it say that," the answer has to be a file, not a prompt.
 - **Postgres for our state, MySQL stays Khanza's.** Don't fight the legacy schema; read from it, write our own. *(Built: `docker-compose.yml` and `db/migrations/`. Optional at runtime, since the store falls back to append-only files and says so. Roughly one facility in twelve doesn't have power around the clock, and a system that won't start without a database is one that often doesn't start.)*
 
@@ -347,6 +366,18 @@ So we cannot buy an answer to "is this safe enough for Indonesia," and neither c
 /eval            scorecard, pressure suite, gold sets
 /docs            assumption register, decisions log
 ```
+
+> **Status in the prototype: the shape above is the plan, and the built tree
+> differs in four ways worth knowing.** `CODE.md` has the real layout;
+> the differences are that `/khanza` and `/corpus` do not exist (no hospital
+> system, and guideline content lives in `/packs` rather than a separate
+> versioned index), `/service/capability` became `packs/id/capability/sites.yaml`
+> because a site registry turned out to be data rather than code, and the tree
+> grew `/adapters`, `/db`, `/tests` and `/tools` plus several `/service`
+> packages the plan had not anticipated (`intake`, `reconcile`, `present`,
+> `followup`, `contracts`, `rules`). `/service/graph` exists and holds the
+> durable-runtime contract, but no orchestration library sits behind it, per
+> the status note in §2.
 
 Six rules that matter more than they look:
 

@@ -245,7 +245,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
         "\nAbout `concerns`. Separate rules already check this patient against a "
         "fixed list of danger signs, and they do not need your help with those. "
         "Use this field for something those rules were never written to look "
-        "for — a pattern across visits, a combination that worries you, "
+        "for: a pattern across visits, a combination that worries you, "
         "something in the history that does not fit. Say why, in one sentence a "
         "clinician can act on.\n"
         "`escalate` means a clinician should look now; `mention` is a line they "
@@ -267,7 +267,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
     parts.append(
         "\nRules for `investigations`: codes only, drawn from the enumeration "
         "in the schema, and only tests that are genuinely needed now. It is not "
-        "a place for sentences, intervals or monitoring plans — a test you want "
+        "a place for sentences, intervals or monitoring plans, e.g. a test you want "
         "repeated later is `follow_up_interval_days` plus "
         "`patient_instructions`. An empty list is the correct answer when no "
         "new test is needed."

@@ -146,7 +146,7 @@ def main() -> int:
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
-    print("\nV1 scorecard — adult hypertension follow-up")
+    print("\nV1 scorecard: adult hypertension follow-up, the V1 pathway only")
     print("=" * 64)
     metrics = run(args.clean, args.per_mutation, args.verbose)
     for metric in metrics:
@@ -156,10 +156,13 @@ def main() -> int:
     print("=" * 64)
     print(f"  {len(metrics) - len(failed)}/{len(metrics)} bars met")
     print(
-        "\n  Sets A and B are generated from the same guideline the gate checks\n"
-        "  against. They prove the pipeline and the gate mechanics, and nothing\n"
-        "  clinical. Set C — real visits, physician-adjudicated — is the only\n"
-        "  evidence that counts. Do not quote these numbers as validation.\n"
+        "\n  Two limits on what this says. Sets A and B are generated from the\n"
+        "  same guideline the gate checks against, so they prove the pipeline\n"
+        "  and the gate mechanics and nothing clinical. And every case here is\n"
+        "  hypertension: the 19 mutations are hypertension-specific, so the\n"
+        "  second pathway is exercised by the tests and the demo but is not\n"
+        "  behind these bars. Set C (real visits, physician-adjudicated) is the\n"
+        "  only evidence that counts. Do not quote these numbers as validation.\n"
     )
     return 1 if failed else 0
 
