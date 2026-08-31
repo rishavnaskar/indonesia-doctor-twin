@@ -37,8 +37,11 @@ models.
 **1. Make the repository public**, then push. `render.yaml` and `Dockerfile`
 are already in it.
 
-**2. Create the services.** Render → **New → Blueprint** → pick this repository.
-It reads `render.yaml` and creates the web service and the Postgres together.
+**2. Create the services.** [dashboard.render.com](https://dashboard.render.com),
+signing in with GitHub so it can see the repository. Then **New** (top right) →
+**Blueprint** → **Connect** next to this repository → name it, branch `main`,
+leave Blueprint Path empty so it uses `render.yaml` at the root → **Deploy
+Blueprint**. It creates the web service and the Postgres together.
 
 **3. Add the key.** In the web service → **Environment**, set
 `OPENROUTER_API_KEY`. It is marked `sync: false` in the blueprint precisely so
@@ -64,14 +67,23 @@ re-run` and name the model that actually served them.
 ## What to expect, and what to say about it
 
 **It sleeps.** A free web service stops after 15 minutes idle and takes roughly
-a minute to wake. The first click after a quiet period is slow; every one after
-is not. Worth a sentence when you share the link.
+a minute to wake — Render shows a loading page meanwhile. The first click after
+a quiet period is slow; every one after is not. Worth a sentence when you share
+the link. The allowance is 750 free instance hours per workspace per month,
+which one service cannot exhaust.
 
-**The database is deleted after 30 days** on the free plan. The system survives
-it — with no database reachable the store falls back to append-only files and
-says which it chose on the page — but the encounter history resets and the
-scripted page will re-run live on first load. Re-seed, or move
-`CLINICIAN_DATABASE_URL` to any other Postgres; nothing else changes.
+**The database expires 30 days after creation**, with a 14-day grace period
+before deletion, and a workspace gets one free database. The system survives it
+— with no database reachable the store falls back to append-only files and says
+which it chose on the page — but the encounter history resets and the scripted
+page will re-run live on first load. Re-seed, or point
+`CLINICIAN_DATABASE_URL` at any other Postgres; nothing else changes. If this
+needs to outlive the interview, a free Neon or Supabase database is a drop-in
+and does not expire.
+
+**A payment method is not needed to start.** Render suspends a service rather
+than billing you if it exceeds the free bandwidth or build-minute allowances
+and no card is on file, which is the failure mode you want here.
 
 **Data residency, which a reviewer should raise.** This document argues that
 Indonesian law requires health data to be processed in-country, and this
