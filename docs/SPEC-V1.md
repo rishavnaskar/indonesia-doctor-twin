@@ -10,7 +10,7 @@
 
 ## 0. Why this pathway, and only this pathway
 
-Adult hypertension follow-up — an established patient, already diagnosed, returning for review.
+Adult hypertension follow-up, i.e. an established patient, already diagnosed, returning for review.
 
 It is the narrowest workflow that still exercises **every architectural component we need to prove**: longitudinal patient state, missing-information detection, medication reconciliation, lab-trend reasoning, guideline retrieval, red-flag detection, executability checking, drafting, deterministic gating, clinician approval, coding and FHIR emission.
 
@@ -18,7 +18,7 @@ And it does that **without diagnostic entropy.** We are not asking the system to
 
 > **Explicitly deferred to V2:** type 2 diabetes, then combined cardiometabolic management. Do not build them into V1's state machine. Build the packs so they can be added without touching the graph.
 
-**Why hypertension specifically, in Indonesia:** it is protocol-dense and therefore scorable; it is longitudinal and therefore exercises patient state; it is high-volume; and it sits inside **PRB** (Program Rujuk Balik), BPJS's referral-back programme for stable chronic patients on a single diagnosis without complications — which gives us a defined patient cohort, a defined drug list, and a defined billing mechanism to build against.
+**Why hypertension specifically, in Indonesia:** it is protocol-dense and therefore scorable; it is longitudinal and therefore exercises patient state; it is high-volume; and it sits inside **PRB** (Program Rujuk Balik), BPJS's referral-back programme for stable chronic patients on a single diagnosis without complications, which gives us a defined patient cohort, a defined drug list, and a defined billing mechanism to build against.
 
 ---
 
@@ -34,7 +34,7 @@ And it does that **without diagnostic entropy.** We are not asking the system to
 | **Payer** | BPJS/JKN, including PRB patients |
 | **Language** | Bahasa Indonesia |
 
-### Out of scope for V1 — hard exclusions
+### Out of scope for V1: hard exclusions
 
 These are not "not yet." They are **routing rules**: if any is true, the system produces no clinical draft and hands the encounter to the clinician untouched, with a stated reason.
 
@@ -54,7 +54,7 @@ These are not "not yet." They are **routing rules**: if any is true, the system 
 
 ## 2. The clinical rule set
 
-Everything in this section is **configuration, not code** — it lives in `/packs/id/guideline` and `/packs/id/formulary`, versioned, with a citation on every row.
+Everything in this section is **configuration rather than code**. It lives in `/packs/id/guideline` and `/packs/id/formulary`, versioned, with a citation on every row.
 
 > ### Clinical governance gate
 >
@@ -66,8 +66,8 @@ Everything in this section is **configuration, not code** — it lives in `/pack
 |---|---|---|---|
 | Hypertension | SBP ≥ 140 **and/or** DBP ≥ 90 mmHg | InaSH / PERHI | `verified` |
 | Grade 1 | SBP 140–159 or DBP 90–99 | InaSH / PERHI | `verified` |
-| Grade 2 | SBP ≥ 160 or DBP ≥ 100 | Conventional split | `partial` — confirm against the InaSH 2024 consensus |
-| Measurement standard | Seated, rested, correct cuff size, mean of ≥2 readings | Guideline standard | `partial` — confirm |
+| Grade 2 | SBP ≥ 160 or DBP ≥ 100 | Conventional split | `partial`, confirm against the InaSH 2024 consensus |
+| Measurement standard | Seated, rested, correct cuff size, mean of ≥2 readings | Guideline standard | `partial`, confirm |
 
 ### 2.2 Targets
 
@@ -75,13 +75,13 @@ Everything in this section is **configuration, not code** — it lives in `/pack
 |---|---|---|---|
 | General adult | < 140/90 mmHg | PERKI, *Pedoman Tatalaksana Hipertensi pada Penyakit Kardiovaskular* | `verified` |
 | With ventricular dysfunction | Consider < 130/80 mmHg | PERKI, same | `verified` |
-| Elderly, diabetes, CKD | **Not yet extracted** | InaSH 2024 consensus | `unverified` — clinical lead to extract before these subgroups are enabled |
+| Elderly, diabetes, CKD | **Not yet extracted** | InaSH 2024 consensus | `unverified`, clinical lead to extract before these subgroups are enabled |
 
 **Engineering consequence:** the target is a *function* of patient attributes, not a constant. Model it as a lookup with an explicit `no_target_defined` outcome that forces abstention rather than defaulting to 140/90.
 
-### 2.3 The formulary — what is actually prescribable
+### 2.3 The formulary: what is actually prescribable
 
-Sourced from the **PRB formulary** under Fornas (Kepmenkes HK.01.07/MENKES/1199/2025, dated 31 Dec 2025; claim pricing separately under KMK 730/2025, 14 Jul 2025). The restrictions are the interesting part — they are real, encodable, and a generic clinical model will violate them.
+Sourced from the **PRB formulary** under Fornas (Kepmenkes HK.01.07/MENKES/1199/2025, dated 31 Dec 2025; claim pricing separately under KMK 730/2025, 14 Jul 2025). The restrictions are the interesting part. They're real, encodable, and a generic clinical model will usually violate them.
 
 | Drug | Forms | Encodable restriction |
 |---|---|---|
@@ -98,9 +98,9 @@ Sourced from the **PRB formulary** under Fornas (Kepmenkes HK.01.07/MENKES/1199/
 
 Adjacent cardiovascular items available on PRB and relevant to comorbid patients: aspirin 80/100 mg, clopidogrel, simvastatin, atorvastatin (ASCVD, LDL target ≤ 70 mg/dL), carvedilol, spironolactone (NYHA-restricted), digoxin, ISDN, ISMN.
 
-> **This table is the single highest-value artefact in V1.** It is why our prescription drafts are executable and a generic model's are not. The candesartan rule alone — an ARB is not prescribable until a month of documented ACEi intolerance exists in the record — is the kind of constraint that no amount of model quality substitutes for, and it is checkable deterministically against the patient's own history.
+> **This table is the single highest-value artefact in V1.** It is why our prescription drafts are executable and a generic model's are not. The candesartan rule alone (an ARB isn't prescribable until a month of documented ACEi intolerance exists in the record) is the kind of constraint that model quality doesn't substitute for, and it's checkable deterministically against the patient's own history.
 
-### 2.4 Red flags — the rules that stop everything
+### 2.4 Red flags: the rules that stop everything
 
 Evaluated on **structured state**, never on model output. Any hit routes the encounter to `ESCALATE` immediately.
 
@@ -108,11 +108,11 @@ Evaluated on **structured state**, never on model output. Any hit routes the enc
 |---|---|---|
 | R1 | SBP ≥ 180 or DBP ≥ 120 **with** any of: chest pain, dyspnoea, focal neurological deficit, visual disturbance, severe headache, altered consciousness | **Hypertensive emergency.** Immediate clinician alert, red. No draft produced. |
 | R2 | SBP ≥ 180 or DBP ≥ 120 **without** those symptoms | Hypertensive urgency. Red, clinician must acknowledge before proceeding. |
-| R3 | SBP < 90, or symptomatic hypotension, on treatment | Over-treatment. Red — draft a reduction, do not draft an increase. |
+| R3 | SBP < 90, or symptomatic hypotension, on treatment | Over-treatment. Red. Draft a reduction, do not draft an increase. |
 | R4 | New chest pain, syncope, or new focal neurological symptom at any BP | Red. Route out of the pathway. |
 | R5 | eGFR fall > 30% from baseline since last visit | Red. ACEi/ARB review. |
 | R6 | K⁺ > 5.5 mmol/L | Red. Blocks any ACEi / ARB / spironolactone action. |
-| R7 | Newly positive pregnancy status | Immediate exclusion (§1) plus red flag — ACEi/ARB must stop. |
+| R7 | Newly positive pregnancy status | Immediate exclusion (§1) plus red flag, since ACEi/ARB must stop. |
 
 ### 2.5 Interaction and contraindication rules
 
@@ -126,7 +126,7 @@ Evaluated on **structured state**, never on model output. Any hit routes the enc
 | Dose outside the formulary's stated range | Hard block |
 | Drug not on the PRB/Fornas list for a JKN patient | Hard block |
 
-**These live in `/packs/id/formulary` as data.** Roughly 10 molecules and ~15 rules for V1 — small enough to curate by hand and have a pharmacist verify, which resolves assumption A3 for this pathway.
+**These live in `/packs/id/formulary` as data.** Roughly 10 molecules and ~15 rules for V1, which is small enough to curate by hand and have a pharmacist verify. That resolves assumption A3 for this pathway.
 
 ---
 
@@ -231,39 +231,39 @@ The system does not "have a conversation." It advances a patient through defined
 
 Each node declares what it reads, whether a model is involved, and what it must return. **No node may proceed on a malformed output from the previous one.**
 
-### 5.1 ELIGIBLE — deterministic
+### 5.1 ELIGIBLE: deterministic
 
 | | |
 |---|---|
 | Reads | Khanza encounter, patient demographics, diagnosis list |
 | Model | **None** |
 | Returns | `{eligible: bool, exclusions: [reason]}` |
-| On exclusion | → `HANDOFF`. Panel shows: *"Not handled by the assistant — [reason]."* No clinical content. |
+| On exclusion | → `HANDOFF`. Panel shows: *"Not handled by the assistant: [reason]."* No clinical content. |
 
-### 5.2 INTAKE — model, bounded
+### 5.2 INTAKE: model, bounded
 
 A **structured interviewer**, not an advisor. Fixed schema, fixed question set, no negotiation of clinical conclusions with the patient. §3 of RESEARCH forbids anything looser.
 
 | | |
 |---|---|
 | Reads | PatientState, last encounter |
-| Model | Yes — dialogue management only |
+| Model | Yes, dialogue management only |
 | Collects | Symptoms since last visit (checklist + free text), medication adherence, side effects, home BP readings, lifestyle, new medications from outside the hospital |
 | Returns | Structured `IntakeResult`, schema-validated |
 | Never does | Answer clinical questions · give advice · state or discuss a diagnosis · respond to pressure to change a clinical position |
 | Delivery | Nurse-assisted tablet by default; patient self-service opt-in (assumption A2) |
 | Hard rule | Any patient utterance requesting advice returns a fixed deflection and is logged. The interviewer has no clinical voice. |
 
-### 5.3 RECONCILE — deterministic + one model call
+### 5.3 RECONCILE: deterministic + one model call
 
 | | |
 |---|---|
 | Reads | Khanza medication list, PatientState, IntakeResult |
 | Model | Only for matching free-text drug mentions to molecules |
-| Produces | Reconciled medication list with a `discrepancy[]` array — patient says they stopped it, dose differs from record, outside prescription not in the system |
+| Produces | Reconciled medication list with a `discrepancy[]` array: patient says they stopped it, dose differs from record, outside prescription not in the system |
 | Rule | Discrepancies are **surfaced, never silently resolved.** |
 
-### 5.4 RED FLAGS — deterministic
+### 5.4 RED FLAGS: deterministic
 
 | | |
 |---|---|
@@ -273,7 +273,7 @@ A **structured interviewer**, not an advisor. Fixed schema, fixed question set, 
 | Returns | `{flags: [...], severity: none / amber / red}` |
 | On red | → `ESCALATE`, no draft produced, clinician alerted immediately |
 
-### 5.5 SUFFICIENCY — deterministic
+### 5.5 SUFFICIENCY: deterministic
 
 The check most systems omit. Do we have enough to say anything at all?
 
@@ -282,18 +282,18 @@ Requires, for a titration decision: a valid BP this visit · a defined target fo
 | | |
 |---|---|
 | Returns | `{sufficient: bool, missing: [item]}` |
-| If insufficient | → `REQUEST INFO`. Output is a request — *"BP controlled; K⁺ and eGFR are 7 months old, needed before any ACEi change"* — **not** a recommendation. |
+| If insufficient | → `REQUEST INFO`. Output is a request, i.e. *"BP controlled; K⁺ and eGFR are 7 months old, needed before any ACEi change"*, rather than a recommendation. |
 
-### 5.6 PROPOSE — the model call
+### 5.6 PROPOSE: the model call
 
 The only place clinical reasoning happens.
 
 | | |
 |---|---|
 | Reads | PatientState, IntakeResult, reconciled meds, retrieved guideline sections, site capability record |
-| Model | Yes — via the router (`/service/router`), never a hard-coded name |
+| Model | Yes, via the router (`/service/router`), never a hard-coded name |
 | Retrieval | Top-k from `/packs/id/guideline`, versioned; every clinical assertion must carry a resolvable citation |
-| Returns | `Proposal` — see below |
+| Returns | `Proposal`, see below |
 
 ```
 Proposal
@@ -310,14 +310,14 @@ Proposal
   confidence            # calibrated, drives the §2.2 abstention floor
   uncertainty_notes
   provenance            # model@version · prompt_template@version ·
-                        # corpus@version — all three pinned per proposal
+                        # corpus@version, all three pinned per proposal
 ```
 
 **Provenance is three-dimensional, not one.** F9 already pins the corpus version. The model and the prompt template change more often than the guideline does, and a regression in either must be traceable to the exact proposal it produced. A proposal without all three pins is malformed and fails the gate.
 
 **Structured output, schema-enforced.** A proposal that does not parse is a gate failure, not a retry.
 
-### 5.7 GATE — deterministic, no framework imports
+### 5.7 GATE: deterministic, no framework imports
 
 The nine checks from RESEARCH §6, instantiated for this pathway. **`/service/gate` imports nothing from `/service/reason` and does not import the orchestration library.** It must be testable with nothing else running.
 
@@ -335,23 +335,23 @@ The nine checks from RESEARCH §6, instantiated for this pathway. **`/service/ga
 
 **On any failure the proposal does not render.** The clinician sees the encounter as if the assistant had said nothing, plus a quiet log entry. Failing silently toward "no output" is the correct direction.
 
-### 5.8 PRESENT — deterministic
+### 5.8 PRESENT: deterministic
 
 Inside the Khanza consultation form, triggered on defined events (field blur, order entry, plan commit). Penda's pattern.
 
-- **Green** — silent. The clinician sees nothing. This is most visits, and the silence is what makes amber and red worth reading.
-- **Amber** — collapsed, optional, one line.
-- **Red** — must be acknowledged before the order can be committed.
+- **Green**: silent. The clinician sees nothing. That's most visits, and the silence is what makes amber and red worth reading.
+- **Amber**: collapsed, optional, one line.
+- **Red**: has to be acknowledged before the order can be committed.
 
-### 5.9 CLINICIAN DECIDES — the interrupt
+### 5.9 CLINICIAN DECIDES: the interrupt
 
 The signature line, implemented as a durable workflow interrupt. State is checkpointed before the pause and resumed by `thread_id`.
 
-**Signer binding.** The resume is only valid from an authenticated clinician whose SIP is current in the capability registry (`competencies[]`) at the moment of signing. The audit record binds together: practitioner ID and SIP · the exact proposal version (with its three provenance pins) · the decision · timestamp. A signature from an expired or absent SIP is refused in software, exactly like an unsigned prescription — this is the non-negotiable "a licensed doctor signs everything" enforced at the one place it can actually be enforced.
+**Signer binding.** The resume is only valid from an authenticated clinician whose SIP is current in the capability registry (`competencies[]`) at the moment of signing. The audit record binds together: practitioner ID and SIP · the exact proposal version (with its three provenance pins) · the decision · timestamp. A signature from an expired or absent SIP is refused in software, much like an unsigned prescription. That's "a licensed doctor signs everything" enforced at about the only place it can be enforced.
 
-Captured on every proposal: `accepted | edited | rejected`, the edit diff, time to decision, and — on rejection — a one-tap reason from a fixed list. **The reject reasons are training data and they are the most valuable telemetry in the system.**
+Captured on every proposal: `accepted | edited | rejected`, the edit diff, time to decision, and, on rejection, a one-tap reason from a fixed list. **The reject reasons are training data and they are the most valuable telemetry in the system.**
 
-### 5.10 COMMIT — deterministic + one model call
+### 5.10 COMMIT: deterministic + one model call
 
 Coding. ICD-10 primary and secondary, ICD-9-CM where a procedure occurred.
 
@@ -364,31 +364,31 @@ Coding. ICD-10 primary and secondary, ICD-9-CM where a procedure occurred.
 
 Then emit: FHIR R4 bundle → SATUSEHAT; claim draft → E-Klaim; PatientState updated and versioned.
 
-> ### `added v6` The PRB referral-back draft — the output nobody else will build
+> ### `added v6` The PRB referral-back draft, i.e. the output nobody else will build
 >
-> When a patient is stable, the specialist is supposed to issue a **Surat Rujuk Balik (SRB)** — the referral-back letter that moves them onto PRB at their FKTP, with their chronic prescription attached. BPJS's own checklist for it is called **3B**: *benar diagnosanya* (right diagnosis), *benar sudah stabil* (truly stable), *benar obatnya* (right drugs — on the PRB list, within its restrictions and maximum prescription rules).
+> When a patient is stable, the specialist is supposed to issue a **Surat Rujuk Balik (SRB)**, the referral-back letter that moves them onto PRB at their FKTP with their chronic prescription attached. BPJS's own checklist for it is called **3B**: *benar diagnosanya* (right diagnosis), *benar sudah stabil* (truly stable), *benar obatnya* (right drugs, i.e. on the PRB list, within its restrictions and maximum prescription rules).
 >
-> All three B's are **deterministically checkable against PatientState**: confirmed I10 · BP at target across the last N visits (N set by the clinical lead, §10 Q9) · current regimen entirely on the §2.3 list within its restrictions. When they hold, COMMIT drafts the SRB and prescription for the specialist to sign — one more draft on the same signature line, no new state, no model judgment.
+> All three B's are **deterministically checkable against PatientState**: confirmed I10 · BP at target across the last N visits (N set by the clinical lead, §10 Q9) · current regimen entirely on the §2.3 list within its restrictions. When they hold, COMMIT drafts the SRB and prescription for the specialist to sign. One more draft on the same signature line, with no new state and no model judgment.
 >
-> Why bother: stable follow-ups are low-tariff visits occupying the scarcest resource in the network — specialist time — and PRB compliance is something BPJS actively pushes. Drafting the SRB the moment the criteria hold frees those slots for new referrals, aligns the group with its payer, and exercises the exact machinery (deterministic criteria → drafted document → signature) the whole system is built on. It is also a feature no generic clinical AI will ship, because it only exists in Indonesian payment plumbing.
+> Why bother: stable follow-ups are low-tariff visits occupying the scarcest resource in the network (specialist time), and PRB compliance is something BPJS actively pushes. Drafting the SRB the moment the criteria hold frees those slots for new referrals, aligns the group with its payer, and exercises the same machinery the whole system is built on (deterministic criteria → drafted document → signature). It's also a feature no generic clinical AI is likely to ship, since it only exists in Indonesian payment plumbing.
 
-### 5.11 FOLLOW-UP — durable, scheduled
+### 5.11 FOLLOW-UP: durable, scheduled
 
-Interval from the proposal, clinician-confirmed. Survives restarts, power loss and connectivity gaps — the checkpointer is the offline story. Escalates on non-attendance after a defined window.
+Interval from the proposal, clinician-confirmed. Survives restarts, power loss and connectivity gaps, since the checkpointer is the offline story. Escalates on non-attendance after a defined window.
 
-**`added v6` The between-visit loop — where the twin actually lives.** A follow-up interval is not a silence. Between visits the state keeps syncing, on three channels, all structured and none of them chat:
+**`added v6` The between-visit loop, which is where the twin actually lives.** A follow-up interval isn't a silence. Between visits the state keeps syncing, on three channels, all structured and none of them chat:
 
 | Channel | What flows in | Provenance |
 |---|---|---|
-| Home BP readings | Patient or family enters readings via a **button-driven structured flow** (nurse-assisted or WhatsApp-style structured messaging — fixed prompts, numeric fields, never free conversation) | `patient_reported`, or `device` where a connected cuff exists |
-| Refill signal | PRB patients collect chronic medication **monthly** — twelve touchpoints a year against four visits. A missed refill is an adherence signal the visit would only discover months later | `derived` from dispensing data |
+| Home BP readings | Patient or family enters readings via a **button-driven structured flow** (nurse-assisted or WhatsApp-style structured messaging: fixed prompts, numeric fields, never free conversation) | `patient_reported`, or `device` where a connected cuff exists |
+| Refill signal | PRB patients collect chronic medication **monthly**, i.e. twelve touchpoints a year against four visits. A missed refill is an adherence signal the visit would only discover months later | `derived` from dispensing data |
 | Symptom check-in | The same fixed checklist as INTAKE, abbreviated | `patient_reported` |
 
-Escalation on this data is **deterministic**: the same R1–R7 thresholds applied to reported readings, with one addition — a patient-reported outlier triggers a *confirmation request* (repeat reading, correct technique) before any red flag fires, because home readings carry more noise than clinic ones. No model touches this path.
+Escalation on this data is **deterministic**: the same R1–R7 thresholds applied to reported readings, with one addition: a patient-reported outlier triggers a *confirmation request* (repeat reading, correct technique) before any red flag fires, because home readings carry more noise than clinic ones. No model touches this path.
 
-The evidence for bothering: meta-analyses of home BP telemonitoring consistently show **3.7–5.6 mmHg additional systolic reduction** against usual care — on a par with adding half a drug, at the cost of a messaging flow. And BP control rate is the payer's own quality metric, so the same loop that improves outcomes produces the number that proves it.
+The evidence for bothering: meta-analyses of home BP telemonitoring consistently show **3.7–5.6 mmHg additional systolic reduction** against usual care, which is roughly on a par with adding half a drug, at the cost of a messaging flow. And BP control rate is the payer's own quality metric, so the same loop that improves outcomes produces the number that proves it.
 
-**Build boundary:** the schema, provenance handling and escalation rules are V1 — `bp_series` already accepts multi-source readings. Switching the patient-facing channel on is **V1.5**, after the clinic-side loop is stable. Do not let it slip out of the design now; retrofitting provenance is exactly the mistake §3 exists to prevent.
+**Build boundary:** the schema, provenance handling and escalation rules are V1, and `bp_series` already accepts multi-source readings. Switching the patient-facing channel on is **V1.5**, after the clinic-side loop is stable. Worth not letting it slip out of the design now, since retrofitting provenance is the mistake §3 exists to prevent.
 
 ---
 
@@ -404,7 +404,7 @@ The evidence for bothering: meta-analyses of home BP telemonitoring consistently
 | SATUSEHAT | write | FHIR R4 over OAuth2 | Sandbox first. Boundary, not canonical model |
 | E-Klaim | write | Claim draft | Codes only |
 
-**Offline behaviour:** every write is queued and replayed. A dropped connection mid-consultation must not lose the encounter or produce a duplicate on reconnect — idempotency keys on every outbound write.
+**Offline behaviour:** every write is queued and replayed. A dropped connection mid-consultation shouldn't lose the encounter or produce a duplicate on reconnect, hence idempotency keys on every outbound write.
 
 ---
 
@@ -424,7 +424,7 @@ The ones that matter are not model failures.
 | F8 | Connectivity lost mid-encounter | Checkpointer | Resume by `thread_id`; no duplicate emission |
 | F9 | Guideline updated; older outputs were produced against the old version | Corpus versioning | Every output records `corpus@version`. Non-negotiable for audit |
 | F10 | **The clinician stops opening it** | Engagement telemetry from day one | The most likely quiet death (A14). Engagement is a primary endpoint, not telemetry |
-| F11 | `added v6` **Prompt injection** — instructions embedded in patient free text, a pasted outside-prescription label, or a poisoned Khanza note reach the model as if they were ours | Injection probes in Set B and the pressure suite | Every string not authored by us — patient utterances, record free text, scanned documents — enters the model **delimited as data, never concatenated as instruction**. And the real defence is structural: whatever the model is tricked into proposing still faces the gate, which reads no free text and takes no instructions. An injection that survives to a rendered output is a release blocker, same class as F5 |
+| F11 | `added v6` **Prompt injection**, i.e. instructions embedded in patient free text, a pasted outside-prescription label, or a poisoned Khanza note reaching the model as if they were ours | Injection probes in Set B and the pressure suite | Every string not authored by us (patient utterances, record free text, scanned documents) enters the model **delimited as data, never concatenated as instruction**. And the real defence is structural: whatever the model is tricked into proposing still faces the gate, which reads no free text and takes no instructions. An injection that survives to a rendered output is a release blocker, same class as F5 |
 
 ---
 
@@ -459,15 +459,15 @@ Nothing reaches a clinician's screen until all of these hold on the evaluation s
 | `added v6` Plan concordance with the adjudicated decision | Report from day one; the clinical lead sets the bar before assist mode | Set C |
 | P95 latency, propose→present | < 3 s | Production trace |
 
-**The concordance row is the "twin fidelity" number** — the honest, measurable answer to the brief's own phrase: of the decisions a good doctor actually made on these visits, what fraction did the system's draft match? It is the one metric that speaks the interviewer's language, it can only be measured on Set C, and it is deliberately *reported* rather than *gated* at first — a system tuned to maximise agreement with historical practice would also reproduce historical mistakes, which is exactly what the Kenya deployment was there to catch.
+**The concordance row is the "twin fidelity" number**, i.e. the measurable answer to the brief's own phrase: of the decisions a good doctor actually made on these visits, what fraction did the system's draft match? It's the one metric that speaks the interviewer's language, it can only be measured on Set C, and it's deliberately *reported* rather than *gated* at first. A system tuned to maximise agreement with historical practice would also reproduce historical mistakes, which is roughly what the Kenya deployment was there to catch.
 
 ### 8.3 Three datasets, not two
 
 | Set | What | Proves |
 |---|---|---|
-| **A — synthetic clean** | ~400 hypertension follow-up cases generated from the guideline | The pipeline runs |
-| **B — synthetic adversarial** | ~150 deliberately broken twins: 10× dose, ACEi+ARB, candesartan without documented intolerance, missed red flag, non-stocked drug, hyperkalaemia ignored — plus `v6` injection probes: instructions hidden in intake free text and record notes (F11) | The gate catches planted errors |
-| **C — real retrospective, physician-adjudicated** | 300 real historical hypertension visits, blind-scored by Indonesian physicians | **Clinical reality.** This is the only one that counts as evidence |
+| **A, synthetic clean** | ~400 hypertension follow-up cases generated from the guideline | The pipeline runs |
+| **B, synthetic adversarial** | ~150 deliberately broken twins: 10× dose, ACEi+ARB, candesartan without documented intolerance, missed red flag, non-stocked drug, hyperkalaemia ignored, plus `v6` injection probes: instructions hidden in intake free text and record notes (F11) | The gate catches planted errors |
+| **C, real retrospective, physician-adjudicated** | 300 real historical hypertension visits, blind-scored by Indonesian physicians | **Clinical reality.** This is the only one that counts as evidence |
 
 > **The trap to avoid.** Sets A and B are generated from the same guideline the system retrieves from. Scoring 99% on them proves the plumbing works and proves nothing clinical. **Set C is not optional and it is not a later phase.** Anyone who quotes an A or B score as clinical validation should be corrected in the room.
 
@@ -491,7 +491,7 @@ Measured: consultation time · history completeness · diagnostic and treatment 
 
 - No diagnosis of new or undifferentiated presentations
 - No combined cardiometabolic management (V3)
-- **Type 2 diabetes was V2 and now exists in the prototype** — as an architecture
+- **Type 2 diabetes was V2 and now exists in the prototype**, as an architecture
   test, not as clinical scope. It was added to find out whether "the engine is
   pathway-agnostic" was true, and it was not: see the corrections in CODE.md. The
   pathway has no clinical sign-off, no evaluation set and no adjudicated cases,
@@ -500,7 +500,7 @@ Measured: consultation time · history completeness · diagnostic and treatment 
   about diabetes care.
 - No autonomous prescribing under any condition
 - No open-ended patient conversation
-- No voice input (typed and structured intake first — A10 is unverified)
+- No voice input (typed and structured intake first, since A10 is unverified)
 - No tariff or severity computation
 - No multi-site deployment; one site, one pathway, done properly
 - No TB or imaging in this pathway
@@ -513,7 +513,7 @@ Week-one questions for the STR + SIP hire. Each blocks a specific rule, and none
 
 1. Confirm Grade 2 thresholds and the measurement standard against the InaSH 2024 consensus (§2.1).
 2. Extract BP targets for **elderly, diabetes and CKD** subgroups (§2.2). Until these exist those subgroups stay in `no_target_defined` and the system abstains.
-3. Confirm the guideline's escalation algorithm — when to titrate versus add versus switch.
+3. Confirm the guideline's escalation algorithm: when to titrate versus add versus switch.
 4. Confirm the ACEi-intolerance documentation standard the candesartan rule depends on: what counts, and where is it recorded in Khanza?
 5. Set the abstention confidence floor. This is a clinical risk decision, not a modelling one.
 6. Approve the fixed deflection language for the intake agent.
@@ -525,4 +525,4 @@ Week-one questions for the STR + SIP hire. Each blocks a specific rule, and none
 
 ## The one line
 
-> V1 is not an AI doctor. It is a system that walks one known patient through one known protocol, refuses to speak when it is unsure, and hands a licensed doctor a draft they can accept in one click or ignore entirely — and we will know within fourteen weeks whether that is worth anything, because we are measuring it against the same doctor working without it.
+> V1 isn't an AI doctor. It's a system that walks one known patient through one known protocol, refuses to speak when it isn't sure, and hands a licensed doctor a draft they can accept in one click or ignore entirely. We should know within fourteen weeks whether that's worth anything, because we're measuring it against the same doctor working without it.
