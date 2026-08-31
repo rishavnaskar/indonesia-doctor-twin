@@ -12,23 +12,28 @@ CLINIC_HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI clinician — build a patient</title>
 <style>
-:root{--bg:#f5f6f8;--panel:#fff;--ink:#14171a;--muted:#5f6871;--faint:#66707c;--line:#dfe3e8;
---accent:#1c4fd8;--on-accent:#fff;--soft:#eef2fe;--green:#1a7f4b;--amber:#8f5a00;--red:#b3261e;
---green-bg:#eaf6ef;--amber-bg:#fdf3e2;--red-bg:#fceceb;--code:#eef1f4}
-@media (prefers-color-scheme:dark){:root{--bg:#131619;--panel:#1b1f23;--ink:#e8eaed;--muted:#9aa4ae;
---faint:#98a1ab;--line:#2b3137;--accent:#7da2ff;--on-accent:#10141a;--soft:#1d2536;--green:#6ed99b;--amber:#ecb75a;
---red:#f0857c;--green-bg:#16281f;--amber-bg:#2a2418;--red-bg:#2c1b1a;--code:#22272c}}
+/* Same tokens as the scripted page. Two surfaces of one product that do not
+   look like one product is the fastest way to make both look unfinished. */
+:root{color-scheme:light;
+--paper:#f7f6f8;--paper-warm:#efece7;--panel:#fff;--ink:#0b0b0c;--graphite:#4c4c52;--ash:#68686f;
+--line:#e2ded7;--line-soft:#eeebe5;--ember:#f0521c;--ember-deep:#b93714;
+--green:#14684a;--amber:#8a5a12;--red:#b3261e;
+--green-bg:#edf4f0;--amber-bg:#f8f1e4;--red-bg:#fbedec;--code:#f1efea}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{margin:0;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;
+font:15px/1.55 "DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+letter-spacing:.16em;text-transform:uppercase;font-weight:500;color:var(--ash);margin:0 0 12px}
 .mono,code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
-header{padding:18px 26px;border-bottom:1px solid var(--line);background:var(--panel)}
-h1{margin:0 0 4px;font-size:18px}
-.lede{color:var(--muted);font-size:13.5px;max-width:88ch}
-a,a:visited{color:var(--accent)}
-a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+header{padding:40px 30px 30px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{margin:0 0 14px;font-size:clamp(1.7rem,3.4vw,2.5rem);font-weight:500;
+letter-spacing:-.035em;line-height:1;text-wrap:balance}
+.lede{color:var(--graphite);font-size:clamp(1rem,1.2vw,1.06rem);line-height:1.55;
+max-width:56ch;text-wrap:pretty;margin:0}
+a,a:visited{color:var(--ember)}
+a:focus-visible{outline:2px solid var(--ember);outline-offset:2px;border-radius:2px}
 main{padding:20px 26px;max-width:1180px}
-.bar{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+.bar{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:14px 16px;
 margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
 /* A select sizes to its longest option, and these options are sentences. On a
    narrow screen that pushed the whole page sideways. */
@@ -44,28 +49,34 @@ margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-en
   .row > div{flex:1 1 40%}
 }
 label.f{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
-color:var(--faint);margin-bottom:4px;font-weight:600}
-select,input[type=number],input[type=text],textarea{font:inherit;font-size:13.5px;padding:6px 8px;
-border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+color:var(--ash);margin-bottom:4px;font-weight:600}
+select,input[type=number],input[type=text],textarea{font:inherit;font-size:13.5px;padding:7px 9px;
+border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
 input[type=number]{width:78px}
-button{font:inherit;font-size:13.5px;font-weight:600;padding:8px 16px;border-radius:7px;
-border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer}
-button.ghost{background:transparent;color:var(--accent)}
-button[disabled]{opacity:.5;cursor:default}
+/* One ember button per view. The accent is the loudest thing on the page, so
+   spending it on three buttons at once spends it on nothing — the eye has no
+   primary action to land on. Secondary actions are ink on a hairline. */
+button{font:inherit;font-size:13.5px;font-weight:500;padding:9px 17px;border-radius:4px;
+border:1px solid var(--ember);background:var(--ember);color:#fff;cursor:pointer}
+button:hover{background:var(--ember-deep);border-color:var(--ember-deep)}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+button.ghost:hover{background:var(--paper-warm);border-color:var(--ash)}
+button[disabled],button[disabled]:hover{opacity:.45;cursor:default;background:transparent;
+color:var(--ash);border-color:var(--line)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
 .p{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .p h3{margin:0 0 10px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center}
-.rm{border:0;background:none;color:var(--faint);font-size:16px;padding:0 6px;cursor:pointer;
+.rm{border:0;background:none;color:var(--ash);font-size:16px;padding:0 6px;cursor:pointer;
 line-height:1;font-weight:400}
 .rm:hover{color:var(--red)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
-.sec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ash);
 font-weight:600;margin:12px 0 6px}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{font-size:11.5px;padding:3px 9px;border-radius:20px;border:1px solid var(--line);
-background:var(--bg);cursor:pointer;user-select:none;color:var(--muted)}
+background:var(--paper);cursor:pointer;user-select:none;color:var(--graphite)}
 .chip.on{background:var(--red-bg);border-color:var(--red);color:var(--red);font-weight:600}
-.chip.on.flag{background:var(--soft);border-color:var(--accent);color:var(--accent)}
+.chip.on.flag{background:var(--paper-warm);border-color:var(--ash);color:var(--graphite);font-weight:500}
 .med{display:flex;gap:6px;align-items:center;margin-bottom:6px}
 .med select{flex:1}
 .verdict{margin-top:12px;border-top:1px solid var(--line);padding-top:11px}
@@ -74,29 +85,30 @@ letter-spacing:.04em;text-transform:uppercase}
 .pill.green{background:var(--green-bg);color:var(--green)}
 .pill.amber{background:var(--amber-bg);color:var(--amber)}
 .pill.red{background:var(--red-bg);color:var(--red)}
-.pill.fail{background:var(--code);color:var(--muted)}
-.plain{color:var(--muted);font-size:12.5px}
+.pill.fail{background:var(--code);color:var(--graphite)}
+.plain{color:var(--graphite);font-size:12.5px}
 .find{border-left:3px solid var(--red);padding-left:10px;margin:8px 0;font-size:12.5px}
 .find.warn{border-left-color:var(--amber)}
-.find .src{color:var(--faint);font-size:11px}
-.stat{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:11px 15px;
+.find .src{color:var(--ash);font-size:11px}
+.stat{background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--ember);
+border-radius:4px;padding:12px 16px;
 margin-bottom:16px;font-size:13.5px}
 .err{background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:11px 15px;
 margin-bottom:16px;font-size:13.5px}
-.tog{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
-details{margin-top:8px}summary{cursor:pointer;font-size:12.5px;color:var(--accent)}
+.tog{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--graphite)}
+details{margin-top:8px}summary{cursor:pointer;font-size:12.5px;color:var(--ember)}
 body.busy .p{opacity:.75}
-body.busy input,body.busy select,body.busy textarea{pointer-events:none;background:var(--code);color:var(--muted)}
+body.busy input,body.busy select,body.busy textarea{pointer-events:none;background:var(--code);color:var(--graphite)}
 body.busy .chip,body.busy .rm,body.busy button{pointer-events:none;opacity:.55}
 body.busy #msg{opacity:1}
 .pipe{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
 .pipe span{font-size:10.5px;padding:2px 7px;border-radius:4px;background:var(--code);
-color:var(--faint);font-family:ui-monospace,Menlo,monospace}
-.pipe span.at{background:var(--accent);color:#fff;font-weight:700}
-.pipe span.past{background:var(--soft);color:var(--accent)}
-.working{font-size:12px;color:var(--accent);font-weight:600;margin-top:8px;display:flex;
+color:var(--ash);font-family:ui-monospace,Menlo,monospace}
+.pipe span.at{background:var(--ember);color:#fff;font-weight:700}
+.pipe span.past{background:var(--paper-warm);color:var(--ember)}
+.working{font-size:12px;color:var(--ember);font-weight:600;margin-top:8px;display:flex;
 align-items:center;gap:7px}
-.spin{width:11px;height:11px;border:2px solid var(--line);border-top-color:var(--accent);
+.spin{width:11px;height:11px;border:2px solid var(--line);border-top-color:var(--ember);
 border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .chk{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
@@ -104,7 +116,7 @@ border-radius:50%;animation:sp .7s linear infinite}
 .chk .mk{flex:0 0 14px;font-weight:700}
 .chk.ok .mk{color:var(--green)}.chk.hit .mk{color:var(--red)}
 .kv{display:flex;gap:8px;font-size:12px;padding:3px 0}
-.kv b{color:var(--faint);font-weight:500;min-width:96px}
+.kv b{color:var(--ash);font-weight:500;min-width:96px}
 textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .warnbox{background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;
 padding:11px 15px;margin-bottom:12px;font-size:12.5px}
@@ -113,20 +125,24 @@ padding:16px 18px;margin-bottom:16px}
 .cmp h3{margin:0 0 4px;font-size:14px}
 .cmp table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px}
 .cmp th,.cmp td{text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid var(--line)}
-.cmp th{color:var(--faint);font-weight:500;font-size:11.5px}
-.cmp tr.diff td{background:var(--soft)}
+.cmp th{color:var(--ash);font-weight:500;font-size:11.5px}
+.cmp tr.diff td{background:var(--paper-warm)}
 .cmp .o{font-weight:600}
 .cmp .o.committed{color:var(--green)}
-.cmp .o.abstain,.cmp .o.handoff{color:var(--muted)}
+.cmp .o.abstain,.cmp .o.handoff{color:var(--graphite)}
 .cmp .o.escalate{color:var(--red)}
 .cmp .o.request_info{color:var(--amber)}
+/* Quiet notes. Not a callout: a bordered box above the controls stops the
+   reader to say something they mostly already assumed. */
+.fineprint{max-width:74ch;margin:0 0 16px;font-size:12.5px;line-height:1.6;color:var(--ash)}
+.fineprint b{color:var(--graphite);font-weight:500}
 </style></head><body>
 <header>
-<h1>Build a patient, then run the clinician</h1>
-<div class="lede">Generate or edit patients, change anything about them, and watch what the
-system does. The same pipeline as the <a href="/">scripted scenarios</a> — same nine checks,
-same gate, same signature rule. Change a blood pressure, add a symptom, move the patient to a
-hospital without a potassium assay, and the verdict moves with it.</div>
+<p class="eyebrow">Interactive &middot; build a patient</p>
+<h1>Change the patient.<br>Watch the verdict move.</h1>
+<div class="lede">Same pipeline as the <a href="/">scripted run</a>. Same nine checks, same
+gate, same signature rule. Raise a blood pressure, add a symptom, or send the patient to a
+hospital that cannot run a potassium test &mdash; the answer changes, and it says why.</div>
 </header>
 <main>
 <div class="bar">
@@ -178,12 +194,11 @@ async function boot(){
   // than relying on the guard alone — the guard fails closed, but a record that
   // never arrives is better than one that is correctly refused.
   if (V.hosted) {
-    $("publicnote").innerHTML = `<div class="stat" style="border-left:3px solid var(--amber)">
-      <b>Public demo — synthetic patients only. Do not paste a real patient record.</b>
-      The architecture behind this requires health data to be processed inside
-      Indonesia and this deployment is not, which is why everything in it is
-      generated. A record without <span class="mono">"is_synthetic": true</span> is
-      refused before any request to a hosted model is built.</div>`;
+    $("publicnote").innerHTML = `<p class="fineprint"><b>Public demo &mdash; generated patients
+      only. Please don't paste a real record.</b> Health data has to stay in Indonesia and this
+      server does not, so nothing real belongs here. A record without
+      <span class="mono">"is_synthetic": true</span> is refused before the request is built,
+      but the check is the backstop, not the invitation.</p>`;
   }
   $("profile").innerHTML = V.profiles.map(p=>`<option value="${esc(p.key)}">${esc(p.label)}</option>`).join("");
   $("site").innerHTML = V.sites.map(s=>

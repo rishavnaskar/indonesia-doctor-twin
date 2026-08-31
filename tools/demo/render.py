@@ -35,85 +35,118 @@ _TEMPLATE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
 <style>
+/* Palette and type follow the house system: warm paper, near-black ink, one
+   ember accent. Light only, deliberately — the references commit to a single
+   look rather than hedging with a dark variant that nobody tunes. */
 :root {
-  --bg:#f5f6f8; --panel:#fff; --ink:#14171a; --muted:#5f6871; --faint:#66707c;
-  --line:#dfe3e8; --accent:#1c4fd8; --on-accent:#fff; --soft:#eef2fe;
-  --green:#1a7f4b; --amber:#8f5a00; --red:#b3261e;
-  --green-bg:#eaf6ef; --amber-bg:#fdf3e2; --red-bg:#fceceb; --code:#eef1f4;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:#131619; --panel:#1b1f23; --ink:#e8eaed; --muted:#9aa4ae; --faint:#98a1ab;
-    --line:#2b3137; --accent:#7da2ff; --on-accent:#10141a; --soft:#1d2536;
-    --green:#6ed99b; --amber:#ecb75a; --red:#f0857c;
-    --green-bg:#16281f; --amber-bg:#2a2418; --red-bg:#2c1b1a; --code:#22272c;
-  }
+  color-scheme: light;
+  --paper:#f7f6f8; --paper-warm:#efece7; --panel:#fff;
+  --ink:#0b0b0c; --graphite:#4c4c52; --ash:#68686f;
+  --line:#e2ded7; --line-soft:#eeebe5;
+  --ember:#f0521c; --ember-deep:#b93714;
+  --green:#14684a; --amber:#8a5a12; --red:#b3261e;
+  --green-bg:#edf4f0; --amber-bg:#f8f1e4; --red-bg:#fbedec; --code:#f1efea;
+  --shell:1180px;
 }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--ink);
-  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-.mono,code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; }
-/* The page styled no links at all, so they fell back to the user agent's
-   #0000EE — 1.93:1 against the dark background, where AA wants 4.5:1. The
-   visited rule matters as much as the base one: the default visited purple is
-   worse still, and it only appears after someone has clicked, which is exactly
-   when nobody is looking for it. */
-a, a:visited { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-a:hover { text-decoration-thickness: 2px; }
-a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
-header { padding:20px 26px; border-bottom:1px solid var(--line); background:var(--panel); }
-h1 { margin:0 0 5px; font-size:19px; letter-spacing:-.01em; }
-.lede { color:var(--muted); font-size:13.5px; max-width:80ch; }
-.meta { margin-top:12px; display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12px; color:var(--faint); }
-.meta b { color:var(--muted); font-weight:600; }
-.stat { margin-top:14px; padding:11px 15px; border-radius:8px; background:var(--soft);
-  border:1px solid var(--line); font-size:13.5px; }
+body { margin:0; background:var(--paper); color:var(--ink);
+  font:15px/1.6 "DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased; }
+.mono,code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px; }
+
+/* Small monospaced label that names a section. Used instead of a heavier
+   heading so the eye finds structure without the page shouting. */
+.eyebrow { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+  letter-spacing:.16em; text-transform:uppercase; font-weight:500; color:var(--ash);
+  margin:0 0 14px; }
+
+a, a:visited { color:var(--ink); text-underline-offset:3px;
+  text-decoration-color:color-mix(in srgb, var(--ink) 30%, transparent); }
+a:hover { text-decoration-color:var(--ember); }
+a:focus-visible { outline:2px solid var(--ember); outline-offset:2px; border-radius:2px; }
+
+header { padding:44px 30px 0; border-bottom:1px solid var(--line); background:var(--panel); }
+.hin { max-width:1180px; }
+.htop { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:40px 56px;
+  align-items:start; }
+@media (max-width:860px){ .htop{ grid-template-columns:1fr; gap:28px; } }
+h1 { margin:0 0 16px; font-size:clamp(2rem,4.2vw,3.1rem); font-weight:500;
+  letter-spacing:-.035em; line-height:.98; text-wrap:balance; }
+.lede { color:var(--graphite); font-size:clamp(1rem,1.2vw,1.08rem); line-height:1.55;
+  max-width:52ch; text-wrap:pretty; margin:0; }
+.cta { display:inline-block; margin-top:20px; font-weight:500; font-size:14.5px;
+  text-decoration:none; border-bottom:1px solid var(--ember); padding-bottom:2px; }
+.cta:hover { color:var(--ember-deep); }
+
+/* The run's facts, as hairline-separated rows rather than a filled box. There
+   used to be three stacked callout panels here; three highlighted blocks in a
+   row is the page insisting on all of it at once, which reads as none of it. */
+.facts { border-top:1px solid var(--line); }
+.facts .row { display:flex; justify-content:space-between; gap:20px;
+  padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
+.facts .k { color:var(--ash); }
+.facts .v { text-align:right; font-weight:500; }
+.facts .v.mono { font-size:12px; }
+
+.summary { margin:36px 0 0; padding:0; max-width:62ch;
+  font-size:clamp(1.05rem,1.6vw,1.3rem); line-height:1.4; letter-spacing:-.015em;
+  font-weight:500; text-wrap:balance; }
+.summary span { color:var(--ash); font-weight:400; }
+.fineprint { max-width:68ch; margin:14px 0 0; padding-bottom:34px; font-size:12.5px;
+  line-height:1.6; color:var(--ash); }
+.fineprint b { color:var(--graphite); font-weight:500; }
+
 .wrap { display:grid; grid-template-columns:290px 1fr; }
 @media (max-width:900px){ .wrap{ grid-template-columns:1fr; } }
 nav { border-right:1px solid var(--line); background:var(--panel); }
+.trail span { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .enc { display:block; width:100%; text-align:left; border:0; background:none; color:inherit;
   font:inherit; padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
-.enc:hover { background:var(--soft); }
-.enc[aria-current="true"] { background:var(--soft); box-shadow:inset 3px 0 0 var(--accent); }
+.enc:hover { background:var(--paper-warm); }
+.enc[aria-current="true"] { background:var(--paper-warm); box-shadow:inset 2px 0 0 var(--ember); }
 .enc .t { font-weight:600; font-size:13px; margin-bottom:2px; }
-.enc .n { color:var(--faint); font-size:11.5px; }
+.enc .n { color:var(--ash); font-size:11.5px; }
 .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
 .dot.green{background:var(--green)} .dot.amber{background:var(--amber)} .dot.red{background:var(--red)}
-main { padding:22px 26px; max-width:960px; }
+main { padding:26px 30px 60px; max-width:960px; }
 .hd { font-size:17px; font-weight:650; margin:0 0 3px; }
-.hd + .sub { color:var(--muted); font-size:13px; margin-bottom:14px; }
-.outcome { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px;
-  font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+.hd + .sub { color:var(--graphite); font-size:13px; margin-bottom:14px; }
+.outcome { display:inline-block; padding:3px 9px; border-radius:3px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  font-weight:500; letter-spacing:.1em; text-transform:uppercase; }
 .outcome.green{background:var(--green-bg);color:var(--green)}
 .outcome.amber{background:var(--amber-bg);color:var(--amber)}
 .outcome.red{background:var(--red-bg);color:var(--red)}
-.outcome.fail{background:var(--code);color:var(--muted)}
+.outcome.fail{background:var(--code);color:var(--graphite)}
 .err { border:1px solid var(--line); border-left:3px solid var(--amber); border-radius:8px;
   padding:14px 16px; margin-bottom:14px; background:var(--panel); }
 .err b { display:block; margin-bottom:5px; }
-.card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
-  padding:16px 18px; margin-bottom:14px; }
-.card > h2 { margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.07em;
-  color:var(--muted); font-weight:650; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:4px;
+  padding:18px 20px; margin-bottom:14px; }
+.card > h2 { margin:0 0 14px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:var(--ash);
+  font-weight:500; }
 h3 { margin:16px 0 7px; font-size:12px; text-transform:uppercase; letter-spacing:.06em;
-  color:var(--faint); font-weight:600; }
+  color:var(--ash); font-weight:600; }
 h3:first-of-type { margin-top:0; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 26px; }
 @media (max-width:700px){ .grid2{ grid-template-columns:1fr; } }
 table { width:100%; border-collapse:collapse; font-size:13.5px; }
 th,td { text-align:left; padding:6px 10px 6px 0; border-bottom:1px solid var(--line); vertical-align:top; }
-th { color:var(--faint); font-weight:500; font-size:12px; white-space:nowrap; width:1%; padding-right:18px; }
+th { color:var(--ash); font-weight:500; font-size:12px; white-space:nowrap; width:1%; padding-right:18px; }
 tr:last-child th, tr:last-child td { border-bottom:0; }
 thead th { border-bottom:1px solid var(--line); width:auto; }
-.plain { color:var(--muted); font-size:12.5px; }
-.gloss { color:var(--muted); font-size:12.5px; font-style:italic; margin-top:3px; }
+.plain { color:var(--graphite); font-size:12.5px; }
+.gloss { color:var(--graphite); font-size:12.5px; font-style:italic; margin-top:3px; }
 .bi { border-left:2px solid var(--line); padding-left:11px; }
 .bi .id { font-size:14px; }
 .tag { display:inline-block; padding:1px 7px; border-radius:5px; background:var(--code);
-  font-size:11.5px; color:var(--muted); margin-left:6px; }
+  font-size:11.5px; color:var(--graphite); margin-left:6px; }
 .tag.stale { background:var(--amber-bg); color:var(--amber); font-weight:600; }
 .tag.flag { background:var(--red-bg); color:var(--red); font-weight:600; }
-.band { border-radius:10px; padding:14px 16px; margin-bottom:14px; border:1px solid; }
+.band { border-radius:4px; padding:15px 17px; margin-bottom:14px; border:1px solid;
+  border-left-width:3px; }
 .band.green{background:var(--green-bg);border-color:var(--green)}
 .band.amber{background:var(--amber-bg);border-color:var(--amber)}
 .band.red{background:var(--red-bg);border-color:var(--red)}
@@ -122,12 +155,12 @@ thead th { border-bottom:1px solid var(--line); width:auto; }
 .band .h { font-size:15px; font-weight:650; margin-top:4px; }
 .band ul { margin:10px 0 0; padding-left:18px; } .band li { margin-bottom:6px; }
 .empty { border:1px dashed var(--line); border-radius:10px; padding:26px 20px; text-align:center;
-  color:var(--muted); font-size:13px; margin-bottom:14px; }
+  color:var(--graphite); font-size:13px; margin-bottom:14px; }
 .empty b { display:block; color:var(--ink); font-size:14.5px; margin-bottom:5px; }
 .tabs { display:flex; gap:2px; margin:18px 0 14px; border-bottom:1px solid var(--line); }
-.tab { border:0; background:none; color:var(--muted); font:inherit; font-size:13.5px;
+.tab { border:0; background:none; color:var(--graphite); font:inherit; font-size:13.5px;
   padding:8px 14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
-.tab[aria-selected="true"]{ color:var(--accent); border-bottom-color:var(--accent); font-weight:650; }
+.tab[aria-selected="true"]{ color:var(--ember); border-bottom-color:var(--ember); font-weight:650; }
 .chk { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
 .chk:last-child{border-bottom:0}
 .chk .mark { flex:0 0 20px; font-weight:700; }
@@ -136,32 +169,38 @@ thead th { border-bottom:1px solid var(--line); width:auto; }
 .finding { border-left:3px solid var(--red); padding:2px 0 2px 12px; margin-bottom:12px; }
 .finding.warn { border-left-color:var(--amber); }
 .finding .m { margin:3px 0; }
-.finding .src { color:var(--faint); font-size:11.5px; }
-.watch { font-size:13px; color:var(--muted); border-left:3px solid var(--accent);
+.finding .src { color:var(--ash); font-size:11.5px; }
+.watch { font-size:13px; color:var(--graphite); border-left:3px solid var(--ember);
   padding-left:12px; margin:0 0 14px; }
 .trail { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:4px; }
 .trail span { background:var(--code); padding:3px 8px; border-radius:5px; font-size:11px; }
-.steps { font-size:12.5px; color:var(--muted); }
+.steps { font-size:12.5px; color:var(--graphite); }
 .steps div { padding:3px 0; }
 button.act { font:inherit; font-size:13px; font-weight:650; padding:7px 15px; border-radius:7px;
-  border:1px solid var(--red); background:var(--red); color:var(--on-accent); cursor:pointer; margin-top:12px; }
-button.act[disabled]{ background:transparent; color:var(--muted); border-color:var(--line); font-weight:500; }
-.note { font-size:12.5px; color:var(--faint); margin-top:10px; }
+  border:1px solid var(--red); background:var(--red); color:#fff; cursor:pointer; margin-top:12px; }
+button.act[disabled]{ background:transparent; color:var(--graphite); border-color:var(--line); font-weight:500; }
+.note { font-size:12.5px; color:var(--ash); margin-top:10px; }
 .bpnow { font-size:26px; font-weight:650; letter-spacing:-.02em; }
-.bpnow small { font-size:13px; font-weight:400; color:var(--muted); }
+.bpnow small { font-size:13px; font-weight:400; color:var(--graphite); }
 </style>
 </head>
 <body>
 <header>
-  <h1>AI clinician — adult high blood pressure, follow-up visits</h1>
-  <div class="lede">A doctor's assistant, not a doctor. It drafts a plan for a return visit;
-    a licensed doctor reviews and signs every one. Nine safety checks — plain code, no AI —
-    sit between the draft and the doctor, and any one of them can stop it.
-    Every figure below came from a real run of the system. Nothing is written by hand.
-    <div style="margin-top:8px"><a href="/clinic">Build your own patient and run it &rarr;</a></div></div>
-  <div class="meta" id="meta"></div>
-  <div class="stat" id="drafter" style="background:var(--panel)"></div>
-  <div class="stat" id="stat"></div>
+  <div class="hin">
+    <div class="htop">
+      <div>
+        <p class="eyebrow">Adult hypertension &middot; follow-up visits</p>
+        <h1>A doctor&rsquo;s assistant.<br>Not a doctor.</h1>
+        <p class="lede">It drafts the plan for a return visit. A licensed doctor signs every
+          one. Nine checks sit in between &mdash; plain code, no model &mdash; and any one of
+          them stops the draft before anyone sees it. Nothing on this page was written by hand.</p>
+        <a class="cta" href="/clinic">Build your own patient and run it &rarr;</a>
+      </div>
+      <div class="facts" id="facts"></div>
+    </div>
+    <p class="summary" id="stat"></p>
+    <p class="fineprint" id="fineprint"></p>
+  </div>
 </header>
 <div class="wrap">
   <nav id="nav"></nav>
@@ -176,53 +215,50 @@ const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&l
 const row = (k,v) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`;
 
 function meta(){
-  const p = DATA.pack;
-  document.getElementById("meta").innerHTML = [
-    ["Rules pack", p.pack_id+" "+p.version], ["Clinical sign-off", p.review_status.replace(/_/g," ")],
-    ["Drugs on the approved list", p.molecule_count], ["Hospitals modelled", p.site_count],
-    ["Patient-facing language", p.language], ["Run at", DATA.generated_at],
-    // What this run kept, and where. A prototype that claims durable state
-    // should say so on the page rather than in a document — every encounter
-    // below was checkpointed, and the count survives restarting the process.
-    ["State kept in", (DATA.store||{}).location || "memory only"],
-    ["Encounters on record", (DATA.store||{}).encounters_checkpointed],
-    ["Signatures on record", (DATA.store||{}).signatures],
-    // Resumption is the checkpoint being load-bearing rather than decorative,
-    // so it is stated rather than left to be inferred from the page appearing
-    // faster than it did last time.
+  const p = DATA.pack, st = DATA.store || {};
+  // Facts as hairline rows, not a filled panel. Everything here is read off a
+  // real run — the drafter's name included, so a page claiming a model wrote
+  // something is a page the model actually wrote.
+  const rows = [
+    ["Drafted by", DATA.reasoner, true],
+    ["Rules pack", p.pack_id + " " + p.version, true],
+    ["Clinical sign-off", p.review_status.replace(/_/g, " "), false],
+    ["Drugs on the list", p.molecule_count, false],
+    ["Hospitals modelled", p.site_count, false],
+    ["Patient language", p.language, false],
+    ["State kept in", st.location || "memory only", true],
+    ["On record", `${st.encounters_checkpointed} visits, ${st.signatures} signatures`, false],
     ["This page", DATA.resumed
-      ? `${DATA.resumed} of ${DATA.total} replayed from the store, not re-run`
-      : "every visit run fresh"]
-  ].map(([k,v])=>`${esc(k)}: <b>${esc(v)}</b>`).join("");
-  document.getElementById("drafter").innerHTML =
-    `<b>Drafts written by:</b> <span class="mono">${esc(DATA.reasoner)}</span>` +
-    (DATA.is_model
-      ? ` &mdash; a real AI model, swapped in behind the same interface. Everything after the
-          draft is unchanged: the same nine checks, the same signature rule, the same code.`
-      : ` &mdash; <b>not an AI model.</b> This is the rule-following reference version, and it is
-          the default on purpose: it is free, instant, and gives the identical answer every time,
-          so a change in behaviour is a real change rather than the model having a different day.
-          The AI model plugs into the same interface and nothing downstream moves.
-          Run <span class="mono">make live</span> to see it drafted by an actual model.`);
-  if (DATA.hosted) {
-    document.getElementById("meta").insertAdjacentHTML("afterend",
-      `<div class="stat" style="border-left:3px solid var(--amber)">
-        <b>This is a public demo, and every patient in it is synthetic.</b>
-        The architecture behind it requires health data to be processed inside
-        Indonesia; this page is not, which is exactly why nothing real is in it.
-        The residency guard enforces that rather than trusting it &mdash; a record
-        not marked synthetic is refused before any request to a hosted model is
-        built, so pointing this deployment at a real patient fails closed instead
-        of quietly exporting one.</div>`);
-  }
+      ? `${DATA.resumed} of ${DATA.total} replayed, not re-run` : "every visit run fresh", false],
+    ["Run at", DATA.generated_at, true],
+  ];
+  document.getElementById("facts").innerHTML = rows.map(([k, v, mono]) =>
+    `<div class="row"><span class="k">${esc(k)}</span>
+      <span class="v${mono ? " mono" : ""}">${esc(v)}</span></div>`).join("");
+
   const fails = DATA.drafter_failures || 0;
   document.getElementById("stat").innerHTML =
-    `<b>${DATA.declined} of the ${DATA.total} visits below ended with no recommendation reaching the doctor.</b>
-     That is the system working, not failing. Every refusal names its own reason, and you can read
-     all of them under &ldquo;What the system did&rdquo;.` +
-    (fails ? ` <b>A further ${fails} could not be drafted at all</b> — the model returned something
-      unusable. That is a model failure, not a clinical one, and it is counted separately because
-      the two mean different things.` : "");
+    `${DATA.declined} of these ${DATA.total} visits ended with no plan reaching the doctor.
+     <span>That is the system working. Every refusal says why.</span>` +
+    (fails ? ` <span>${fails} more could not be drafted at all &mdash; the model returned
+      something unusable. Different failure, counted separately.</span>` : "");
+
+  // Quiet, not a callout. The point is that a reader who wonders about it finds
+  // the answer, not that everyone is stopped and told.
+  const notes = [];
+  if (DATA.hosted) {
+    notes.push(`<b>Public demo, synthetic patients only.</b> Health data has to stay in
+      Indonesia and this server does not. So nothing real is on it, and a record that is not
+      marked synthetic never leaves the machine &mdash; the check runs before the request is
+      built, not after.`);
+  }
+  if (!DATA.is_model) {
+    notes.push(`<b>Drafted by rule-following code, not a model.</b> That is the default: free,
+      instant, and identical every run, so a change in behaviour is a real change rather than
+      the model having a different day. A real model plugs into the same interface and nothing
+      downstream moves.`);
+  }
+  document.getElementById("fineprint").innerHTML = notes.join(" ");
 }
 
 function nav(){
@@ -365,23 +401,20 @@ function clinicianView(e){
   if (e.error) {
     return out + `<div class="err"><b>The drafter failed on this visit.</b>
       <span class="mono">${esc(e.error)}</span>
-      <div class="plain" style="margin-top:8px">Nothing reached the safety checks and nothing
-      reached the doctor. The consultation continues exactly as it would without the system.
-      A weak model producing unusable output is a normal event, and containing it to one visit
-      rather than one outage is the behaviour worth showing.</div></div>`;
+      <div class="plain" style="margin-top:8px">Nothing reached the checks. Nothing reached the
+      doctor. The consultation carries on as if the system were not there.
+      Weak models return junk sometimes. That should cost one visit, not the whole page.</div></div>`;
   }
   if (p.silent && p.shows_draft) {
     out += `<div class="empty"><b>No alert.</b>
-      Nothing here was worth interrupting the doctor for, so the system says nothing —
-      no summary, no tick, no &ldquo;all clear&rdquo;. The draft below is simply waiting in the
-      consultation form. Most visits look like this, and that silence is the only reason
-      a warning is worth reading when one does appear.</div>`;
+      Nothing here needed the doctor's attention, so the system says nothing. No summary,
+      no tick, no &ldquo;all clear&rdquo;. The draft is just waiting in the consultation form.
+      Most visits look like this. The quiet is what makes a warning mean something.</div>`;
   } else if (p.silent) {
     out += `<div class="empty"><b>The doctor sees nothing at all.</b>
-      The safety checks refused the draft, and there is nothing here the doctor must act on —
-      so they are not interrupted to be told that. They carry on exactly as they would
-      without the system. The reasons were logged; they are under
-      &ldquo;What the system did&rdquo;.</div>`;
+      The checks refused the draft. There was nothing here to act on, so nobody is
+      interrupted to be told that. The reasons are logged either way &mdash; they are
+      under &ldquo;What the system did&rdquo;.</div>`;
   } else { out += bandBlock(e); }
   if (p.shows_draft) out += draftCard(e);
   return out;
@@ -481,11 +514,10 @@ function auditView(e){
         ${p.evidence.map(e=>`<tr><td>${esc(e.label)}</td>
           <td>${e.last_performed?esc(e.last_performed):`<span style="color:var(--amber)">never recorded</span>`}</td>
           <td class="mono">${e.volume_30d}</td></tr>`).join("")}</table>
-        <div class="note">Naming a service is not the same as delivering it. A capability listed
-          with nothing behind it is the stale-registry failure this check exists to catch.</div>`:""}
-      <div class="note">A plan is only a plan if this hospital can carry it out. A drug the pharmacy
-        does not stock, or a test that has to travel to another island, makes the output a referral
-        rather than a recommendation.</div>
+        <div class="note">Claiming a service is not the same as providing it. A capability with
+          nothing behind it is the stale registry this check exists to catch.</div>`:""}
+      <div class="note">A plan only counts if this hospital can carry it out. If the pharmacy has
+        no stock, or the test has to travel to another island, the answer is a referral.</div>
     </div>
     ${prov?`<div class="card"><h2>Where this came from</h2><table>
       ${row("AI model", `<span class="mono">${esc(prov[0])}</span>`)}
