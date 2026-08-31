@@ -3,6 +3,12 @@
 The system does not have a conversation. It advances a patient through defined
 states, every transition logged, every state with a defined exit.
 
+As built, and not quite as SPEC-V1 §4 draws it. The spec gates the model call
+behind red flags and sufficiency; here every eligible patient is drafted and the
+gate decides afterwards. The outcomes are identical because the gate refuses
+either way, but the cost is not: a red-flag encounter spends a draft it was
+meant to skip. Only the hard exclusions short-circuit before PROPOSE.
+
     ELIGIBLE -> (HANDOFF | INTAKE) -> RECONCILE -> RED FLAGS
              -> (ESCALATE | SUFFICIENCY) -> (REQUEST INFO | PROPOSE)
              -> GATE -> (ABSTAIN | PRESENT) -> CLINICIAN DECIDES

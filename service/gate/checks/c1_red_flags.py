@@ -1,8 +1,12 @@
 """Check 1 — red-flag rules.
 
-Re-evaluated here against the *proposal*, not only against the state. The red
-flags already ran as their own node before the model was called; this is defence
-in depth. If a red flag is live at gate time, something upstream failed and the
+Re-evaluated here against the *proposal*, not only against the state.
+
+SPEC-V1 §4 puts a red-flag node before PROPOSE, so that a patient in this state
+never costs a draft. That node does not exist yet: `workflow.py` runs the
+drafter for every eligible patient and this check is where the escalation
+actually happens. Measured, a red-flag encounter calls the drafter once and the
+plan is discarded here. Safe, and one layer rather than two. If a red flag is live at gate time, something upstream failed and the
 proposal must not render regardless.
 
 Evaluated on structured state. Never on model output.
