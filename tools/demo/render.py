@@ -67,9 +67,9 @@ a:hover { text-decoration-color:var(--ember); }
 a:focus-visible { outline:2px solid var(--ember); outline-offset:2px; border-radius:2px; }
 
 header { padding:44px 30px 0; border-bottom:1px solid var(--line); background:var(--panel); }
-.hin { max-width:1180px; }
-.htop { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:40px 56px;
-  align-items:start; }
+.hin { max-width:none; }
+.htop { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,520px);
+  gap:40px 72px; align-items:start; }
 @media (max-width:860px){ .htop{ grid-template-columns:1fr; gap:28px; } }
 h1 { margin:0 0 16px; font-size:clamp(2rem,4.2vw,3.1rem); font-weight:500;
   letter-spacing:-.035em; line-height:.98; text-wrap:balance; }
@@ -109,7 +109,7 @@ nav { border-right:1px solid var(--line); background:var(--panel); }
 .enc .n { color:var(--ash); font-size:11.5px; }
 .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
 .dot.green{background:var(--green)} .dot.amber{background:var(--amber)} .dot.red{background:var(--red)}
-main { padding:26px 30px 60px; max-width:960px; }
+main { padding:26px 30px 60px; max-width:none; min-width:0; }
 .hd { font-size:17px; font-weight:650; margin:0 0 3px; }
 .hd + .sub { color:var(--graphite); font-size:13px; margin-bottom:14px; }
 .outcome { display:inline-block; padding:3px 9px; border-radius:3px;

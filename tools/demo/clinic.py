@@ -32,7 +32,7 @@ letter-spacing:-.035em;line-height:1;text-wrap:balance}
 max-width:56ch;text-wrap:pretty;margin:0}
 a,a:visited{color:var(--ember)}
 a:focus-visible{outline:2px solid var(--ember);outline-offset:2px;border-radius:2px}
-main{padding:20px 26px;max-width:1180px}
+main{padding:24px 30px 60px;max-width:none}
 .bar{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:14px 16px;
 margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
 /* A select sizes to its longest option, and these options are sentences. On a
@@ -63,7 +63,7 @@ button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 button.ghost:hover{background:var(--paper-warm);border-color:var(--ash)}
 button[disabled],button[disabled]:hover{opacity:.45;cursor:default;background:transparent;
 color:var(--ash);border-color:var(--line)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
 .p{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .p h3{margin:0 0 10px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center}
 .rm{border:0;background:none;color:var(--ash);font-size:16px;padding:0 6px;cursor:pointer;
