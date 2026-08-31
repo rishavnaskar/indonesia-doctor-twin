@@ -191,8 +191,9 @@ def _thread_id(scenario, rules, router) -> str:
     the second run without ever showing a result that belongs to a question
     nobody asked.
 
-    This is also what makes `make live` usable: nine model calls the first time,
-    none the second, and an edit to a guideline file still costs nine.
+    This is also what makes `make live` usable: nine model calls for this page
+    the first time, none the second, and an edit to a guideline file costs them
+    again. `tools/live.py` does the same for the run's other five.
     """
     material = json.dumps({
         "view": VIEW_VERSION,

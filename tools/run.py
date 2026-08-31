@@ -172,7 +172,8 @@ def main() -> int:
              [PY, "-m", "tools.walkthrough"], False))
     if args.live and not args.ci:
         stages.append(
-            ("Live encounters", "real model, real refusals, real provenance",
+            ("Live encounters",
+             "real model, real refusals, real provenance — replayed once stored",
              [PY, "-m", "tools.live", "--n", "5"], False))
 
     total = len(stages) + (0 if args.ci else 1)
