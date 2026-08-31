@@ -140,6 +140,7 @@ hospital without a potassium assay, and the verdict moves with it.</div>
   <div><button id="run" disabled>Run the AI clinician</button></div>
   <div><button class="ghost" id="compare" disabled title="Run these patients at every hospital">Compare hospitals</button></div>
 </div>
+<div id="publicnote"></div>
 <div id="restored"></div>
 <div id="msg"></div>
 <div class="grid" id="grid"></div>
@@ -172,6 +173,18 @@ function setObs(p, code, value, ageDays){
 
 async function boot(){
   V = await (await fetch("/api/vocabulary")).json();
+  // On a public URL this page is a route by which a real patient record could
+  // arrive, because it accepts pasted JSON. Say so before that happens rather
+  // than relying on the guard alone — the guard fails closed, but a record that
+  // never arrives is better than one that is correctly refused.
+  if (V.hosted) {
+    $("publicnote").innerHTML = `<div class="stat" style="border-left:3px solid var(--amber)">
+      <b>Public demo — synthetic patients only. Do not paste a real patient record.</b>
+      The architecture behind this requires health data to be processed inside
+      Indonesia and this deployment is not, which is why everything in it is
+      generated. A record without <span class="mono">"is_synthetic": true</span> is
+      refused before any request to a hosted model is built.</div>`;
+  }
   $("profile").innerHTML = V.profiles.map(p=>`<option value="${esc(p.key)}">${esc(p.label)}</option>`).join("");
   $("site").innerHTML = V.sites.map(s=>
     `<option value="${esc(s.site_id)}">${esc(s.site_id)} — ${esc(s.label)}</option>`).join("");

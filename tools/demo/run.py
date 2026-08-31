@@ -882,6 +882,7 @@ def vocabulary(pack_id: str = "id") -> dict:
             for k, v in (glossary.get("observations") or {}).items()
         ],
         "diagnoses": glossary.get("diagnoses") or {},
+        "hosted": os.environ.get("CLINICIAN_HOSTED", "") == "1",
         # Grouped, because a flat list of fifteen gives no sense of which ones
         # are supposed to produce a draft and which are supposed to refuse.
         "profiles": [
@@ -950,6 +951,12 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
         # states where this deployment keeps its state, because "durable" is
         # the kind of claim that should be checkable from the thing itself.
         "store": store().summary(),
+        # Set by the container. A public deployment says so on the page: this
+        # document argues that health data must be processed in-country, and a
+        # demo on foreign infrastructure has to answer that rather than hope
+        # nobody asks. The answer is that every record here is synthetic and the
+        # residency guard structurally refuses anything else.
+        "hosted": os.environ.get("CLINICIAN_HOSTED", "") == "1",
         # How many of the encounters below came back from the store rather than
         # being run again. On a second `make live` this is the whole page, and
         # zero model calls.

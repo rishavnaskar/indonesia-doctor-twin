@@ -21,6 +21,7 @@ import html as html_lib
 import http.server
 import json
 import socketserver
+import os
 import sys
 import threading
 import time
@@ -241,7 +242,16 @@ def main() -> int:
                              "opinion of itself (costs one call per sample)")
     parser.add_argument("--provider", default="openrouter", choices=["anthropic", "openrouter"])
     parser.add_argument("--no-open", action="store_true")
+    parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"),
+                        help="interface to bind. Defaults to localhost; a public "
+                             "deployment sets HOST=0.0.0.0")
     args = parser.parse_args()
+
+    # A platform tells the process which port to listen on, and it is not
+    # negotiable — bind the wrong one and the health check fails with the app
+    # running perfectly. --port still wins, so local use is unchanged.
+    if os.environ.get("PORT") and "--port" not in sys.argv:
+        args.port = int(os.environ["PORT"])
 
     from service.packs.loader import PackError, load_pack
 
@@ -421,7 +431,7 @@ def main() -> int:
         daemon_threads = True
 
     try:
-        server = Server(("127.0.0.1", args.port), Handler)
+        server = Server((args.host, args.port), Handler)
     except OSError as exc:
         # Almost always a previous run still serving, or a second checkout. A
         # stack trace ending in "Address already in use" underneath a `make`
@@ -435,10 +445,15 @@ def main() -> int:
         return 1
 
     with server as httpd:
-        url = f"http://127.0.0.1:{args.port}/"
+        url = f"http://{args.host}:{args.port}/"
         print(f"\n  Serving the clinician surface at {url}")
-        print("  Bound to localhost only. The page answers straight away and shows")
-        print("  progress while the scenarios run.")
+        if args.host in ("127.0.0.1", "localhost"):
+            print("  Bound to localhost only. The page answers straight away and shows")
+            print("  progress while the scenarios run.")
+        else:
+            print(f"  Bound to {args.host} — reachable from outside this machine.")
+            print("  Synthetic records only: the residency guard refuses to send")
+            print("  anything else to a hosted model.")
         if args.live:
             print("  Live mode: one model call per scenario, built once and reused.")
         print(f"  Build your own patients at {url}clinic")

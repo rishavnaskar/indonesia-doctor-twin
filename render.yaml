@@ -1,0 +1,42 @@
+# One free web service and one free Postgres, from this repository.
+#
+# The surface only. `make` runs the gates and then serves, which is right for a
+# developer and wrong for a platform: a container restarting should answer a
+# health check in seconds, not re-run a test suite first. CI is where the gates
+# belong.
+#
+# Everything here is on Render's free plans. Two things that follow from that
+# and are better known in advance than discovered: a free web service sleeps
+# after 15 minutes idle and takes roughly a minute to wake, and a free Postgres
+# is deleted after 30 days. The second is survivable by design — with no
+# database reachable the store falls back to append-only files and says so on
+# the page — but the encounter history resets, so re-seed if it matters.
+
+services:
+  - type: web
+    name: ai-clinician
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    # Answers immediately, while the page is still building. Pointing the check
+    # at / would fail the deploy during the first render.
+    healthCheckPath: /status
+    envVars:
+      - key: CLINICIAN_DATABASE_URL
+        fromDatabase:
+          name: clinician-store
+          property: connectionString
+      # Draft with a real model. The page still costs nothing to load: the
+      # encounters are replayed from the store, seeded before launch.
+      - key: CLINICIAN_LIVE
+        value: "1"
+      # Set in the dashboard, never in the repository. Without it the
+      # entrypoint falls back to the reference reasoner rather than failing.
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+databases:
+  - name: clinician-store
+    plan: free
+    # Postgres 16, matching docker-compose.yml so the migrations behave the same.
+    postgresMajorVersion: "16"

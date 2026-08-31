@@ -204,6 +204,17 @@ function meta(){
           so a change in behaviour is a real change rather than the model having a different day.
           The AI model plugs into the same interface and nothing downstream moves.
           Run <span class="mono">make live</span> to see it drafted by an actual model.`);
+  if (DATA.hosted) {
+    document.getElementById("meta").insertAdjacentHTML("afterend",
+      `<div class="stat" style="border-left:3px solid var(--amber)">
+        <b>This is a public demo, and every patient in it is synthetic.</b>
+        The architecture behind it requires health data to be processed inside
+        Indonesia; this page is not, which is exactly why nothing real is in it.
+        The residency guard enforces that rather than trusting it &mdash; a record
+        not marked synthetic is refused before any request to a hosted model is
+        built, so pointing this deployment at a real patient fails closed instead
+        of quietly exporting one.</div>`);
+  }
   const fails = DATA.drafter_failures || 0;
   document.getElementById("stat").innerHTML =
     `<b>${DATA.declined} of the ${DATA.total} visits below ended with no recommendation reaching the doctor.</b>

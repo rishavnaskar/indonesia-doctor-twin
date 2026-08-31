@@ -1,0 +1,12 @@
+.venv/
+.git/
+.store/
+.tools/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.eval_out/
+*.pyc
+.env
+demo.html
+docs/DEMO.md
