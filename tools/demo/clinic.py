@@ -118,6 +118,18 @@ border-radius:50%;animation:sp .7s linear infinite}
 .chk .mk{flex:0 0 14px;font-weight:700}
 .chk.ok .mk{color:var(--green)}.chk.hit .mk{color:var(--red)}
 .kv{display:flex;gap:8px;font-size:12px;padding:3px 0}
+.draft{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;
+background:var(--panel)}
+.draft .hd{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);
+margin-bottom:9px}
+.dr{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.dr:last-child{border-bottom:0}
+.dr b.k{color:var(--ash);font-weight:500;min-width:92px;flex:0 0 92px}
+.dr .v{flex:1;min-width:0}
+.tag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:20px;
+border:1px solid var(--line);background:var(--paper);color:var(--graphite);margin-left:4px}
+.gloss{color:var(--graphite);font-size:12px;font-style:italic;margin-top:5px}
+.sig{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
 .kv b{color:var(--ash);font-weight:500;min-width:96px}
 textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .warnbox{background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;
@@ -342,6 +354,50 @@ function auditPanel(r){
   </details>`;
 }
 
+// The same draft the scripted page shows, in a narrower column. Deliberately a
+// copy of that structure rather than a summary of it: /clinic is where a reader
+// changes something and re-runs, so seeing only the recommendation there and the
+// full draft on the other page makes the two look like different systems.
+function drow(k, v){ return `<div class="dr"><b class="k">${esc(k)}</b><div class="v">${v}</div></div>`; }
+
+function draftCard(r, d){
+  const changes = (d.medication_changes||[]).map(c=>drow(esc(c.action),
+    `<b>${esc(c.molecule)}</b> ${c.mg_per_dose}&nbsp;mg, ${c.doses_per_day}&times; a day
+     ${c.class_label?`<span class="tag">${esc(c.class_label)}</span>`:""}
+     ${c.class_plain?`<div class="plain">${esc(c.class_plain)}</div>`:""}
+     ${c.rationale?`<div class="plain">Reason given: ${esc(c.rationale)}</div>`:""}`)).join("");
+  const instructions = d.patient_instructions ? `
+    <div class="sec" style="margin-top:11px">What the patient is told</div>
+    ${d.patient_instructions_gloss
+      ? `<div style="font-size:12.5px">${esc(d.patient_instructions_gloss)}</div>
+         <div class="gloss">${esc(d.patient_instructions)}
+           <span class="tag">as given to the patient, in ${esc(V.pack.language)}</span></div>`
+      : `<div style="font-size:12.5px">${esc(d.patient_instructions)}
+           <span class="tag">in ${esc(V.pack.language)}; no English version was supplied</span></div>`}` : "";
+  const sig = r.signature ? `
+    <div class="sig">
+      <div class="sec">Signature</div>
+      ${drow("Signed by", `${esc(r.signature.practitioner_id)} · ${esc(r.signature.role)}`)}
+      ${drow("Licence valid until", esc(r.signature.licence_expires))}
+      ${drow("Decision", esc(r.signature.decision))}
+      <div class="plain" style="margin-top:6px">The signature is refused in software if the
+        licence has lapsed or the doctor is not on this hospital's roster.</div>
+    </div>` : "";
+  return `<div class="draft">
+    <div class="hd">The draft, for the doctor to accept, edit or reject</div>
+    ${drow("Assessment", `${esc(d.assessment)}<div class="plain">${esc(d.assessment_plain)}</div>`)}
+    ${drow("Proposed action", `<b>${esc(d.recommendation.replace(/_/g," "))}</b>
+      <div class="plain">${esc(d.recommendation_plain)}</div>`)}
+    ${changes}
+    ${d.follow_up_interval_days?drow("Come back in", `${d.follow_up_interval_days} days`):""}
+    ${r.claim?drow("Billing codes", r.claim.codes.map(c=>
+      `<div><span class="mono">${esc(c.code)}</span> <span class="plain">${esc(c.plain)}</span></div>`).join("")):""}
+    ${drow("Confidence", `${(d.confidence*100).toFixed(0)}%`)}
+    ${instructions}
+    ${sig}
+  </div>`;
+}
+
 function verdict(p){
   const r = results[p.patient_id];
   if (running) {
@@ -361,10 +417,7 @@ function verdict(p){
   return `<div class="verdict">
     <span class="pill ${r.presentation.band}">${esc(r.outcome.replace(/_/g," "))}</span>
     <div class="plain" style="margin-top:6px">${esc(r.outcome_plain)}</div>
-    ${d && r.presentation.shows_draft ? `<div class="sec">Draft</div>
-      <div><b>${esc(d.recommendation.replace(/_/g," "))}</b> · ${esc(d.recommendation_plain)}</div>
-      ${d.medication_changes.map(c=>`<div class="plain">${esc(c.action)} ${esc(c.molecule)} ${c.mg_per_dose}mg ×${c.doses_per_day}</div>`).join("")}
-      ${r.claim?`<div class="plain">Coded: ${r.claim.codes.map(c=>esc(c.code)).join(", ")}</div>`:""}` : ""}
+    ${d && r.presentation.shows_draft ? draftCard(r, d) : ""}
     ${(r.exclusions||[]).length ? `<div class="sec">Why this patient is out of scope</div>
       ${r.exclusions.map(x=>`<div class="find">
         <div class="src">Exclusion ${esc(x.id)}</div><b>${esc(x.label)}</b>
