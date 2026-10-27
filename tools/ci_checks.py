@@ -55,7 +55,7 @@ def _banned_vocabulary() -> set[str]:
             words.add(rules.pack_id.lower())
             words |= {m.lower() for m in rules.molecules}
             words |= {m.lower() for m in rules.recognised}
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # noqa: BLE001 - a check must not crash on a bad pack
         print(f"  ! could not read packs for vocabulary: {exc}")
     # 'id' as a pack id is far too short to grep for without drowning in noise.
     return {w for w in words if len(w) > 3}
@@ -190,7 +190,7 @@ def _prose_dash(text: str) -> bool:
 
 def check_no_em_dashes_in_docs() -> list[str]:
     failures = []
-    for path in sorted(ROOT.glob("docs/*.md")) + [ROOT / "README.md"]:
+    for path in [*sorted(ROOT.glob("docs/*.md")), ROOT / "README.md"]:
         for n, line in enumerate(path.read_text().splitlines(), 1):
             if EM_DASH in line or any(e in line for e in ENTITY_DASHES):
                 failures.append(f"{path.relative_to(ROOT)}:{n}")
@@ -198,17 +198,27 @@ def check_no_em_dashes_in_docs() -> list[str]:
 
 
 def check_no_em_dashes_in_rendered_text() -> list[str]:
-    """Every string the user reads: pack values, and Python string literals.
+    """Every string the user reads: pack values, HTML templates, string literals.
 
     Docstrings and comments are exempt. They are notes to whoever maintains
     this, not text the surface renders.
+
+    The HTML files are here because the surface's three pages used to be raw
+    strings inside Python modules, where this check caught them. Moving them
+    into tools/demo/templates/ would have quietly dropped 1,200 lines of
+    rendered text out of a check that exists to read what actually ships.
     """
     failures = []
+
+    for path in sorted((ROOT / "tools").rglob("*.html")):
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if _prose_dash(line) or any(e in line for e in ENTITY_DASHES):
+                failures.append(f"{path.relative_to(ROOT)}:{n}")
 
     for path in sorted((ROOT / "packs").rglob("*.yaml")):
         try:
             data = yaml.safe_load(path.read_text())
-        except Exception:
+        except Exception:  # noqa: BLE001 - an unparseable pack is another check's job
             continue
 
         def walk(node, trail=""):
@@ -235,10 +245,10 @@ def check_no_em_dashes_in_rendered_text() -> list[str]:
             continue
         exempt = set()
         for node in ast.walk(tree):
-            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
-                                 ast.AsyncFunctionDef)) and node.body:
-                if ast.get_docstring(node, clean=False) is not None:
-                    exempt.add(node.body[0].lineno)
+            if (isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                  ast.AsyncFunctionDef)) and node.body
+                    and ast.get_docstring(node, clean=False) is not None):
+                exempt.add(node.body[0].lineno)
         for node in ast.walk(tree):
             if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
                 continue

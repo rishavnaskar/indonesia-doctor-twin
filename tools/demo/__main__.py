@@ -8,221 +8,27 @@ Serving and exporting produce the same page from the same run. The export
 exists because the people who most need to see this are the least likely to
 clone a repository and run make.
 
-The server answers immediately and builds in the background. A live run makes
-one model call per scenario and, on a rate-limited free tier, that can take
-minutes — during which a server that simply does not respond is
-indistinguishable from one that has hung. It says what it is doing instead.
+This module is argument parsing. The routes, the background build and the
+health check are in server.py.
 """
 
 from __future__ import annotations
 
 import argparse
-import html as html_lib
-import http.server
-import json
-import socketserver
 import os
 import sys
-import threading
-import time
-import webbrowser
 from pathlib import Path
 
-from tools.demo.clinic import CLINIC_HTML
+from service.logging import configure, get_logger
 from tools.demo.render import render
-from tools.demo.run import collect, compare_sites, run_patients, vocabulary
+from tools.demo.run import collect
+from tools.demo.server import serve
 from tools.live import load_env
 
-
-class RunJob:
-    """One interactive run, watched while it happens.
-
-    The model call is the slow phase, so a caller that cannot say which phase
-    it is in can only report "working" — which is what a hung process reports
-    too. This records the real step each patient is on, from the workflow's own
-    callback, so the page shows what is actually happening rather than an
-    animation of what usually happens.
-    """
-
-    def __init__(self, patients, site_id, live, args):
-        self.patients = patients
-        self.site_id = site_id
-        self.live = live
-        self.args = args
-        self.lock = threading.Lock()
-        self.steps: dict[int, str] = {}
-        self.done: dict[int, str] = {}
-        self.result: dict | None = None
-        self.error: str | None = None
-        self.started_at = time.time()
-        threading.Thread(target=self._run, daemon=True).start()
-
-    def _run(self) -> None:
-        try:
-            router = None
-            if self.live:
-                load_env()
-                from service.router.router import router_with_model
-
-                router = router_with_model(self.args.model, provider=self.args.provider,
-                                           samples=self.args.samples, critic=self.args.critic, use_tools=self.args.tools, shadow=self.args.shadow)
-
-            def on_step(index, name):
-                with self.lock:
-                    self.steps[index] = name
-
-            def on_progress(index, total, title, outcome):
-                with self.lock:
-                    self.done[index] = str(outcome)
-                    self.steps.pop(index, None)
-
-            result = run_patients(
-                self.patients, site_id=self.site_id, pack_id=self.args.pack,
-                router=router, on_progress=on_progress, on_step=on_step,
-            )
-            with self.lock:
-                self.result = result
-        except Exception as exc:  # noqa: BLE001
-            with self.lock:
-                self.error = f"{type(exc).__name__}: {exc}"
-
-    def status(self) -> dict:
-        with self.lock:
-            return {
-                "ready": self.result is not None,
-                "error": self.error,
-                "total": len(self.patients),
-                "steps": {str(k): v for k, v in self.steps.items()},
-                "finished": {str(k): v for k, v in self.done.items()},
-                "elapsed": round(time.time() - self.started_at),
-                "result": self.result,
-            }
+log = get_logger(__name__)
 
 
-_JOBS: dict[str, RunJob] = {}
-
-
-class Build:
-    """One run of the scenarios, built once and reused.
-
-    Rebuilding per request was the original design, so that editing a pack and
-    reloading showed the rules move. With a real model behind the router that
-    turned every browser request — including the one Safari makes for a
-    favicon — into another full set of model calls, serialised behind the
-    single-threaded server. Observed: twelve minutes to first paint.
-
-    So: build once, reuse, and rebuild only when explicitly asked.
-    """
-
-    def __init__(self, args):
-        self.args = args
-        self.lock = threading.Lock()
-        self.html: str | None = None
-        self.error: str | None = None
-        self.progress: list[dict] = []
-        self.done = 0
-        self.total = 0
-        self.started_at = 0.0
-        self.thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        with self.lock:
-            if self.thread and self.thread.is_alive():
-                return
-            self.html = None
-            self.error = None
-            self.progress = []
-            self.done = 0
-            self.total = 0
-            self.started_at = time.time()
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-
-    def _note(self, done, total, title, outcome) -> None:
-        with self.lock:
-            self.done, self.total = done, total
-            self.progress.append({"title": title, "outcome": str(outcome)})
-        print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
-
-    def _run(self) -> None:
-        try:
-            router = None
-            if self.args.live:
-                load_env()
-                from service.router.router import router_with_model
-
-                router = router_with_model(self.args.model, provider=self.args.provider,
-                                           samples=self.args.samples, critic=self.args.critic, use_tools=self.args.tools, shadow=self.args.shadow)
-            data = collect(self.args.pack, router=router, on_progress=self._note)
-            page = render(data)
-        except Exception as exc:  # noqa: BLE001 - a broken pack must be visible
-            with self.lock:
-                self.error = f"{type(exc).__name__}: {exc}"
-            print(f"  build failed: {self.error}", flush=True)
-            return
-        with self.lock:
-            self.html = page
-        print(f"  ready in {time.time() - self.started_at:.0f}s", flush=True)
-
-    def status(self) -> dict:
-        with self.lock:
-            return {
-                "ready": self.html is not None,
-                "error": self.error,
-                "done": self.done,
-                "total": self.total,
-                "elapsed": round(time.time() - self.started_at),
-                "progress": list(self.progress),
-                "live": bool(self.args.live),
-            }
-
-
-_LOADING = """<!doctype html><html><head><meta charset="utf-8">
-<title>AI clinician, building</title><style>
-:root{color-scheme:light;--bg:#f7f6f8;--panel:#fff;--ink:#0b0b0c;--muted:#4c4c52;
---ash:#68686f;--line:#e2ded7;--accent:#f0521c;--code:#f1efea}
-body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
-font:15px/1.6 "DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-display:flex;align-items:center;justify-content:center;min-height:100vh}
-.box{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:30px 32px;max-width:620px;width:92%}
-.eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
-letter-spacing:.16em;text-transform:uppercase;color:var(--ash);margin:0 0 12px}
-h1{margin:0 0 8px;font-size:1.6rem;font-weight:500;letter-spacing:-.03em;line-height:1.05}
-p{color:var(--muted);font-size:13.5px;margin:0 0 18px}
-.bar{height:3px;background:var(--code);border-radius:2px;overflow:hidden;margin-bottom:14px}
-.fill{height:100%;background:var(--accent);width:0;transition:width .4s}
-li{font-size:13px;margin-bottom:5px;list-style:none}
-ul{padding:0;margin:0}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted)}
-.err{color:#b3261e}
-</style></head><body><div class="box">
-<p class="eyebrow">Working</p>
-<h1>Running the visits</h1>
-<p id="sub">Each visit is one call to a real model. On a free tier that takes a couple of
-minutes. If a model is rate-limited it gets retried, then the next one is tried.</p>
-<div class="bar"><div class="fill" id="fill"></div></div>
-<ul id="log"></ul>
-<div class="mono" id="t"></div>
-</div><script>
-async function tick(){
-  const s = await (await fetch("/status")).json();
-  if (s.ready) { location.reload(); return; }
-  if (s.error) { document.getElementById("log").innerHTML =
-    `<li class="err">Build failed: ${s.error}</li>`; return; }
-  document.getElementById("fill").style.width = s.total ? (100*s.done/s.total)+"%" : "6%";
-  document.getElementById("log").innerHTML =
-    s.progress.map(p=>`<li>&#10003; ${p.title} <span class="mono">&rarr; ${p.outcome}</span></li>`).join("");
-  document.getElementById("t").textContent =
-    `${s.done} of ${s.total||"?"} done &middot; ${s.elapsed}s elapsed`.replace("&middot;","·");
-  if (!s.live) document.getElementById("sub").textContent =
-    "Running through the rule-following reasoner. This should take a second.";
-  setTimeout(tick, 700);
-}
-tick();
-</script></body></html>"""
-
-
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="The clinician surface, from a real run.")
     parser.add_argument("--export", metavar="PATH", help="write a single self-contained file")
     parser.add_argument("--port", type=int, default=8000)
@@ -246,15 +52,50 @@ def main() -> int:
                              "opinion of itself (costs one call per sample)")
     parser.add_argument("--provider", default="openrouter", choices=["anthropic", "openrouter"])
     parser.add_argument("--no-open", action="store_true")
+    parser.add_argument("--log-level", default=None, choices=["debug", "info", "warning", "error"],
+                        help="structured logs go to stderr. CLINICIAN_LOG_LEVEL does "
+                             "the same thing, and CLINICIAN_LOG_FORMAT=plain makes "
+                             "them readable rather than machine-readable")
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"),
                         help="interface to bind. Defaults to localhost; a public "
                              "deployment sets HOST=0.0.0.0")
-    args = parser.parse_args()
+    return parser
+
+
+def export(args) -> int:
+    """Write the whole run to one self-contained file."""
+    router = None
+    if args.live:
+        load_env()
+        from service.router.router import router_with_model
+
+        router = router_with_model(
+            args.model, provider=args.provider, samples=args.samples,
+            critic=args.critic, use_tools=args.tools, shadow=args.shadow,
+        )
+
+    def note(done, total, title, outcome):
+        log.info("scenario.finished",
+                 extra={"done": done, "total": total, "title": title,
+                        "outcome": str(outcome)})
+        print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
+
+    path = Path(args.export)
+    path.write_text(render(collect(args.pack, router=router, on_progress=note)),
+                    encoding="utf-8")
+    print(f"\n  Wrote {path} ({path.stat().st_size / 1024:.0f} KB, self-contained).")
+    print("  Open it anywhere, or send it to someone who will not run make.\n")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    configure(args.log_level, force=True)
 
     # A platform tells the process which port to listen on, and it is not
-    # negotiable — bind the wrong one and the health check fails with the app
+    # negotiable: bind the wrong one and the health check fails with the app
     # running perfectly. --port still wins, so local use is unchanged.
-    if os.environ.get("PORT") and "--port" not in sys.argv:
+    if os.environ.get("PORT") and "--port" not in (argv if argv is not None else sys.argv):
         args.port = int(os.environ["PORT"])
 
     from service.packs.loader import PackError, load_pack
@@ -262,273 +103,13 @@ def main() -> int:
     try:
         load_pack(args.pack)
     except PackError as exc:
+        log.error("pack.unreadable", extra={"pack": args.pack, "detail": str(exc)[:200]})
         print(f"\n  Could not load the rule pack {args.pack!r}: {exc}\n")
         return 2
 
     if args.export:
-        router = None
-        if args.live:
-            load_env()
-            from service.router.router import router_with_model
-
-            router = router_with_model(args.model, provider=args.provider,
-                                       samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow)
-
-        def note(done, total, title, outcome):
-            print(f"  [{done}/{total}] {title} -> {outcome}", flush=True)
-
-        path = Path(args.export)
-        path.write_text(render(collect(args.pack, router=router, on_progress=note)),
-                        encoding="utf-8")
-        print(f"\n  Wrote {path} ({path.stat().st_size / 1024:.0f} KB, self-contained).")
-        print("  Open it anywhere, or send it to someone who will not run make.\n")
-        return 0
-
-    build = Build(args)
-    build.start()
-
-    class Handler(http.server.BaseHTTPRequestHandler):
-        # HEAD sets this, so the routing below runs unchanged and only the body
-        # is withheld. See do_HEAD.
-        head_only = False
-
-        def _send(self, body: bytes, content_type: str, code: int = 200) -> None:
-            try:
-                self.send_response(code)
-                self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Cache-Control", "no-store")
-                self.end_headers()
-                if not self.head_only:
-                    self.wfile.write(body)
-            except (BrokenPipeError, ConnectionResetError):
-                pass  # the browser hung up; nothing to report
-
-        def _json(self, payload: dict, code: int = 200) -> None:
-            self._send(json.dumps(payload).encode("utf-8"), "application/json", code)
-
-        def _router(self, live: bool):
-            if not live:
-                return None
-            load_env()
-            from service.router.router import router_with_model
-
-            return router_with_model(args.model, provider=args.provider,
-                                     samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow)
-
-        def do_POST(self):  # noqa: N802 - stdlib naming
-            path = self.path.split("?", 1)[0]
-            try:
-                length = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(length) or b"{}")
-            except (ValueError, json.JSONDecodeError) as exc:
-                self._json({"error": f"could not read the request: {exc}"}, 400)
-                return
-
-            try:
-                if path == "/api/generate":
-                    from tools.demo.patients import generate
-
-                    self._json({"patients": generate(
-                        int(body.get("n", 3)),
-                        seed=int(body.get("seed", 0)),
-                        profile=str(body.get("profile", "clean")),
-                    )})
-                    return
-
-                if path == "/api/compare":
-                    patients = body.get("patients") or []
-                    if not patients:
-                        self._json({"error": "no patients to compare"}, 400)
-                        return
-                    self._json(compare_sites(
-                        patients, pack_id=args.pack,
-                        router=self._router(bool(body.get("live"))),
-                    ))
-                    return
-
-                if path == "/api/reset":
-                    # Destroys the audit trail. Distinct from /api/history/clear,
-                    # which deletes nothing and only moves the page's start
-                    # marker forward. Guarded rather than hidden: a button the
-                    # server refuses is better than a button that is not there,
-                    # because the refusal says why.
-                    from tools.demo.run import reset_allowed, reset_everything
-
-                    if not reset_allowed():
-                        self._json({"error": "Reset is switched off on this "
-                                             "deployment. Set CLINICIAN_ALLOW_RESET=1 "
-                                             "to enable it."}, 403)
-                        return
-                    if body.get("confirm") != "DELETE":
-                        self._json({"error": "confirmation missing"}, 400)
-                        return
-                    counts = reset_everything()
-                    build.start()  # the scripted page was built from what just went
-                    self._json({"destroyed": counts})
-                    return
-
-                if path == "/api/history/clear":
-                    from tools.demo.run import clear_clinic_history
-
-                    self._json({"cleared_at": clear_clinic_history()})
-                    return
-
-                if path == "/api/run":
-                    patients = body.get("patients") or []
-                    if not patients:
-                        self._json({"error": "no patients to run"}, 400)
-                        return
-                    job_id = f"j{len(_JOBS) + 1}-{int(time.time() * 1000) % 100000}"
-                    _JOBS[job_id] = RunJob(
-                        patients, str(body.get("site_id", "SITE-A")),
-                        bool(body.get("live")), args,
-                    )
-                    self._json({"job_id": job_id})
-                    return
-            except Exception as exc:  # noqa: BLE001
-                # Including ResidencyError, which is the guard doing its job and
-                # therefore belongs on screen with its own words rather than as
-                # a 500 the browser renders as "something went wrong".
-                self._json({"error": f"{type(exc).__name__}: {exc}"}, 400)
-                return
-
-            self._json({"error": "not found"}, 404)
-
-        def do_HEAD(self):  # noqa: N802 - stdlib naming
-            """Same status and headers as GET, no body.
-
-            Without this, BaseHTTPRequestHandler answers every HEAD with 501.
-            That is not a cosmetic gap: health checks, uptime monitors and
-            proxies routinely probe with HEAD, and a 501 reads as unhealthy —
-            which is a restart, and then another, with the application working
-            perfectly the entire time.
-
-            Routing is not duplicated. The GET handler runs exactly as it would
-            otherwise and `_send` withholds the body, so the two can never
-            disagree about what a path returns.
-            """
-            self.head_only = True
-            try:
-                self.do_GET()
-            finally:
-                self.head_only = False
-
-        def do_GET(self):  # noqa: N802 - stdlib naming
-            path = self.path.split("?", 1)[0]
-
-            # Anything that is not the page must never trigger a rebuild. A
-            # favicon request used to cost a full set of model calls.
-            if path == "/favicon.ico":
-                self._send(b"", "image/x-icon", 204)
-                return
-            if path == "/clinic":
-                self._send(CLINIC_HTML.encode("utf-8"), "text/html; charset=utf-8")
-                return
-            if path == "/sites":
-                # Built per request rather than cached with the scripted page:
-                # it reads the pack and nothing else, so it costs a file read
-                # and can never be stale against an edited guideline.
-                from tools.demo.run import sites_view
-                from tools.demo.sites import render_sites
-
-                self._send(render_sites(sites_view(args.pack)).encode("utf-8"),
-                           "text/html; charset=utf-8")
-                return
-            if path == "/api/sites":
-                from tools.demo.run import sites_view
-
-                self._json(sites_view(args.pack))
-                return
-            if path.startswith("/api/job"):
-                job_id = ""
-                if "?" in self.path:
-                    from urllib.parse import parse_qs
-
-                    job_id = (parse_qs(self.path.split("?", 1)[1]).get("id") or [""])[0]
-                job = _JOBS.get(job_id)
-                if job is None:
-                    self._json({"error": "unknown job"}, 404)
-                else:
-                    self._json(job.status())
-                return
-            if path == "/api/vocabulary":
-                self._json(vocabulary(args.pack))
-                return
-            if path == "/api/history":
-                from tools.demo.run import clinic_history, store
-
-                self._json({
-                    "visits": clinic_history(),
-                    "backend": store().backend,
-                    "location": store().summary()["location"],
-                })
-                return
-            if path == "/status":
-                self._send(json.dumps(build.status()).encode(), "application/json")
-                return
-            if path == "/rerun":
-                build.start()
-                self._send(_LOADING.encode(), "text/html; charset=utf-8")
-                return
-            if path != "/":
-                self._send(b"not found", "text/plain", 404)
-                return
-
-            status = build.status()
-            if status["error"]:
-                self._send(
-                    f"<pre>{html_lib.escape(status['error'])}</pre>".encode(),
-                    "text/html; charset=utf-8", 500,
-                )
-            elif status["ready"]:
-                self._send(build.html.encode("utf-8"), "text/html; charset=utf-8")
-            else:
-                self._send(_LOADING.encode(), "text/html; charset=utf-8")
-
-        def log_message(self, *a):  # quiet
-            pass
-
-    # Threaded, so polling /status is not queued behind anything.
-    class Server(socketserver.ThreadingTCPServer):
-        allow_reuse_address = True
-        daemon_threads = True
-
-    try:
-        server = Server((args.host, args.port), Handler)
-    except OSError as exc:
-        # Almost always a previous run still serving, or a second checkout. A
-        # stack trace ending in "Address already in use" underneath a `make`
-        # that has just spent two minutes passing every gate reads as though
-        # something broke, which is the opposite of what happened.
-        print(f"\n  Port {args.port} is already in use.\n")
-        print("  Something is already serving there, usually a previous run of")
-        print("  this. Stop it, or pick another port:\n")
-        print(f"      make PORT={args.port + 1}\n")
-        print(f"  ({type(exc).__name__}: {exc})\n")
-        return 1
-
-    with server as httpd:
-        url = f"http://{args.host}:{args.port}/"
-        print(f"\n  Serving the clinician surface at {url}")
-        if args.host in ("127.0.0.1", "localhost"):
-            print("  Bound to localhost only. The page answers straight away and shows")
-            print("  progress while the scenarios run.")
-        else:
-            print(f"  Bound to {args.host}, reachable from outside this machine.")
-            print("  Synthetic records only: the residency guard refuses to send")
-            print("  anything else to a hosted model.")
-        if args.live:
-            print("  Live mode: one model call per scenario, built once and reused.")
-        print(f"  Build your own patients at {url}clinic")
-        print("  Visit /rerun to run the scripted scenarios again.  Ctrl-C to stop.\n")
-        if not args.no_open:
-            webbrowser.open(url)
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\n  stopped.\n")
-    return 0
+        return export(args)
+    return serve(args)
 
 
 if __name__ == "__main__":

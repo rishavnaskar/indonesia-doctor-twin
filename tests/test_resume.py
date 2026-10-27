@@ -18,6 +18,7 @@ from service.packs.loader import load_pack
 from service.router.router import default_router
 from tools import scenarios as scenario_module
 from tools.demo import run as demo_run
+from tools.demo import store_access
 
 
 @pytest.fixture(scope="module")
@@ -36,8 +37,8 @@ def isolated_store(tmp_path, monkeypatch):
     monkeypatch.setenv("CLINICIAN_STORE", str(tmp_path / "store"))
     monkeypatch.setenv("CLINICIAN_STORE_BACKEND", "files")
     monkeypatch.delenv("CLINICIAN_FRESH", raising=False)
-    monkeypatch.setattr(demo_run, "_STORE", None)
-    monkeypatch.setattr(demo_run, "_RUNTIME", None)
+    monkeypatch.setattr(store_access, "_STORE", None)
+    monkeypatch.setattr(store_access, "_RUNTIME", None)
     yield
 
 
@@ -62,8 +63,8 @@ def test_a_new_process_resumes_from_what_is_on_disk(rules, scenario):
     demo_run._encounter(scenario, rules, _labels(rules), router)
 
     # Everything this process holds in memory, dropped.
-    demo_run._STORE = None
-    demo_run._RUNTIME = None
+    store_access._STORE = None
+    store_access._RUNTIME = None
 
     assert demo_run._encounter(scenario, rules, _labels(rules), router)["resumed"] is True
 
@@ -77,13 +78,13 @@ def test_editing_the_pack_invalidates_the_stored_run(rules, scenario, field, val
     that survived a guideline change would be showing the old guideline's
     answer under the new guideline's name."""
     router = default_router()
-    before = demo_run._thread_id(scenario, rules, router)
+    before = demo_run.thread_id_for(scenario, rules, router)
 
     import copy
     edited = copy.copy(rules)
     setattr(edited, field, value)
 
-    assert demo_run._thread_id(scenario, edited, router) != before
+    assert demo_run.thread_id_for(scenario, edited, router) != before
 
 
 def test_a_different_patient_is_a_different_encounter(rules, scenario):
@@ -96,7 +97,7 @@ def test_a_different_patient_is_a_different_encounter(rules, scenario):
     other.state = copy.deepcopy(scenario.state)
     other.state.age = scenario.state.age + 1
 
-    assert demo_run._thread_id(other, rules, router) != demo_run._thread_id(
+    assert demo_run.thread_id_for(other, rules, router) != demo_run.thread_id_for(
         scenario, rules, router)
 
 
@@ -118,7 +119,7 @@ def test_swapping_the_drafter_invalidates_the_stored_run(rules, scenario):
         def get(self, _name):
             return _Route()
 
-    assert demo_run._thread_id(scenario, rules, _Router()) != demo_run._thread_id(
+    assert demo_run.thread_id_for(scenario, rules, _Router()) != demo_run.thread_id_for(
         scenario, rules, default_router())
 
 
@@ -150,9 +151,9 @@ def test_the_drafter_key_does_not_move_once_a_model_has_answered(rules, scenario
             return _Route()
 
     router = _Router()
-    before = demo_run._thread_id(scenario, rules, router)
+    before = demo_run.thread_id_for(scenario, rules, router)
     backend._answered = True
-    assert demo_run._thread_id(scenario, rules, router) == before
+    assert demo_run.thread_id_for(scenario, rules, router) == before
 
 
 def test_fresh_forces_a_re_run(rules, scenario, monkeypatch):
@@ -197,7 +198,7 @@ def test_a_drafter_that_cannot_be_named_does_not_borrow_another_one_s_key(rules,
         def get(self, *args, **kwargs):
             raise KeyError("no backend")
 
-    assert demo_run._thread_id(scenario, rules, AlwaysFails()) != demo_run._thread_id(
+    assert demo_run.thread_id_for(scenario, rules, AlwaysFails()) != demo_run.thread_id_for(
         scenario, rules, default_router())
 
 
@@ -254,8 +255,8 @@ def test_clinic_visits_come_back_in_a_later_session():
     were being written to the store the whole time — nothing read them back."""
     ran = _run_clinic()
 
-    demo_run._STORE = None  # a new server process
-    demo_run._RUNTIME = None
+    store_access._STORE = None  # a new server process
+    store_access._RUNTIME = None
 
     restored = demo_run.clinic_history()
     assert {v["key"] for v in restored} == {e["key"] for e in ran["encounters"]}
@@ -408,6 +409,7 @@ def test_pack_edit_invalidates_the_thread_id(tmp_path):
     actually makes the claim in the README true.
     """
     import shutil
+
     from service.packs.loader import PACKS_ROOT, load_pack
 
     root = tmp_path / "packs"

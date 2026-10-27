@@ -8,6 +8,7 @@ reviewer something the check disagrees with is worse than no page.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from service.gate.checks.c9_executable import evidence_gap
 from service.packs.loader import load_pack
@@ -79,10 +80,9 @@ def test_page_renders_without_the_pack_leaking_raw_yaml():
 
 def test_the_route_serves_it():
     """A view nothing serves is not a feature."""
-    import tools.demo.__main__ as demo
+    from tools.demo import server
 
-    src = demo.__file__
-    text = open(src).read()
+    text = Path(server.__file__).read_text(encoding="utf-8")
     assert '"/sites"' in text and '"/api/sites"' in text
 
 

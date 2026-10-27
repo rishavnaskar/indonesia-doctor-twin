@@ -61,8 +61,8 @@ def to_wire(state: PatientState) -> dict[str, Any]:
             }
             for o in state.observations
         ],
-        "symptoms": {k: v for k, v in state.symptoms.items()},
-        "flags": {k: v for k, v in state.flags.items()},
+        "symptoms": dict(state.symptoms),
+        "flags": dict(state.flags),
         "allergies": [a.substance for a in state.allergies],
         "intolerances": [
             {"molecule": i.molecule, "drug_class": i.drug_class,

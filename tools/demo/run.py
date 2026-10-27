@@ -1,95 +1,75 @@
 """Run the scenarios and capture everything the surface needs.
 
 Every field on the page comes from here, and everything here comes from a real
-`run_encounter`. Nothing is written by hand. The moment one number on that page
-is a literal, the whole "every claim traceable" posture is gone — and this is
-exactly the audience that will ask.
+`run_encounter`. Nothing is written by hand.
+
+This module is the orchestration only. What it was also doing, and no longer
+does, lives next door:
+
+  * store_access.py  the process-wide store and runtime, and reset
+  * resume.py        the thread id, and what is already in the store
+  * wire.py          encounters, patients and failures as plain JSON
+  * history.py       what /clinic ran in earlier sessions
+  * catalogue.py     the pack read out for the browser and for /sites
+
+The names below are re-exported from here because callers have always imported
+them from `tools.demo.run`, and moving a function is not a reason to break
+them.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
-import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from uuid import uuid4
-from dataclasses import asdict, is_dataclass
-from datetime import date, datetime
-from typing import Any
 
 from service.gate.checks import catalogue as check_catalogue
-
-from service.graph.workflow import Outcome, run_encounter
-from service.packs.loader import load_pack
 from service.gate.types import Severity
+from service.graph.workflow import Outcome, run_encounter
+from service.logging import get_logger
+from service.packs.loader import load_pack
 from service.present.layer import Labels, present
 from service.router.router import default_router
-from service.signing import AuditLog, Signer
+from service.signing import Signer
 from tools import scenarios as scenario_module
+from tools.demo.catalogue import sites_view, vocabulary
+from tools.demo.history import clear_clinic_history, clinic_history
+from tools.demo.resume import VIEW_VERSION, Tampered, stored, thread_id_for
+from tools.demo.store_access import forced_fresh, reset_allowed, reset_everything, runtime, store
+from tools.demo.wire import (
+    failed_encounter,
+    patient_view,
+    plain,
+    proposal_view,
+    unreadable_record,
+)
+
+__all__ = [
+    "MAX_CONCURRENT_ENCOUNTERS",
+    "NOW",
+    "VIEW_VERSION",
+    "clear_clinic_history",
+    "clinic_history",
+    "collect",
+    "compare_sites",
+    "forced_fresh",
+    "reset_allowed",
+    "reset_everything",
+    "run_patients",
+    "runtime",
+    "sites_view",
+    "store",
+    "vocabulary",
+]
+
+log = get_logger(__name__)
 
 NOW = datetime(2026, 8, 29, 10, 0)
 
 # Free tiers are shared pools, so this stays small: the point is to overlap the
 # waiting, not to win a race against everyone else on the internet.
 MAX_CONCURRENT_ENCOUNTERS = 3
-
-_STORE = None
-_RUNTIME = None
-_STORE_LOCK = threading.Lock()
-
-# Bump when the shape of an encounter dict changes. It is part of the thread id,
-# so a stored view built by older code is simply never found: the encounter
-# re-runs rather than being handed to a renderer that no longer understands it.
-#
-# 2: the draft carries English patient instructions alongside the local-language
-#    ones. Encounters stored under version 1 were drafted before that field
-#    existed, so replaying them would render a page with no English on it and
-#    look like the change had not shipped.
-VIEW_VERSION = 2
-
-def _forced_fresh() -> bool:
-    from service.store import forced_fresh
-
-    return forced_fresh()
-
-
-def store():
-    """The deployment's durable store — Postgres if one is reachable, else files.
-
-    Opened once per process and shared, because the connection is the expensive
-    part. The objects built *from* it are per-encounter: three encounters run
-    concurrently, and a queue shared between threads has a read-then-write in
-    `enqueue` that nothing here would notice going wrong. Rebuilding costs a
-    reload of a table that a demo keeps small.
-    """
-    global _STORE
-    with _STORE_LOCK:
-        if _STORE is None:
-            from service.store import Store
-
-            _STORE = Store()
-    return _STORE
-
-
-def runtime():
-    """The durable runtime, loaded once per process.
-
-    Unlike the queue and the audit log this one is shared between the three
-    concurrent encounters, because it is also the thing they look themselves up
-    in — rebuilding it per encounter would re-read every checkpoint the
-    deployment has ever written, once per patient. Sharing is safe here in a way
-    it is not for the queue: distinct thread ids mean distinct lists, and
-    `setdefault` on the thread dict is atomic.
-    """
-    global _RUNTIME
-    # store() outside the lock, not inside it: threading.Lock is not reentrant,
-    # and taking it here and again in store() deadlocks the first caller.
-    durable = store()
-    with _STORE_LOCK:
-        if _RUNTIME is None:
-            _RUNTIME = durable.runtime()
-    return _RUNTIME
 
 
 def _reported_drafter(encounters, fallback: str) -> str:
@@ -109,435 +89,6 @@ def _reported_drafter(encounters, fallback: str) -> str:
     return fallback
 
 
-CLEAR_MARKER = "CLINIC-HISTORY-CLEARED"
-
-
-def clinic_history(limit: int = 24) -> list[dict]:
-    """Visits run at /clinic in earlier sessions, newest first.
-
-    The interactive page was the one part of the system that kept nothing: its
-    results lived in a dict in the server process and its patients lived in the
-    browser tab, so closing either one lost the work. They were being written to
-    the store the whole time — nothing was reading them back.
-    """
-    since = _cleared_at()
-    latest: dict[str, dict] = {}
-    for history in runtime().checkpoints.values():
-        for entry in reversed(history):
-            if entry.step != "rendered" or not isinstance(entry.state, dict):
-                continue
-            view = entry.state
-            if view.get("origin") != "clinic":
-                break
-            ran_at = view.get("ran_at") or ""
-            if since and ran_at <= since:
-                break
-            # One card per patient: re-running the same record is the same
-            # patient seen again, not a second patient.
-            keep = latest.get(view.get("key"))
-            if keep is None or ran_at > (keep.get("ran_at") or ""):
-                latest[view.get("key")] = view
-            break
-    ordered = sorted(latest.values(), key=lambda v: v.get("ran_at") or "", reverse=True)
-    return ordered[:limit]
-
-
-def clear_clinic_history() -> str:
-    """Hide what is on the page without deleting any of it.
-
-    The store refuses UPDATE and DELETE — that is the point of it — so clearing
-    is a marker written forward rather than history rewritten backwards. The
-    visits stay on the record and remain replayable by `python -m tools.store`;
-    the page simply starts after the marker. An audit log with a clear button
-    that worked would not be an audit log.
-    """
-    at = datetime.now().isoformat()
-    runtime().checkpoint(CLEAR_MARKER, "rendered", {"origin": "cleared", "ran_at": at})
-    return at
-
-
-def _cleared_at() -> str:
-    history = runtime().checkpoints.get(CLEAR_MARKER) or []
-    stamps = [e.state.get("ran_at", "") for e in history
-              if isinstance(e.state, dict) and e.state.get("origin") == "cleared"]
-    return max(stamps) if stamps else ""
-
-
-def _drafter_identity(router) -> str:
-    """Who is drafting, named stably enough to key a cache on.
-
-    Deliberately not `backend.version()`. That reports who *answered* — a
-    hosted backend rewrites it to `model@served_by` after its first reply — so
-    using it here would give the first encounter of a run a different key from
-    the second, and no run would ever resume.
-
-    The router's class is part of the key, because failing to name a backend is
-    not itself a name. An earlier version returned "reference" whenever the
-    lookup raised, which is how the reference reasoner reports itself — so a
-    router that raises for a different reason, such as one that fails every
-    draft, resumed the reference reasoner's successful results and reported
-    zero failures. Two different drafters must never share a key.
-    """
-    kind = type(router).__name__
-    try:
-        backend = router.get(router.default).backend
-    except (KeyError, AttributeError):
-        return f"{kind}/reference"
-    return f"{kind}/{getattr(backend, 'model', None) or backend.version()}"
-
-
-def _thread_id(scenario, rules, router) -> str:
-    """A thread id derived from everything that could change the answer.
-
-    Content-addressed on purpose. Re-running `make` re-uses what is already in
-    the store, and the moment any input moves — a pack edited, a different site,
-    a real model swapped in for the reference reasoner, a different patient —
-    the id moves with it and the encounter runs again. The pack enters as its
-    content digest rather than its declared version, because the version is
-    written by hand and an edit that forgets to bump it would otherwise replay a
-    stale answer. So the demo is fast on
-    the second run without ever showing a result that belongs to a question
-    nobody asked.
-
-    This is also what makes `make live` usable: nine model calls for this page
-    the first time, none the second, and an edit to a guideline file costs them
-    again. `tools/live.py` does the same for the run's other five.
-    """
-    material = json.dumps({
-        "view": VIEW_VERSION,
-        "scenario": scenario.key,
-        "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
-        "site": scenario.site.get("site_id", ""),
-        "drafter": _drafter_identity(router),
-        "tampered": bool(scenario.tamper),
-        # The patient itself, because /clinic builds them in the browser and two
-        # patients under one scenario key are two different encounters.
-        "patient": _plain(scenario.state),
-    }, sort_keys=True, default=str)
-    return f"DEMO-{scenario.key}-{hashlib.sha256(material.encode()).hexdigest()[:12]}"
-
-
-def _stored(thread_id: str) -> dict | None:
-    """A finished encounter from a previous run, if this is the same question."""
-    if _forced_fresh():
-        return None
-    history = runtime().checkpoints.get(thread_id) or []
-    for entry in reversed(history):
-        if entry.step == "rendered" and isinstance(entry.state, dict):
-            return {**entry.state, "resumed": True}
-    return None
-
-
-def _plain(value: Any) -> Any:
-    if is_dataclass(value) and not isinstance(value, type):
-        return {k: _plain(v) for k, v in asdict(value).items()}
-    if isinstance(value, dict):
-        return {str(k): _plain(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [_plain(v) for v in value]
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    if hasattr(value, "value") and hasattr(value, "name"):  # Enum
-        return value.value
-    return value
-
-
-def _patient(state, site, rules) -> dict:
-    """Everything a reader needs to judge the case for themselves.
-
-    The earlier version showed a patient id, an age and one blood pressure,
-    which is not a clinical picture — it is a row. Someone asked to evaluate
-    whether a refusal was correct cannot do it without the history, the current
-    symptoms, the drugs and how stale the labs are.
-    """
-    glossary = rules.glossary
-    codes = glossary.get("diagnoses") or {}
-    obs_terms = glossary.get("observations") or {}
-    symptom_terms = glossary.get("symptoms") or {}
-    flag_terms = glossary.get("flags") or {}
-    class_terms = glossary.get("drug_classes") or {}
-
-    sbp, dbp = state.latest("sbp"), state.latest("dbp")
-
-    observations = []
-    seen: set[str] = set()
-    for obs in sorted(state.observations, key=lambda o: o.taken_at, reverse=True):
-        if obs.code in seen:
-            continue
-        seen.add(obs.code)
-        term = obs_terms.get(obs.code) or {}
-        age_days = state.observation_age_days(obs.code)
-        observations.append({
-            "code": obs.code,
-            "label": term.get("label", obs.code),
-            "plain": term.get("plain", ""),
-            "value": obs.value,
-            "unit": obs.unit or term.get("unit", ""),
-            "taken_at": obs.taken_at.isoformat(),
-            "age_days": age_days,
-            "source": _plain(obs.source),
-            # Staleness is a clinical fact here, not a display detail: the
-            # sufficiency check refuses to advise on measurements past their age.
-            "stale": bool(age_days is not None and age_days > 90),
-        })
-
-    history = [
-        {
-            "encounter_id": e.encounter_id,
-            "date": e.encounter_date.isoformat(),
-            "sbp": round(e.sbp) if e.sbp else None,
-            "dbp": round(e.dbp) if e.dbp else None,
-            "decision": e.decision or "",
-            "signed_by": e.signed_by or "",
-        }
-        for e in sorted(state.encounters, key=lambda e: e.encounter_date, reverse=True)
-    ]
-
-    return {
-        "patient_id": state.patient_id,
-        "age": state.age,
-        "sex": {"M": "Male", "F": "Female"}.get(state.sex, state.sex),
-        "as_of": state.as_of.isoformat(),
-        "sbp": round(sbp.value) if sbp else None,
-        "dbp": round(dbp.value) if dbp else None,
-        "medications": [
-            {
-                "text": f"{m.molecule} {m.mg_per_dose:g} mg x{m.doses_per_day}/day",
-                "molecule": m.molecule,
-                "drug_class": rules.drug_class_of(m.molecule) or "",
-                "class_label": (class_terms.get(rules.drug_class_of(m.molecule) or "") or {})
-                                .get("label", ""),
-                "plain": (class_terms.get(rules.drug_class_of(m.molecule) or "") or {})
-                          .get("plain", ""),
-                "since": m.since.isoformat() if m.since else None,
-                "source": _plain(m.source),
-            }
-            for m in state.medications
-        ],
-        "diagnoses": [
-            {
-                "code": d.code,
-                # Fall back to the three-character category when the specific
-                # code is not in the glossary: "E11.9" still reads as diabetes.
-                "plain": codes.get(d.code) or codes.get(d.code.split(".")[0], ""),
-                "onset": d.onset.isoformat() if d.onset else None,
-                "status": d.status,
-            }
-            for d in state.diagnoses
-        ],
-        "symptoms": [
-            {"code": k, "plain": symptom_terms.get(k, k.replace("_", " "))}
-            for k, v in sorted(state.symptoms.items()) if v
-        ],
-        "symptoms_denied": [
-            {"code": k, "plain": symptom_terms.get(k, k.replace("_", " "))}
-            for k, v in sorted(state.symptoms.items()) if not v
-        ],
-        "flags": [
-            {"code": k, "plain": flag_terms.get(k, k.replace("_", " "))}
-            for k, v in sorted(state.flags.items()) if v
-        ],
-        "allergies": [
-            {"substance": a.substance, "reaction": a.reaction or ""} for a in state.allergies
-        ],
-        "intolerances": [
-            {
-                "molecule": i.molecule,
-                "drug_class": i.drug_class,
-                "class_label": (class_terms.get(i.drug_class) or {}).get("label", i.drug_class),
-                "documented_at": i.documented_at.isoformat(),
-                "reaction": i.reaction or "",
-            }
-            for i in state.intolerances
-        ],
-        "observations": observations,
-        "history": history,
-        "site_id": site["site_id"],
-        "site_label": site.get("label", ""),
-        "site_tier": site.get("tier", ""),
-        "site_as_of": site.get("as_of", ""),
-        "labs_available": sorted(site.get("labs_available") or []),
-        "stocked": sorted(site.get("stocked_molecules") or []),
-        "evidence": [
-            {"service": row.get("service"),
-             "label": (obs_terms.get(row.get("service")) or {}).get("label", row.get("service")),
-             "last_performed": row.get("last_performed"),
-             "volume_30d": row.get("volume_30d")}
-            for row in (site.get("evidence_ref") or [])
-        ],
-    }
-
-
-def _proposal(proposal, rules) -> dict | None:
-    if proposal is None:
-        return None
-    glossary = rules.glossary
-    classes = glossary.get("drug_classes") or {}
-    instructions = proposal.patient_instructions
-    gloss = ""
-    for key, text in (rules.guideline.get("patient_instructions") or {}).items():
-        if text == instructions:
-            gloss = (rules.guideline.get("patient_instructions_gloss") or {}).get(key, "")
-            break
-    return {
-        "recommendation_plain": (glossary.get("recommendations") or {}).get(
-            _plain(proposal.recommendation), ""),
-        "assessment_plain": (glossary.get("assessments") or {}).get(
-            _plain(proposal.assessment), ""),
-        "patient_instructions_gloss": proposal.patient_instructions_en or gloss,
-        "concerns": [
-            {"text": c.text, "urgency": c.urgency.value, "citation": c.citation}
-            for c in proposal.concerns
-        ],
-        "assessment": _plain(proposal.assessment),
-        "recommendation": _plain(proposal.recommendation),
-        "bp_trend_summary": proposal.bp_trend_summary,
-        "confidence": proposal.confidence,
-        "medication_changes": [
-            {
-                "action": _plain(c.action),
-                "molecule": c.molecule,
-                "mg_per_dose": c.mg_per_dose,
-                "doses_per_day": c.doses_per_day,
-                "rationale": c.rationale,
-                "citation": c.citation,
-                "class_label": (classes.get(rules.drug_class_of(c.molecule) or "") or {})
-                                .get("label", ""),
-                "class_plain": (classes.get(rules.drug_class_of(c.molecule) or "") or {})
-                                .get("plain", ""),
-            }
-            for c in proposal.medication_changes
-        ],
-        "investigations": list(proposal.investigations),
-        "patient_instructions": proposal.patient_instructions,
-        "follow_up_interval_days": proposal.follow_up_interval_days,
-        "uncertainty_notes": proposal.uncertainty_notes,
-        "provenance": [
-            proposal.provenance.model,
-            proposal.provenance.prompt_template,
-            proposal.provenance.corpus,
-        ],
-    }
-
-
-class _Tampered:
-    """A router that corrupts the draft on its way out.
-
-    Used to plant the errors the gate is supposed to catch. Holds no state of
-    its own and never touches the router it wraps, so concurrent encounters
-    cannot interfere with each other.
-    """
-
-    def __init__(self, router, tamper):
-        self._router = router
-        self._tamper = tamper
-
-    def __getattr__(self, name):
-        return getattr(self._router, name)
-
-    def propose(self, state, rules, site=None, **kwargs):
-        proposal = self._router.propose(state, rules, site, **kwargs)
-        self._tamper(proposal)
-        return proposal
-
-
-def _unreadable(wire: dict, index: int, rules, site, exc: Exception) -> dict:
-    """A record that could not be read at all. Named, not silently dropped."""
-    identifier = str(wire.get("patient_id") or f"record {index}")
-    return {
-        "key": identifier,
-        "title": identifier,
-        "note": "This record could not be read.",
-        "watch_for": "",
-        "patient": {
-            "patient_id": identifier, "age": None, "sex": "", "as_of": "",
-            "sbp": None, "dbp": None, "medications": [], "diagnoses": [],
-            "symptoms": [], "symptoms_denied": [], "flags": [], "allergies": [],
-            "intolerances": [], "observations": [], "history": [],
-            "site_id": site.get("site_id", ""), "site_label": site.get("label", ""),
-            "site_tier": site.get("tier", ""), "site_as_of": site.get("as_of", ""),
-            "labs_available": [], "stocked": [], "evidence": [],
-        },
-        "outcome": "unreadable",
-        "outcome_plain": (
-            "The record itself could not be read, so nothing ran. This is a "
-            "problem with the input, not with the patient or the system."
-        ),
-        "committed": False,
-        "error": f"{type(exc).__name__}: {exc}",
-        "message": "", "exclusions": [], "discrepancies": [],
-        "trail": [],
-        "presentation": {
-            "band": "green", "band_label": "", "headline": "", "gloss": "",
-            "silent": True, "shows_draft": False, "requires_acknowledgement": False,
-            "lines": [], "audit": [],
-        },
-        "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
-        "findings": [], "proposal": None, "claim": None, "signature": None,
-        "questions": [],
-    }
-
-
-def _failed(scenario, rules, exc: Exception) -> dict:
-    """An encounter the drafter could not complete. Not a clinical outcome.
-
-    A residency refusal is separated from a model failure because they are not
-    the same event and describing one as the other is a false statement about
-    what happened. Nothing was sent: the guard refused before a request was
-    built. Reporting that as "the model returned something unusable" would
-    misdescribe the one behaviour this system most wants understood.
-    """
-    residency = type(exc).__name__ == "ResidencyError"
-    if residency:
-        return {
-            **_failed_shell(scenario, rules),
-            "outcome": "residency_refused",
-            "outcome_plain": (
-                "This record is not marked synthetic, so it was refused before any "
-                "request was built. Nothing left the machine. Health data must be "
-                "processed in-country, and a hosted model sits outside that boundary."
-            ),
-            "error": f"{type(exc).__name__}: {exc}",
-        }
-    return {
-        **_failed_shell(scenario, rules),
-        "outcome": "drafter_failed",
-        "outcome_plain": (
-            "The drafter could not produce a usable proposal, so nothing reached "
-            "the safety checks and nothing reached the doctor. This is a failure "
-            "of the model, not of the patient's care. The doctor proceeds as "
-            "they would without the system."
-        ),
-        "error": f"{type(exc).__name__}: {exc}",
-    }
-
-
-def _failed_shell(scenario, rules) -> dict:
-    """The fields every failed encounter carries, whatever failed."""
-    return {
-        "key": scenario.key,
-        "title": scenario.title,
-        "note": scenario.note,
-        "watch_for": scenario.watch_for,
-        "patient": _patient(scenario.state, scenario.site, rules),
-        "committed": False,
-        "trail": ["ROUTE", "ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE"],
-        "presentation": {
-            "band": "green", "band_label": "", "headline": "", "gloss": "",
-            "silent": True, "shows_draft": False, "requires_acknowledgement": False,
-            "lines": [], "audit": [],
-        },
-        "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
-        "message": "",
-        "exclusions": [],
-        "discrepancies": [],
-        "findings": [],
-        "proposal": None,
-        "claim": None,
-        "signature": None,
-        "questions": [],
-    }
-
 
 def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
                extra: dict | None = None) -> dict:
@@ -556,13 +107,13 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
     # That made the persistence story a claim in a document rather than
     # something you could restart the process and go looking for.
     durable = store()
-    thread_id = _thread_id(scenario, rules, router)
+    thread_id = thread_id_for(scenario, rules, router)
 
     if resume:
         # If this exact question has been answered before, hand back the answer.
         # A checkpoint whose only use is proving a checkpoint exists is
         # decoration; this is the runtime being load-bearing.
-        already = _stored(thread_id)
+        already = stored(thread_id)
         if already is not None:
             if on_step is not None:
                 on_step("RESUMED")
@@ -582,7 +133,7 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
     # in a finally. That mutates state shared with every other caller, which was
     # already wrong when two requests overlapped and is plainly wrong now that a
     # background thread builds the page. Wrap the router instead.
-    effective = _Tampered(router, scenario.tamper) if scenario.tamper else router
+    effective = Tampered(router, scenario.tamper) if scenario.tamper else router
 
     try:
         result = run_encounter(
@@ -598,7 +149,7 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
         # survive. It belongs on the page as one failed encounter, never as a
         # dead page: a demo that dies on the first bad JSON is a worse advert
         # than a demo that shows the failure being contained.
-        return _failed(scenario, rules, exc)
+        return failed_encounter(scenario, rules, exc)
 
     view = present(
         result.outcome.value, labels,
@@ -625,7 +176,7 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
         "title": scenario.title,
         "note": scenario.note,
         "watch_for": scenario.watch_for,
-        "patient": _patient(scenario.state, scenario.site, rules),
+        "patient": patient_view(scenario.state, scenario.site, rules),
         "outcome": result.outcome.value,
         "outcome_plain": (rules.glossary.get("outcomes") or {}).get(result.outcome.value, ""),
         "message": result.message,
@@ -643,8 +194,8 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
             "silent": view.silent,
             "shows_draft": view.shows_draft,
             "requires_acknowledgement": view.requires_acknowledgement,
-            "lines": [_plain(line) for line in view.lines],
-            "audit": [_plain(line) for line in view.audit],
+            "lines": [plain(line) for line in view.lines],
+            "audit": [plain(line) for line in view.audit],
         },
         "checks": [
             {
@@ -681,7 +232,7 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
             {
                 "check": f.check,
                 "check_name": f.check_name,
-                "severity": _plain(f.severity),
+                "severity": plain(f.severity),
                 "message": f.message,
                 "message_local": f.message_local,
                 "rule_id": f.rule_id,
@@ -690,7 +241,7 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
             }
             for f in (result.decision.findings if result.decision else [])
         ],
-        "proposal": _proposal(result.proposal, rules),
+        "proposal": proposal_view(result.proposal, rules),
         "claim": {
             "codes": [
                 {"code": c,
@@ -716,6 +267,7 @@ def _encounter(scenario, rules, labels, router, on_step=None, *, resume=True,
     # the doctor see" stops being a question only a screenshot can answer.
     runtime().checkpoint(thread_id, "rendered", rendered)
     return rendered
+
 
 
 def run_patients(
@@ -759,7 +311,7 @@ def run_patients(
             # pasted record has a bad age is the same failure already fixed for
             # drafters, and it is worse here: the reader cannot tell which
             # record was the problem.
-            encounter = _unreadable(wire, index, rules, site, exc)
+            encounter = unreadable_record(wire, index, rules, site, exc)
         else:
             scenario = Scenario(
                 key=state.patient_id,
@@ -818,6 +370,7 @@ def run_patients(
     }
 
 
+
 def compare_sites(wire_patients: list[dict], pack_id: str = "id", router=None) -> dict:
     """The same patients at every hospital, side by side.
 
@@ -839,7 +392,7 @@ def compare_sites(wire_patients: list[dict], pack_id: str = "id", router=None) -
             }
             for e in result["encounters"]
         }
-    keys = [e for e in by_site[next(iter(by_site))]]
+    keys = list(by_site[next(iter(by_site))])
     return {
         "sites": [
             {"site_id": s["site_id"], "label": s.get("label", ""), "tier": s.get("tier", "")}
@@ -854,72 +407,6 @@ def compare_sites(wire_patients: list[dict], pack_id: str = "id", router=None) -
         ],
     }
 
-
-def vocabulary(pack_id: str = "id") -> dict:
-    """What the browser needs to build a patient form.
-
-    Read from the pack rather than written into the page, for the same reason
-    everything else clinical is: a drug list, a symptom set and a site roster are
-    national vocabulary, and hard-coding them in JavaScript would put the country
-    back into the engine by the back door.
-    """
-    rules = load_pack(pack_id)
-    glossary = rules.glossary
-    return {
-        "molecules": [
-            {"molecule": name, "drug_class": mol.drug_class,
-             "forms_mg": mol.forms_mg,
-             "label": (glossary.get("drug_classes") or {}).get(mol.drug_class, {}).get("label", "")}
-            for name, mol in sorted(rules.molecules.items())
-        ],
-        "sites": [
-            {"site_id": s["site_id"], "label": s.get("label", ""), "tier": s.get("tier", ""),
-             "labs_available": sorted(s.get("labs_available") or []),
-             "stocked": sorted(s.get("stocked_molecules") or [])}
-            for s in rules.sites.values()
-        ],
-        "symptoms": [
-            {"code": k, "plain": v} for k, v in sorted((glossary.get("symptoms") or {}).items())
-        ],
-        "flags": [
-            {"code": k, "plain": v} for k, v in sorted((glossary.get("flags") or {}).items())
-        ],
-        "observations": [
-            {"code": k, "label": v.get("label", k), "unit": v.get("unit", ""),
-             "plain": v.get("plain", "")}
-            for k, v in (glossary.get("observations") or {}).items()
-        ],
-        "diagnoses": glossary.get("diagnoses") or {},
-        "hosted": os.environ.get("CLINICIAN_HOSTED", "") == "1",
-        "reset_allowed": reset_allowed(),
-        # Grouped, because a flat list of fifteen gives no sense of which ones
-        # are supposed to produce a draft and which are supposed to refuse.
-        "profiles": [
-            {"key": "clean", "label": "Blood pressure · in scope, should draft"},
-            {"key": "polypharmacy", "label": "Blood pressure · already on three drugs"},
-            {"key": "acei_intolerant", "label": "Blood pressure · documented ACE-inhibitor intolerance"},
-            {"key": "no_target", "label": "Blood pressure · group whose target is not extracted"},
-            {"key": "stale_labs", "label": "Blood pressure · labs months out of date"},
-            {"key": "hyperkalaemia", "label": "Blood pressure · potassium too high"},
-            {"key": "red_flag", "label": "Blood pressure · red flag present"},
-            {"key": "excluded_pregnancy", "label": "Blood pressure · pregnant"},
-            {"key": "excluded_minor", "label": "Blood pressure · under 18"},
-            {"key": "excluded_renal", "label": "Blood pressure · severe kidney impairment"},
-            {"key": "excluded_secondary", "label": "Blood pressure · secondary hypertension"},
-            {"key": "excluded_resistant", "label": "Blood pressure · resistant hypertension"},
-            {"key": "excluded_first_presentation", "label": "Blood pressure · first presentation"},
-            {"key": "dm:clean", "label": "Diabetes · in scope, should draft"},
-            {"key": "dm:no_target", "label": "Diabetes · group whose target is not extracted"},
-            {"key": "dm:stale_labs", "label": "Diabetes · HbA1c months out of date"},
-            {"key": "dm:red_flag", "label": "Diabetes · red flag present"},
-            {"key": "dm:excluded_insulin", "label": "Diabetes · already on insulin"},
-            {"key": "dm:excluded_renal", "label": "Diabetes · severe kidney impairment"},
-        ],
-        "pack": {"pack_id": rules.pack_id, "version": rules.version,
-                 "language": rules.language.get("output_language", "")},
-        "glossary": glossary,
-        "checks": check_catalogue(),
-    }
 
 
 def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
@@ -999,118 +486,3 @@ def collect(pack_id: str = "id", router=None, on_progress=None) -> dict:
     }
 
 
-def reset_allowed() -> bool:
-    """Whether the surface is permitted to destroy the store.
-
-    Off on a hosted deployment unless explicitly switched on, because the public
-    demo is a link anyone can open and a wipe button on it is one misclick away
-    from emptying the store under whoever is reading at the time. Locally it is
-    on, since that is the machine whose data it is.
-
-    Set CLINICIAN_ALLOW_RESET=1 to enable it anywhere, or =0 to refuse it
-    everywhere including locally.
-    """
-    explicit = os.environ.get("CLINICIAN_ALLOW_RESET")
-    if explicit is not None:
-        return explicit == "1"
-    return os.environ.get("CLINICIAN_HOSTED", "") != "1"
-
-
-def reset_everything() -> dict:
-    """Destroy the store and drop every cache built from it.
-
-    Resetting the store alone would leave this process serving encounters that
-    no longer exist anywhere, which looks like the reset silently failed. The
-    runtime is cached per process and the scripted page is cached in the build,
-    so both have to go with it.
-    """
-    global _RUNTIME, _STORE
-
-    counts = store().reset()
-    with _STORE_LOCK:
-        # Both are process-cached and both are built from what was just
-        # destroyed. A runtime holding a connection to an emptied database is
-        # fine; one holding checkpoints that no longer exist is not.
-        _RUNTIME = None
-        _STORE = None
-    return counts
-
-
-def _can_sign(site, practitioner, when, Signer, verify_signer, SignatureRefused) -> str | None:
-    """None if this practitioner could sign here today, else why not."""
-    try:
-        verify_signer(site, Signer(practitioner_id=practitioner["practitioner_id"],
-                                   authenticated=True), when)
-    except SignatureRefused as refusal:
-        return str(refusal)
-    return None
-
-
-def sites_view(pack_id: str = "id") -> dict:
-    """Every site the registry knows, and what each can actually do.
-
-    Exists because gate check 9 is the least legible thing the demo does. A
-    reader watching SITE-C refuse a plan is told the site cannot run the assay,
-    and has no way to see that for themselves, so the most interesting refusal
-    in the system reads as an assertion rather than a consequence.
-
-    Everything here is read from the pack. The staleness verdicts come from the
-    gate's own `evidence_gap`, so the page cannot tell a reviewer something the
-    check disagrees with.
-    """
-    from datetime import date
-
-    from service.gate.checks.c9_executable import evidence_gap
-    from service.signing import SignatureRefused, Signer, verify_signer
-
-    rules = load_pack(pack_id)
-    catalogue = rules.investigations or {}
-    prescribable = sorted(rules.molecules)
-    max_age = (rules.evidence_policy or {}).get("max_age_days")
-    today = date.today()
-
-    sites = []
-    for site in rules.sites.values():
-        labs = set(site.get("labs_available") or [])
-        stocked = set(site.get("stocked_molecules") or [])
-        sites.append({
-            "site_id": site["site_id"],
-            "label": site.get("label", ""),
-            "tier": site.get("tier", ""),
-            "service_group": site.get("service_group", ""),
-            "continuous_24h": bool((site.get("hours") or {}).get("continuous_24h")),
-            "as_of": site.get("as_of", ""),
-            "diagnoses": list(site.get("diagnoses") or []),
-            # Asked of the signature line itself rather than by comparing dates
-            # here. SITE-A carries a practitioner whose licence lapsed in
-            # February, and a page that lists them as though they could sign
-            # would contradict the one rule this system enforces hardest.
-            "practitioners": [
-                {**p, "can_sign": _can_sign(site, p, today,
-                                            Signer, verify_signer, SignatureRefused)}
-                for p in (site.get("practitioners") or [])
-            ],
-            "equipment": list(site.get("equipment") or []),
-            # Both lists are rendered against the full vocabulary rather than
-            # alone, because "SITE-C runs creatinine" is a fact and "SITE-C runs
-            # creatinine and nothing else" is the one that explains a referral.
-            "labs": [
-                {"code": code, "label": label, "available": code in labs,
-                 "gap": evidence_gap(site, code, max_age=max_age, today=today)
-                        if code in labs else None}
-                for code, label in sorted(catalogue.items())
-            ],
-            "molecules": [
-                {"molecule": m, "stocked": m in stocked} for m in prescribable
-            ],
-        })
-
-    sites.sort(key=lambda s: s["site_id"])
-    return {
-        "pack": f"{rules.pack_id}@{rules.version}",
-        "evidence_max_age_days": max_age,
-        "investigations": [{"code": c, "label": label}
-                           for c, label in sorted(catalogue.items())],
-        "molecules": prescribable,
-        "sites": sites,
-    }
