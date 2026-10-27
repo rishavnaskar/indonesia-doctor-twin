@@ -9,14 +9,23 @@ Short answer: yes, if you allow me one substitution. 60–70% of what a doctor *
 ## If you have fifteen minutes
 
 ```bash
+git clone https://github.com/rishavnaskar/indonesia-doctor-twin.git
+cd indonesia-doctor-twin
 make          # everything, then the clinician surface opens in a browser
 ```
 
-One command. It creates the virtualenv, starts Postgres if this machine has
-Docker, runs the architecture rules, the test suite, the scorecard, the pressure
-suite and the FHIR bundles against the official HL7 validator, narrates one
-encounter per outcome, and then serves the surface. Open `/clinic` from the
-header link. Takes roughly two minutes, runs offline, and needs no key.
+Three lines from nothing to a running system, and the third is the only one
+that does any work. It creates the virtualenv, installs `requirements.lock`,
+starts Postgres if this machine has Docker, runs the architecture rules, the
+test suite, the scorecard, the pressure suite and the FHIR bundles against the
+official HL7 validator, narrates one encounter per outcome, and then serves the
+surface. Open `/clinic` from the header link. Takes roughly two minutes, runs
+offline, and needs no key.
+
+Python 3.11 or newer, and nothing else. [CI](.github/workflows/ci.yml) runs
+3.11 and 3.13 on every push, and one of its jobs does exactly the three lines
+above on a machine that has never seen this repository, then drives the running
+server, so the paragraph you just read is checked rather than remembered.
 
 ```bash
 make live     # the same, with a real model drafting
@@ -75,6 +84,41 @@ If you have four, read **[DECISION.md](docs/DECISION.md)** and stop.
 3. **Ship the boring things first.** Notes, codes and claims carry no clinical risk and pay for the company. The clinical features are the moat, not the payback.
 4. **Japan is the proof and the warning.** The same system is being built there, and Japan's own overtime legislation produced our exact task decomposition. But the money argument, the adoption driver, the regulator and the benchmark all fail to transfer.
 5. **The safety bar is higher here, not lower.** In Japan the fallback is a tired but qualified doctor. Here it's nobody. Fewer people downstream can catch the machine's mistake.
+
+---
+
+## Building on it
+
+Everything below runs offline and needs no key. [CONTRIBUTING.md](CONTRIBUTING.md)
+has the longer version, [CHANGELOG.md](CHANGELOG.md) has what has moved, and
+[SECURITY.md](SECURITY.md) has what the design refuses.
+
+```bash
+pip install -r requirements-dev.lock   # the tools, on top of the three runtime deps
+make check                             # every check CI runs, same order, no browser
+make lock                              # regenerate the lockfiles after editing requirements
+```
+
+`make check` is lint, types, the architectural rules, the lockfile check, the
+test suite with its coverage floor, the scorecard and the pressure suite. The
+same set runs on every push and every pull request.
+
+Four of those checks are not style. They encode the constraints that are cheap
+now and impossible to retrofit, and `tools/ci_checks.py` explains each at the
+top of the file: nothing under `/service` names a country, a payer, a drug or a
+guideline; the gate imports nothing; only `/service/graph` touches the
+orchestration library; and no hosted tracing endpoint exists anywhere, because
+health data must be processed in-country.
+
+A running deployment answers `/health` with which store backend it actually
+reached, whether the scripted page built, and what has gone wrong in the
+process so far. Logs are one JSON object per line on stderr, with patient
+content and credentials dropped by field name before the line is written. There
+is no SaaS error tracker and no log drain, deliberately: a stack trace here can
+carry the record that produced it.
+
+Every environment variable the system reads is in [.env.example](.env.example).
+None is required.
 
 ---
 

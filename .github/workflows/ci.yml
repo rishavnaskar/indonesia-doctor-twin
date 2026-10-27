@@ -1,0 +1,181 @@
+name: CI
+
+# Every push and every pull request. The point of this file is that nobody can
+# merge a red suite by not running it, so there is no path that skips it.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Never let CI reach a real database or a real model. The store falls back to
+  # append-only files, and the drafter is the rule-following reference
+  # reasoner. A test suite that costs money per run is not a test suite.
+  CLINICIAN_STORE_BACKEND: files
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  lint:
+    name: lint and type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+
+      - name: Install from the lockfile
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.lock
+
+      - name: ruff
+        run: ruff check --output-format=github .
+
+      - name: mypy
+        run: mypy
+
+  test:
+    name: tests on ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor and the ceiling of what pyproject.toml claims to support.
+        # A claim nothing runs against is a guess.
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+
+      - name: Install from the lockfile
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.lock
+
+      - name: Architectural checks
+        # Cheap, and the rules they enforce are impossible to retrofit: no
+        # country in the engine, a gate that imports nothing, no hosted tracing
+        # endpoint anywhere.
+        run: python -m tools.ci_checks
+
+      - name: pytest, with the coverage floor from pyproject.toml
+        run: pytest --cov --cov-report=term-missing --cov-report=xml
+
+      - name: Scorecard
+        # The measurement the whole prototype exists to produce. Offline, no
+        # model, and it fails the build if the gate stops catching what it is
+        # supposed to catch.
+        run: python -m eval.scorecard
+
+      - name: Pressure suite
+        run: python -m eval.pressure
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          retention-days: 14
+
+  fresh-clone:
+    name: fresh clone, README steps only
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install exactly what the README says to install
+        # Deliberately not cached and deliberately not the dev lockfile. This
+        # job exists to answer one question: does a machine that has never seen
+        # this repository get to a working system by following the README? A
+        # cache would answer a different question.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock
+
+      - name: The surface imports and the pack loads
+        run: |
+          python -c "
+          from service.packs.loader import load_pack
+          from service.logging import get_logger
+          rules = load_pack('id')
+          print('pack', rules.pack_id, rules.version, len(rules.molecules), 'molecules')
+          "
+
+      - name: Every scenario, end to end, with no test runner involved
+        run: python -m tools.walkthrough
+
+      - name: The server starts, answers /health, and stops
+        run: |
+          python -m tools.demo --port 8111 --no-open &
+          pid=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8111/health > health.json; then break; fi
+            sleep 1
+          done
+          kill $pid
+          cat health.json
+          python -c "
+          import json, sys
+          report = json.load(open('health.json'))
+          assert report['status'] in ('ok', 'degraded'), report
+          assert report['store']['reachable'] is True, report
+          print('health ok:', report['status'], report['store']['backend'])
+          "
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit==2.10.1
+
+      - name: Audit the runtime lockfile
+        # The runtime closure is what a deployment installs, so it is what a
+        # known vulnerability would actually reach.
+        run: pip-audit --strict --requirement requirements.lock
+
+      - name: Audit the development lockfile
+        # Advisory: a CVE in a linter does not reach a patient, and blocking
+        # every merge on one would teach people to ignore this job.
+        continue-on-error: true
+        run: pip-audit --requirement requirements-dev.lock
+
+  lockfiles:
+    name: lockfiles match their inputs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Every pin in requirements.txt is in requirements.lock
+        # A lockfile that has drifted from its input is worse than none: it
+        # looks reproducible and is not.
+        run: python tools/check_lockfiles.py

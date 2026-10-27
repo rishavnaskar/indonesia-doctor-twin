@@ -28,8 +28,16 @@ The pieces are still individually runnable when you're working on one of them:
 `python -m eval.scorecard`, `python -m eval.pressure`, `python -m
 tools.concordance`, `python -m tools.store`, `python -m tools.live
 --show-prompt`, `python -m tools.live --list-free`, `python -m tools.demo
---export demo.html`, etc. `python -m tools.run --ci` is what CI runs, i.e. the
-gates only, with no walkthrough, no browser and no model.
+--export demo.html`, etc. `python -m tools.run --ci` is the gates only, with no
+walkthrough, no browser and no model.
+
+`make check` is what CI runs: lint, types, the architectural rules above, the
+lockfile check, the suite with its coverage floor, the scorecard and the
+pressure suite. [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs
+that set on every push, on Python 3.11 and 3.13, plus a dependency audit and a
+fresh-clone job that installs only what the README says to install and then
+drives the running server. A deployment answers `/health` with which store
+backend it reached and what has gone wrong in the process so far.
 
 ### Running against a real model
 
@@ -472,8 +480,23 @@ adapters/      EMR ports. Vendor names are allowed here and nowhere else
 datagen/       synthetic patients, reference proposer, planted errors
 eval/          scorecard, pressure suite, plan concordance
 tools/         CI checks, walkthrough, live runner, the demo surface
+  demo/        the surface, one job per module
+    run.py       orchestration: run the scenarios, run a cohort, collect
+    server.py    routes, the background build, the request handler
+    health.py    what /health reports
+    wire.py      encounters, patients and failures as plain JSON
+    resume.py    the thread id, and what is already in the store
+    store_access.py  the process-wide store and runtime, and reset
+    history.py   what /clinic ran in earlier sessions
+    catalogue.py the pack read out for the browser and for /sites
+    templates/   the three HTML pages, as HTML
 docs/          every document, including this one
 ```
+
+No file in this repository is over 500 lines. Three were, all of them in the
+demo surface, and the split above is what that constraint produced. The pages
+moved out of Python string literals at the same time: a 1,100-line r-string is
+not readable as the HTML it is, and no editor highlights it.
 
 
 ## The six rules CI enforces
@@ -486,9 +509,14 @@ docs/          every document, including this one
 3. Only `/service/graph` imports an orchestration library.
 4. No hosted tracing endpoint is configured anywhere.
 5. No em-dashes in the docs.
-6. No em-dashes in text the reader actually sees: pack values, printed strings,
-   HTML. Docstrings and Python comments are exempt, since they are notes to
-   whoever maintains this rather than anything the surface renders.
+6. No em-dashes in text the reader actually sees: pack values, printed
+   strings, and the HTML template files. Docstrings and Python comments are
+   exempt, since they are notes to whoever maintains this rather than anything
+   the surface renders. The template files are in the rule because the pages
+   used to be Python strings, where this check caught them, and moving them
+   into `tools/demo/templates/` would otherwise have quietly dropped 1,200
+   lines of rendered text out of a check whose whole point is reading what
+   actually ships.
 
 Rules 1 and 4 are cheap today and impossible to retrofit. Rule 4 is a compliance
 landmine, not a preference: tracing is on by default in many setups and would
