@@ -30,6 +30,22 @@ are listed in `_NEVER_LOG`.
 forgotten is an exception nobody is going to fix, so `ErrorTally` keeps a
 running count per exception type and `/health` reports it. That is the whole
 error-tracking story: in-process, in-country, and visible from outside.
+
+## Who calls what
+
+The engine takes a logger; the application installs the handler.
+
+Modules under `/service` use plain `logging.getLogger(__name__)` and never
+call `configure()`. They are a library: something that reconfigures the root
+logger as a side effect of being imported would hijack the logging setup of
+any program that imports it, which is rude in a demo and unacceptable in a
+hospital's deployment. There is a test that this module stays importable
+without installing a handler.
+
+`tools/demo` is the application, so it calls `configure()` once in `main()`
+and uses `get_logger()` elsewhere. `get_logger()` configures on first use
+because a surface that logs into the void is worse than one that is slightly
+opinionated about where stderr goes.
 """
 
 from __future__ import annotations

@@ -224,3 +224,92 @@ def test_the_version_is_the_same_in_both_places():
     declared = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
 
     assert declared == service.__version__
+
+
+# ------------------------------------------------------- the engine's logging
+#
+# /service is a library. It takes loggers and emits; it never installs a
+# handler. The demo surface is the application and does that once in main().
+
+
+def test_importing_the_engine_does_not_hijack_root_logging():
+    """A library that reconfigures logging on import is rude in a demo and
+    unacceptable in a deployment that already has its own setup."""
+    import importlib
+    import logging as stdlib_logging
+
+    import service.logging as engine_logging
+
+    root = stdlib_logging.getLogger()
+    saved = list(root.handlers)
+    for handler in saved:
+        root.removeHandler(handler)
+    # Without this the test passes for the wrong reason: configure() is
+    # idempotent, an earlier test has already run it, and a module that calls
+    # get_logger() on import would therefore install nothing here. Checked by
+    # pointing service.store at get_logger and confirming this test goes red.
+    engine_logging._CONFIGURED = False
+
+    try:
+        for name in ("service.store", "service.db"):
+            importlib.reload(importlib.import_module(name))
+        assert root.handlers == [], "importing the engine installed a handler"
+    finally:
+        configure("info", force=True)  # put the suite's own logging back
+
+
+def test_the_store_says_which_backend_it_chose(caplog):
+    """The decision is on the page and at /health, which answers "what is it
+    on now" and not "what did it pick at startup"."""
+    from service.store import Store
+
+    with caplog.at_level(logging.INFO, logger="service.store"):
+        Store()
+
+    opened = [r for r in caplog.records if r.getMessage() == "store.opened"]
+    assert opened, "opening a store logged nothing"
+    assert opened[-1].backend in ("files", "postgres")
+    assert opened[-1].pinned_to_files is True  # conftest pins the suite to files
+
+
+def test_an_unreachable_database_logs_why_without_the_password(caplog):
+    """A refused connection and an uninstalled driver look identical from
+    outside and need different fixes, so both are named."""
+    from service import db
+
+    secret = "hunter2"
+    url = f"postgresql://clinician:{secret}@127.0.0.1:1/nothing"
+
+    with caplog.at_level(logging.WARNING, logger="service.db"):
+        assert db.connect(url) is None
+
+    events = {r.getMessage() for r in caplog.records}
+    assert events & {"db.unreachable", "db.driver_missing"}, events
+    assert secret not in caplog.text, "the connection string's password reached a log line"
+
+
+def test_safe_location_strips_the_credentials():
+    from service.db import safe_location
+
+    assert safe_location("postgresql://user:pw@db.example:5432/clinic") == "db.example:5432/clinic"
+    assert (
+        safe_location("postgresql://db.example:5432/clinic")
+        == "postgresql://db.example:5432/clinic"
+    )
+
+
+def test_destroying_the_store_is_logged(tmp_path, caplog):
+    """The one event here worth finding in a log a week later."""
+    from service.store import Store
+
+    store = Store(tmp_path / "store")
+    store.checkpoints.parent.mkdir(parents=True, exist_ok=True)
+    store.checkpoints.write_text('{"a": 1}\n', encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="service.store"):
+        counts = store.reset()
+
+    reset_records = [r for r in caplog.records if r.getMessage() == "store.reset"]
+    assert reset_records, "a wipe logged nothing"
+    assert reset_records[-1].destroyed == counts
+    assert counts["checkpoints"] == 1

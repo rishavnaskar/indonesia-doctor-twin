@@ -25,11 +25,18 @@ Nothing in this module knows anything clinical. It stores what it is given.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
+# Plain stdlib, deliberately. The engine takes a logger and the application
+# installs the handler: service/logging.py says why at more length. `import
+# logging` here is the standard library, not that module, because Python has
+# no implicit relative imports.
+log = logging.getLogger(__name__)
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "db" / "migrations"
 
@@ -45,20 +52,52 @@ def dsn() -> str:
     return os.environ.get("CLINICIAN_DATABASE_URL", DEFAULT_DSN)
 
 
+def safe_location(url: str | None = None) -> str:
+    """Host and database, never the credentials in front of them.
+
+    A connection string carries a password. This is the only form of it that
+    is allowed into a log line, an error message or a rendered page, and it is
+    here rather than in two places so that there is one thing to get right.
+    """
+    target = url or dsn()
+    return target.split("@")[-1] if "@" in target else target
+
+
 def connect(url: str | None = None):
     """A live connection, or None if there is not one.
 
     Returns rather than raises. The caller's job is to carry on with files, not
     to handle an exception for a condition that is expected in this deployment.
+
+    Both routes to None are logged. "The store quietly chose files" is the
+    thing an operator most needs to find afterwards, and for a long time this
+    function was the one place in the system that knew why and said nothing:
+    the page and /health report which backend answered, never what went wrong
+    reaching the other one. A refused connection and an uninstalled driver
+    look identical from outside and need different fixes.
     """
     try:
         import psycopg
     except ModuleNotFoundError:
+        log.warning("db.driver_missing", extra={"driver": "psycopg"})
         return None
+
+    target = url or dsn()
     try:
-        return psycopg.connect(url or dsn(), autocommit=True, connect_timeout=CONNECT_TIMEOUT)
-    except Exception:  # noqa: BLE001 - every failure means the same thing here
+        conn = psycopg.connect(target, autocommit=True, connect_timeout=CONNECT_TIMEOUT)
+    except Exception as exc:  # noqa: BLE001 - every failure means the same thing here
+        log.warning(
+            "db.unreachable",
+            extra={
+                "location": safe_location(target),
+                "error_type": type(exc).__name__,
+                "timeout_s": CONNECT_TIMEOUT,
+            },
+        )
         return None
+
+    log.info("db.connected", extra={"location": safe_location(target)})
+    return conn
 
 
 def available(url: str | None = None) -> bool:

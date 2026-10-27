@@ -25,9 +25,14 @@ fork in the system's behaviour.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
+
+# Plain stdlib, deliberately. The engine takes a logger and the application
+# installs the handler: service/logging.py says why at more length.
+log = logging.getLogger(__name__)
 
 
 def default_dir() -> Path:
@@ -70,12 +75,30 @@ class Store:
     def __init__(self, directory: Path | str | None = None, *, connection=None):
         self.dir = Path(directory or default_dir())
         self._conn = connection
-        if self._conn is None and not _forced_to_files():
+        pinned = _forced_to_files()
+        if self._conn is None and not pinned:
             from service import db
 
             self._conn = db.connect()
             if self._conn is not None:
                 db.migrate(self._conn)
+
+        # Which backend a deployment ended up on is a decision this object
+        # makes silently, and the module docstring above argues that silence
+        # is the problem. It is reported on the page and at /health, which
+        # covers "what is it on now" and not "what did it pick at startup,
+        # and was that the intended one". One line at the moment of the
+        # choice covers the second.
+        log.info(
+            "store.opened",
+            extra={
+                "backend": self.backend,
+                "location": self._location(),
+                # True means CLINICIAN_STORE_BACKEND asked for files, so this
+                # is not a fallback and db.py will have logged no reason.
+                "pinned_to_files": pinned,
+            },
+        )
 
     @property
     def backend(self) -> str:
@@ -153,27 +176,38 @@ class Store:
         if self._conn is not None:
             from service.db import reset
 
-            return {"backend": "postgres", "location": self._location(), **reset(self._conn)}
+            counts: dict[str, Any] = {
+                "backend": "postgres",
+                "location": self._location(),
+                **reset(self._conn),
+            }
+        else:
+            counts = {"backend": "files", "location": str(self.dir)}
+            for name, path in (
+                ("checkpoints", self.checkpoints),
+                ("signatures", self.audit),
+                ("outbound", self.queue),
+            ):
+                counts[name] = (
+                    sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+                    if path.exists()
+                    else 0
+                )
+                path.unlink(missing_ok=True)
 
-        counts: dict[str, Any] = {"backend": "files", "location": str(self.dir)}
-        for name, path in (
-            ("checkpoints", self.checkpoints),
-            ("signatures", self.audit),
-            ("outbound", self.queue),
-        ):
-            counts[name] = (
-                sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
-                if path.exists()
-                else 0
-            )
-            path.unlink(missing_ok=True)
+        # Destroying an audit trail is the one event here worth finding in a
+        # log a week later. Nested under one key rather than spread across the
+        # record, because the keys come from the backend and a stray one
+        # colliding with a LogRecord attribute would raise at the call site.
+        log.warning("store.reset", extra={"destroyed": counts})
         return counts
 
     def _location(self) -> str:
+        # The password lives in the environment and reaches neither a log line
+        # nor a rendered page; db.safe_location is the only thing that strips
+        # it, so this defers rather than repeating the rule.
         if self._conn is None:
             return str(self.dir)
-        from service.db import dsn
+        from service.db import safe_location
 
-        # The password is in the environment, not in anything we print.
-        url = dsn()
-        return url.split("@")[-1] if "@" in url else url
+        return safe_location()
