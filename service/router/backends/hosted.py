@@ -23,6 +23,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from typing import Any
 
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -210,7 +211,9 @@ class HostedChatBackend:
         if not api_key:
             raise BackendError(f"{self.api_key_env} is not set.")
 
-        messages = [
+        # Not list[dict[str, str]]: an assistant turn in a tool loop carries
+        # `tool_calls`, which is a list, and a tool turn carries ids.
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
@@ -256,7 +259,7 @@ class HostedChatBackend:
         )
         return self._content(body)
 
-    def _post_messages(self, messages: list, api_key: str, *, tools=None,
+    def _post_messages(self, messages: list[dict[str, Any]], api_key: str, *, tools=None,
                        schema: dict | None = None) -> dict:
         payload: dict = {
             "model": self.model,
@@ -419,11 +422,18 @@ class HostedChatBackend:
                 limited.retry_after = _retry_after(exc)  # type: ignore[attr-defined]
                 raise limited from exc
             # Many free models do not implement response_format and reject the
-            # whole request over it. Retry once without, then lean on the strict
-            # parser — which is there precisely because JSON mode is a
-            # convenience and never a guarantee.
-            if json_mode and exc.code == 400 and "response_format" in detail:
-                return self._post(model, system, user, api_key, json_mode=False)
+            # whole request over it. Step the enforcement down one notch and
+            # retry, then lean on the strict parser, which is there precisely
+            # because JSON mode is a convenience and never a guarantee.
+            #
+            # This read `json_mode` for a while, a parameter this method has
+            # never had: the degradation it documents raised NameError instead
+            # of happening. Nothing caught it because reaching the line needs a
+            # provider that 400s on response_format, which the test suite has
+            # no reason to simulate. There is a test for it now.
+            weaker = {"schema": "object", "object": "off"}.get(mode)
+            if weaker and exc.code == 400 and "response_format" in detail:
+                return self._post(model, system, user, api_key, mode=weaker, schema=schema)
             raise BackendError(f"HTTP {exc.code} from {model}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise TransientTransport(f"network error talking to {model}: {exc.reason}") from exc
