@@ -6,7 +6,8 @@ allowed to do. Kept here so the generators read naturally.
 """
 
 from service.packs.loader import load_pack as _load_pack
-from service.reason.reference import _provenance, propose as _propose
+from service.reason.reference import _provenance
+from service.reason.reference import propose as _propose
 
 _DEFAULT_SITE = None
 

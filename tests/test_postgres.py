@@ -27,11 +27,11 @@ def conn():
 
 
 def _signature(**overrides) -> SignatureRecord:
-    fields = dict(
-        practitioner_id="DR-1", role="doctor", licence_expires=date(2027, 1, 1),
-        decision="accepted", proposal_provenance=("m@s", "p@1", "c@1"),
-        signed_at=datetime(2026, 8, 30, 10, 0), rejection_reason=None, edit_diff=None,
-    )
+    fields = {
+        "practitioner_id": "DR-1", "role": "doctor", "licence_expires": date(2027, 1, 1),
+        "decision": "accepted", "proposal_provenance": ("m@s", "p@1", "c@1"),
+        "signed_at": datetime(2026, 8, 30, 10, 0), "rejection_reason": None, "edit_diff": None,
+    }
     fields.update(overrides)
     return SignatureRecord(**fields)
 
@@ -67,7 +67,7 @@ def test_the_database_refuses_to_let_history_be_rewritten(conn, table, statement
 def test_a_decision_outside_the_three_the_system_knows_is_refused(conn):
     """The enum is in the application, but this table outlives the process that
     wrote it. A later migration script or a psql session will not import it."""
-    with pytest.raises(Exception, match="constraint|check"):
+    with pytest.raises(Exception, match=r"constraint|check"):
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO signatures (practitioner_id, role, licence_expires,"
@@ -213,7 +213,7 @@ def test_the_location_never_carries_the_password(monkeypatch):
                        "postgresql://someone:hunter2@db.example:5544/clinician")
     store = Store(connection=object())
     assert "hunter2" not in store._location()
-    assert "db.example:5544/clinician" == store._location()
+    assert store._location() == "db.example:5544/clinician"
 
 
 # --------------------------------------------------------------------- reset

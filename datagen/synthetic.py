@@ -73,7 +73,7 @@ def _regimen(rng, rungs: int) -> list[Medication]:
     """
     out = []
     for _, molecule, doses, per_day in LADDER[:rungs]:
-        options = [(molecule, doses, per_day)] + ALTERNATIVES.get(molecule, [])
+        options = [(molecule, doses, per_day), *ALTERNATIVES.get(molecule, [])]
         chosen, dose_options, chosen_per_day = rng.choice(options)
         out.append(
             Medication(

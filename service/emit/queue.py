@@ -21,11 +21,12 @@ is what lets it be tested exhaustively with no network and no sandbox.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 
 class ItemStatus(str, Enum):
@@ -59,7 +60,7 @@ class QueueItem:
         )
 
     @staticmethod
-    def from_json(line: str) -> "QueueItem":
+    def from_json(line: str) -> QueueItem:
         raw = json.loads(line)
         return QueueItem(
             idempotency_key=raw["idempotency_key"],
@@ -170,6 +171,8 @@ class OutboundQueue:
         Skipped lines are counted in `damaged` so the loss is visible. Silently
         dropping part of a clinical audit log would be worse than crashing.
         """
+        if self.path is None:
+            return
         for line in Path(self.path).read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue

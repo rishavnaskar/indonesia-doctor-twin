@@ -18,7 +18,7 @@ never sit in the live path.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from service.contracts.proposal import Proposal
 
@@ -91,8 +91,12 @@ def router_with_model(
     from service.reason.model_reasoner import ModelReasoner
 
     router = default_router()
-    reasoner = ModelReasoner(build_backend(provider, model, **backend_kwargs),
-                             use_tools=use_tools)
+    # Typed as Any because each wrapper below keeps the reasoner's signature
+    # and nothing downstream, the gate least of all, is meant to know which
+    # one it has. That is the architectural claim; pinning the concrete class
+    # here would quietly contradict it.
+    reasoner: Any = ModelReasoner(build_backend(provider, model, **backend_kwargs),
+                                  use_tools=use_tools)
 
     if critic:
         # A second call, reviewing the first. It may only lower confidence, and

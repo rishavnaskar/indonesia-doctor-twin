@@ -35,7 +35,7 @@ class RegimenDrug:
         return self.mg_per_dose * self.doses_per_day
 
 
-def resulting_regimen(state: "PatientState", proposal: "Proposal") -> dict[str, RegimenDrug]:
+def resulting_regimen(state: PatientState, proposal: Proposal) -> dict[str, RegimenDrug]:
     regimen: dict[str, RegimenDrug] = {
         m.molecule: RegimenDrug(m.molecule, m.mg_per_dose, m.doses_per_day, changed=False)
         for m in state.medications
@@ -58,7 +58,7 @@ def resulting_regimen(state: "PatientState", proposal: "Proposal") -> dict[str, 
     return regimen
 
 
-def classes_in(regimen: dict[str, RegimenDrug], rules: "RuleSet") -> dict[str, list[str]]:
+def classes_in(regimen: dict[str, RegimenDrug], rules: RuleSet) -> dict[str, list[str]]:
     """drug_class -> molecules present in that class."""
     by_class: dict[str, list[str]] = {}
     for molecule in regimen:
@@ -68,7 +68,7 @@ def classes_in(regimen: dict[str, RegimenDrug], rules: "RuleSet") -> dict[str, l
     return by_class
 
 
-def patient_classes(state: "PatientState", rules: "RuleSet") -> set[str]:
+def patient_classes(state: PatientState, rules: RuleSet) -> set[str]:
     """Classes the patient is already on, including ones we never prescribe.
 
     A patient can arrive taking an NSAID bought over the counter. It is not in
@@ -84,7 +84,7 @@ def patient_classes(state: "PatientState", rules: "RuleSet") -> set[str]:
     return classes
 
 
-def touches_raas(regimen: dict[str, RegimenDrug], rules: "RuleSet") -> bool:
+def touches_raas(regimen: dict[str, RegimenDrug], rules: RuleSet) -> bool:
     return any(
         rules.drug_class_of(d.molecule) in RAAS_CLASSES
         for d in regimen.values()

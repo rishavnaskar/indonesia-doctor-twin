@@ -18,8 +18,6 @@ from datagen.synthetic import make_patient
 from eval.concordance import Case, load_cases, report, score
 from service.packs.loader import load_pack
 from service.reason import reference
-from service.rules.predicates import Context
-from service.rules.targets import resolve_target
 from tools.demo.patients import to_wire
 
 

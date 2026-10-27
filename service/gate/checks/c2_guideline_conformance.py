@@ -35,7 +35,8 @@ def run(ctx: GateContext) -> list[Finding]:
     findings: list[Finding] = []
     resolution = resolve_target(ctx.rules.guideline, Context(ctx.state))
 
-    if not resolution.defined:
+    target = resolution.target
+    if target is None:
         group = resolution.blocked_group or "unclassified"
         findings.append(
             Finding(
@@ -53,7 +54,6 @@ def run(ctx: GateContext) -> list[Finding]:
         )
         return findings
 
-    target = resolution.target
     used = ctx.proposal.target_used
 
     if used is None:

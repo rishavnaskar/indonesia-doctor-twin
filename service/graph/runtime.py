@@ -32,8 +32,8 @@ from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 
@@ -161,6 +161,8 @@ class FileRuntime(InMemoryRuntime):
             }, default=str) + "\n")
 
     def _load(self) -> None:
+        if self.path is None:
+            return
         for line in Path(self.path).read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue

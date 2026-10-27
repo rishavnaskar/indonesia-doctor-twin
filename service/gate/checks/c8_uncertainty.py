@@ -13,8 +13,8 @@ own opinion of itself, the gate has already failed.
 
 from __future__ import annotations
 
-from service.gate.types import Finding, GateContext, Severity
 from service.gate.messages import localise
+from service.gate.types import Finding, GateContext, Severity
 
 NUMBER = 8
 NAME = "uncertainty"

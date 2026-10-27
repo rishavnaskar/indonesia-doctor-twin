@@ -57,7 +57,8 @@ def propose(state, rules, site: dict[str, Any] | None = None) -> Proposal:
 
     # Even with no target we still emit. The gate is what refuses, not the
     # reasoner — so the refusal is exercised rather than assumed.
-    if not resolution.defined:
+    target = resolution.target
+    if target is None:
         return Proposal(
             assessment=Assessment.UNCONTROLLED,
             recommendation=Recommendation.REFER,
@@ -68,8 +69,6 @@ def propose(state, rules, site: dict[str, Any] | None = None) -> Proposal:
             uncertainty_notes=resolution.reason or "No target defined.",
         )
 
-    target = resolution.target
-    sbp, dbp = state.latest("sbp"), state.latest("dbp")
     # Control is "every measurement this pathway targets is below its
     # threshold". Reading the codes from the target rather than naming sbp and
     # dbp is what lets a second pathway, whose target is one HbA1c, use the

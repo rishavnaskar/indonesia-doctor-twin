@@ -49,8 +49,8 @@ def tool_specs(rules) -> list[dict[str, Any]]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "code": {"type": "string", "enum": sorted(rules.investigations)
-                                 + ["sbp", "dbp"]},
+                        "code": {"type": "string",
+                                 "enum": [*sorted(rules.investigations), "sbp", "dbp"]},
                     },
                     "required": ["code"],
                 },

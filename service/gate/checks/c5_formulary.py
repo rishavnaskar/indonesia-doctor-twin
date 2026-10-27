@@ -34,7 +34,7 @@ _PRESCRIBING_ACTIONS = (
 
 def run(ctx: GateContext) -> list[Finding]:
     findings: list[Finding] = []
-    rules, state = ctx.rules, ctx.state
+    rules = ctx.rules
 
     for change in ctx.proposal.medication_changes:
         if change.action not in _PRESCRIBING_ACTIONS:

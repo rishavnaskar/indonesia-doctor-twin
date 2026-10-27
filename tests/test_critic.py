@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from datagen.synthetic import make_patient
 from service.contracts.proposal import (
     Assessment,
     ChangeAction,
@@ -21,7 +22,6 @@ from service.contracts.proposal import (
 )
 from service.packs.loader import load_pack
 from service.reason.critic import CriticReviewedReasoner
-from datagen.synthetic import make_patient
 
 
 @pytest.fixture(scope="module")

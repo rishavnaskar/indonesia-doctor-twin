@@ -16,8 +16,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - types only, never imported at runtime
-    from service.packs.loader import RuleSet
     from service.contracts.proposal import Proposal
+    from service.packs.loader import RuleSet
     from service.state.models import PatientState
 
 
@@ -46,9 +46,9 @@ class Finding:
 
 @dataclass
 class GateContext:
-    state: "PatientState"
-    proposal: "Proposal"
-    rules: "RuleSet"
+    state: PatientState
+    proposal: Proposal
+    rules: RuleSet
     site: dict[str, Any] | None = None
 
 

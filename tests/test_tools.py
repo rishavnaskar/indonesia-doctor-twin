@@ -98,7 +98,7 @@ def test_the_loop_records_what_the_drafter_asked_for(rules):
 
     from service.reason.model_reasoner import ModelReasoner
 
-    VALID = {
+    valid = {
         "assessment": "uncontrolled", "recommendation": "titrate_up",
         "confidence": 0.8,
         "medication_changes": [{"action": "increase", "molecule": "amlodipine",
@@ -118,7 +118,7 @@ def test_the_loop_records_what_the_drafter_asked_for(rules):
                                 tools=None, dispatch=None, max_calls=8):
             dispatch("get_measurement", {"code": "k"})
             dispatch("get_site_capability", {})
-            return _json.dumps(VALID)
+            return _json.dumps(valid)
 
     state = make_patient(3, controlled=False)
     proposal = ModelReasoner(ToolBackend(), use_tools=True).propose(

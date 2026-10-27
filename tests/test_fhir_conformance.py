@@ -143,9 +143,9 @@ def test_every_coding_declares_its_system(payload):
                 if "system" not in coding:
                     problems.append(f"{path}.coding: {coding}")
             for key, value in node.items():
-                if key in _BARE_CODING and isinstance(value, dict) and "code" in value:
-                    if "system" not in value:
-                        problems.append(f"{path}.{key}: {value}")
+                if (key in _BARE_CODING and isinstance(value, dict)
+                        and "code" in value and "system" not in value):
+                    problems.append(f"{path}.{key}: {value}")
                 walk(value, f"{path}.{key}")
         elif isinstance(node, list):
             for i, value in enumerate(node):

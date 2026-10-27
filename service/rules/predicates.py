@@ -16,8 +16,9 @@ Stdlib only, by rule. No YAML, no framework, no model.
 from __future__ import annotations
 
 import operator
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from service.state.models import PatientState
 

@@ -1,6 +1,6 @@
 """The signature line is enforced, not documented."""
 
-from datetime import date, datetime
+from datetime import datetime
 
 import pytest
 

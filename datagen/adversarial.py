@@ -14,8 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import timedelta
 
-from datagen.proposer import REFERENCE_PROVENANCE, propose
-from datagen.synthetic import TODAY, make_patient, _obs
+from datagen.proposer import propose
+from datagen.synthetic import TODAY, _obs, make_patient
 from service.contracts.proposal import (
     Assertion,
     ChangeAction,

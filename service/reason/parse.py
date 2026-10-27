@@ -20,10 +20,10 @@ from service.contracts.proposal import (
     Assertion,
     Assessment,
     ChangeAction,
+    Concern,
     MedicationChange,
     Proposal,
     Provenance,
-    Concern,
     Recommendation,
     Target,
     Urgency,
@@ -158,11 +158,11 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
         if isinstance(a, dict)
     ]
 
-    confidence = raw.get("confidence")
+    stated: Any = raw.get("confidence")
     try:
-        confidence = float(confidence)
+        confidence = float(stated)
     except (TypeError, ValueError) as exc:
-        raise ProposalParseError(f"confidence is not a number: {confidence!r}") from exc
+        raise ProposalParseError(f"confidence is not a number: {stated!r}") from exc
 
     return Proposal(
         assessment=assessment,

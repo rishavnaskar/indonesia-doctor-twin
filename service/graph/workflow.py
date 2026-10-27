@@ -26,6 +26,7 @@ clinical effect leaves this module unsigned.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -33,12 +34,13 @@ from typing import Any
 
 from service.emit.coding import ClaimDraft, build_claim
 from service.emit.fhir import Bundle, build_bundle
-from service.emit.referral_back import ReferralBackAssessment, assess as assess_referral_back
+from service.emit.referral_back import ReferralBackAssessment
+from service.emit.referral_back import assess as assess_referral_back
 from service.gate import GateContext, GateDecision, run_gate
-from service.rules.eligibility import check_eligibility
-from service.rules.predicates import Context
 from service.reconcile.engine import Reconciliation, reconcile
 from service.rules import pathways as pathway_router
+from service.rules.eligibility import check_eligibility
+from service.rules.predicates import Context
 from service.signing import AuditLog, Signer, sign
 from service.state.derive import derive_flags
 
@@ -133,7 +135,7 @@ def run_encounter(
     at("ROUTE")
     derive_flags(state, rules)
     choice = pathway_router.select(rules, state)
-    if not choice.matched:
+    if choice.name is None:
         trail.append("ROUTE")
         at("HANDOFF")
         return EncounterResult(
@@ -141,7 +143,7 @@ def run_encounter(
             message=choice.reason,
             questions_for_clinician=_patient_questions(intake),
             reconciliation=reconciliation,
-            trail=trail + ["HANDOFF"],
+            trail=[*trail, "HANDOFF"],
         )
     rules = pathway_router.with_pathway(rules, choice.name)
     trail.append("ROUTE")
@@ -158,7 +160,7 @@ def run_encounter(
             questions_for_clinician=_patient_questions(intake),
             reconciliation=reconciliation,
             exclusions=list(eligibility.exclusions),
-            trail=trail + ["HANDOFF"],
+            trail=[*trail, "HANDOFF"],
         )
 
     # ---- INTAKE ------------------------------------------------------------
@@ -207,7 +209,7 @@ def run_encounter(
             decision=gate_decision,
             questions_for_clinician=_patient_questions(intake),
             reconciliation=reconciliation,
-            trail=trail + [outcome.value.upper()],
+            trail=[*trail, outcome.value.upper()],
         )
 
     # ---- PRESENT -----------------------------------------------------------
@@ -226,13 +228,15 @@ def run_encounter(
     # ---- CLINICIAN DECIDES: the interrupt ---------------------------------
     from service.graph.runtime import Interrupted
 
-    try:
+    # The pause is the point; a real caller resumes on a signature.
+    with contextlib.suppress(Interrupted):
         runtime.interrupt(thread_id, proposal)
-    except Interrupted:
-        pass  # the pause is the point; a real caller resumes on a signature
     at("SIGNED")
     runtime.resume(thread_id, decision)
-    sign(site, signer, proposal, decision, now, audit or AuditLog())
+    # No site means no roster, so verify_signer refuses by name rather than
+    # raising AttributeError on None three frames down. Both block the
+    # signature; only one of them says why.
+    sign(site or {}, signer, proposal, decision, now, audit or AuditLog())
     trail.append("SIGNED")
 
     if decision == "rejected":

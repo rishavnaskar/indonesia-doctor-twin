@@ -14,7 +14,6 @@ from __future__ import annotations
 import pytest
 
 from datagen.synthetic import make_diabetic, make_patient
-from service.packs.loader import load_pack
 from tools.demo.patients import generate
 from tools.demo.run import run_patients, vocabulary
 

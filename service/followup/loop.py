@@ -27,12 +27,12 @@ exactly the mistake SPEC §3 exists to prevent.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from enum import Enum
 from typing import Any
 
 from service.rules.predicates import Context, PredicateError, evaluate
-from service.state.models import Observation, Source
+from service.state.models import Observation
 
 
 class Action(str, Enum):
@@ -177,7 +177,7 @@ def _corroborated(state, rules, reading: Observation, window: timedelta,
         and abs(_days(o.taken_at, reading.taken_at)) <= max(window.days, 1)
     ]
     unrelated = [o for o in others if o.code != reading.code]
-    return any(_fires(state, rules, unrelated + [candidate]) for candidate in recent)
+    return any(_fires(state, rules, [*unrelated, candidate]) for candidate in recent)
 
 
 def _days(a: date, b: date) -> int:

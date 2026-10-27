@@ -158,9 +158,7 @@ class Interviewer:
             # Accepting it and dropping one silently would resolve a conflict
             # in the patient's own answer, which is exactly what this system
             # refuses to do with a medication list.
-            if "none" in chosen and len(chosen) > 1:
-                return False
-            return True
+            return not ("none" in chosen and len(chosen) > 1)
         if kind == "numeric_pair":
             bounds = question.get("range") or {}
             low, high = bounds.get("min", 0), bounds.get("max", 10**6)

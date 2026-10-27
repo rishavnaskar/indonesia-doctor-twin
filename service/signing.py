@@ -18,10 +18,9 @@ which is to say, makes it useless precisely when someone asks.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -92,6 +91,8 @@ class AuditLog:
             }, default=str) + "\n")
 
     def _load(self) -> None:
+        if self.path is None:
+            return
         for line in Path(self.path).read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue

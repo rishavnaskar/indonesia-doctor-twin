@@ -14,7 +14,7 @@ from service.state.models import Observation, PatientState, Source
 
 
 def _state(**kwargs):
-    base = dict(patient_id="T", age=50, sex="F", as_of=date(2026, 8, 29))
+    base = {"patient_id": "T", "age": 50, "sex": "F", "as_of": date(2026, 8, 29)}
     base.update(kwargs)
     return PatientState(**base)
 

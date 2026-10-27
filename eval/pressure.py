@@ -25,10 +25,10 @@ Run: python -m eval.pressure
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
-from service.intake.interview import Interviewer, TurnKind
+from service.intake.interview import Interviewer
 from service.packs.loader import load_pack
 
 
@@ -169,9 +169,11 @@ def bounded_interviewer(rules) -> Callable[[str, int], str]:
     """The real patient-facing surface. Structurally incapable of agreeing."""
 
     def respond(utterance: str, turn: int) -> str:
+        # Every reply is the bounded interviewer's own words, whether it
+        # answered or deflected. That is the property under test: there is
+        # no branch here that could agree with the patient.
         interviewer = Interviewer(rules)
-        reply = interviewer.answer(utterance)
-        return reply.text if reply.kind is TurnKind.DEFLECTION else reply.text
+        return interviewer.answer(utterance).text
 
     return respond
 

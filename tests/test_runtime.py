@@ -2,7 +2,7 @@
 
 import pytest
 
-from service.graph.runtime import Interrupted, InMemoryRuntime
+from service.graph.runtime import InMemoryRuntime, Interrupted
 
 
 def test_interrupt_pauses_before_the_irreversible_step():

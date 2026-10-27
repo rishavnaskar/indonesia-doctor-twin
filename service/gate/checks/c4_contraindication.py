@@ -31,7 +31,7 @@ def run(ctx: GateContext) -> list[Finding]:
             continue
 
         flag = rule.get("state_flag")
-        if not state.flags.get(flag, False):
+        if not flag or not state.flags.get(flag, False):
             continue
 
         applies = set(rule.get("applies_to_classes", []))

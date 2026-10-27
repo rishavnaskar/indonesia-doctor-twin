@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
+
 
 def default_dir() -> Path:
     """Where the file backend writes, read on each call rather than at import.
@@ -153,7 +155,7 @@ class Store:
             return {"backend": "postgres", "location": self._location(),
                     **reset(self._conn)}
 
-        counts = {"backend": "files", "location": str(self.dir)}
+        counts: dict[str, Any] = {"backend": "files", "location": str(self.dir)}
         for name, path in (("checkpoints", self.checkpoints),
                            ("signatures", self.audit), ("outbound", self.queue)):
             counts[name] = (

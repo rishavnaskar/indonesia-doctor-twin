@@ -20,7 +20,7 @@ from typing import Any
 
 from service.contracts.proposal import Provenance
 from service.reason import prompt as prompt_module
-from service.reason.parse import ProposalParseError, extract_json, to_proposal
+from service.reason.parse import extract_json, to_proposal
 from service.reason.schema import proposal_schema
 from service.rules.predicates import Context
 from service.rules.targets import resolve_target

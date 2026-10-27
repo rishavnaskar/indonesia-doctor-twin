@@ -107,7 +107,7 @@ class Labels:
     glosses: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_pack(cls, language: dict[str, Any]) -> "Labels":
+    def from_pack(cls, language: dict[str, Any]) -> Labels:
         block = (language or {}).get("presentation") or {}
         return cls(
             bands={k: str(v) for k, v in (block.get("bands") or {}).items()},
@@ -169,7 +169,7 @@ def _lines(findings: list[Finding], english_first: bool = True) -> tuple[Line, .
 _BAND_ORDER = {Band.GREEN: 0, Band.AMBER: 1, Band.RED: 2}
 
 
-def _raise_for_concerns(view: "Presentation", concerns: tuple, labels: Labels) -> "Presentation":
+def _raise_for_concerns(view: Presentation, concerns: tuple, labels: Labels) -> Presentation:
     """Let the drafter add to what the clinician sees. Never subtract.
 
     The deterministic red flags decide the floor. A concern can push the band

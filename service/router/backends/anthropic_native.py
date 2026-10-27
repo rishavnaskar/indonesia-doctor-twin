@@ -18,10 +18,10 @@ either.
 
 from __future__ import annotations
 
-from service.reason.schema import proposal_schema
-
 from dataclasses import dataclass, field
 from typing import Any
+
+from service.reason.schema import proposal_schema
 
 DEFAULT_MODEL = "claude-opus-5"
 
@@ -109,7 +109,7 @@ class AnthropicBackend:
 
         try:
             response = client.messages.create(**request)
-        except Exception as exc:  # noqa: BLE001 - surfaced with context, never swallowed
+        except Exception as exc:
             text = str(exc)
             if "authentication" in text.lower() or "api_key" in text:
                 # The SDK names three constructor parameters and no next step.

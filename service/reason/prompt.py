@@ -100,7 +100,7 @@ def _relevant_codes(rules, target) -> list[str]:
     """
     codes: list[str] = []
 
-    def add(code: str) -> None:
+    def add(code: str | None) -> None:
         if code and code not in codes:
             codes.append(code)
 
@@ -210,7 +210,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
             "bp_trend_summary": "string",
             "target_used": {
                 **{f"{code}_lt": "number" for code in sorted(
-                    (target.thresholds if target else {}))},
+                    target.thresholds if target else {})},
                 "citation": "string",
             },
             "medication_changes": [

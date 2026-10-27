@@ -16,4 +16,4 @@ sys.modules after import:
 from service.gate.engine import run_gate
 from service.gate.types import Finding, GateContext, GateDecision, Severity
 
-__all__ = ["run_gate", "Finding", "GateContext", "GateDecision", "Severity"]
+__all__ = ["Finding", "GateContext", "GateDecision", "Severity", "run_gate"]

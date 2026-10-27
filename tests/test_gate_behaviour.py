@@ -3,13 +3,13 @@
 Each test names the failure it prevents rather than the code path it covers.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 
-from datagen.proposer import REFERENCE_PROVENANCE, propose
+from datagen.proposer import propose
 from datagen.synthetic import TODAY, make_patient, with_documented_acei_intolerance
-from service.contracts.proposal import ChangeAction, MedicationChange, Target
+from service.contracts.proposal import ChangeAction, MedicationChange
 from service.gate import GateContext, run_gate
 from service.gate.types import Severity
 from service.packs.loader import load_pack
@@ -294,7 +294,6 @@ def test_a_future_dated_reading_is_not_a_reading(rules):
     within 90 days" would pass on a lab that does not exist yet. One clock skew
     or mistyped year and the sufficiency check silently stops asking for the
     test it exists to demand."""
-    from datetime import timedelta
 
     from datagen.synthetic import TODAY
     from service.state.models import Observation, Source
@@ -320,9 +319,7 @@ def test_a_drug_we_do_not_recognise_is_declared_unchecked(rules):
     state = make_patient(1, controlled=False)
     proposal = propose(state, rules)
 
-    state.medications = state.medications + [
-        Medication("unobtainium", 5.0, 1, Source.PATIENT_REPORTED)
-    ]
+    state.medications = [*state.medications, Medication("unobtainium", 5.0, 1, Source.PATIENT_REPORTED)]
     findings = c3_drug_safety.run(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )
@@ -341,9 +338,7 @@ def test_a_recognised_but_unprescribable_drug_stays_silent(rules):
 
     state = make_patient(1, controlled=False)
     proposal = propose(state, rules)
-    state.medications = state.medications + [
-        Medication("ibuprofen", 400.0, 3, Source.PATIENT_REPORTED)
-    ]
+    state.medications = [*state.medications, Medication("ibuprofen", 400.0, 3, Source.PATIENT_REPORTED)]
     findings = c3_drug_safety.run(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )

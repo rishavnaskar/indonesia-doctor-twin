@@ -20,6 +20,8 @@ testing.
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 
 from service.graph.runtime import Checkpoint, InMemoryRuntime, Interrupted
@@ -102,10 +104,8 @@ def test_resume_records_the_decision_and_returns_what_was_paused_on(runtime):
     deciding about" — the caller needs the proposal to carry on with, and the
     decision has to reach the audit trail rather than the return value."""
     runtime.start("T4", {"step": 0})
-    try:
+    with contextlib.suppress(Interrupted):
         runtime.interrupt("T4", {"proposal": "draft"})
-    except Interrupted:
-        pass
 
     assert runtime.resume("T4", "accepted") == {"proposal": "draft"}
     assert any(c.state.get("decision") == "accepted"

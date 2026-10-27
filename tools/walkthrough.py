@@ -12,14 +12,12 @@ from __future__ import annotations
 from datetime import datetime
 
 from datagen.synthetic import make_patient
-from service.contracts.proposal import ChangeAction, MedicationChange
+from service.emit.queue import OutboundQueue
 from service.graph.runtime import InMemoryRuntime
 from service.graph.workflow import Outcome, run_encounter
 from service.packs.loader import load_pack
 from service.router.router import default_router
 from service.signing import AuditLog, Signer
-from service.emit.queue import OutboundQueue
-from service.state.models import Diagnosis, Medication, Observation, Source
 from tools.scenarios import build as build_scenarios
 
 NOW = datetime(2026, 8, 29, 10, 0)

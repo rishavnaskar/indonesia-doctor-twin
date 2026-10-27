@@ -78,6 +78,7 @@ def test_a_non_synthetic_record_is_never_sent(rules):
 def test_the_guard_defaults_to_refusing(rules):
     """A state built by hand, without the flag, must not be exportable."""
     from datetime import date
+
     from service.state.models import PatientState
 
     bare = PatientState(patient_id="X", age=50, sex="F", as_of=date(2026, 8, 29))
@@ -295,11 +296,11 @@ def test_the_prompt_shows_the_measurements_this_pathway_actually_reads(rules):
     The consequence was not cosmetic: a diabetic's HbA1c never reached the
     model, so it judged whether their diabetes was controlled without the one
     number that defines control."""
+    from datagen.synthetic import make_diabetic
+    from service.reason.prompt import _relevant_codes
     from service.rules import pathways
     from service.rules.predicates import Context
     from service.rules.targets import resolve_target
-    from service.reason.prompt import _relevant_codes
-    from datagen.synthetic import make_diabetic
 
     htn = pathways.with_pathway(rules, "hypertension")
     htn_codes = _relevant_codes(
@@ -315,8 +316,8 @@ def test_the_prompt_shows_the_measurements_this_pathway_actually_reads(rules):
 
 
 def test_a_diabetic_patients_hba1c_reaches_the_model(rules):
-    from service.rules import pathways
     from datagen.synthetic import make_diabetic
+    from service.rules import pathways
 
     dm2 = pathways.with_pathway(rules, "diabetes")
     backend = Fake(json.dumps(VALID))

@@ -85,7 +85,7 @@ def _target(rules, state):
     from service.rules.targets import resolve_target
 
     resolution = resolve_target(rules.guideline, Context(state))
-    return resolution.target if resolution.defined else None
+    return resolution.target
 
 
 def _at_target_streak(state, target) -> int:

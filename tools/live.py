@@ -161,13 +161,12 @@ def main() -> int:
     kwargs = {}
     if args.provider == "anthropic" and args.no_thinking:
         kwargs["thinking"] = False
-    if args.provider in ("openrouter", "hosted"):
+    if args.provider in ("openrouter", "hosted") and (args.no_fallback or args.model):
         # An explicitly named model is a deliberate choice — usually an
         # experiment about that model. Silently substituting another one would
         # corrupt the experiment, so naming a model turns fallback off unless
         # nothing was named.
-        if args.no_fallback or args.model:
-            kwargs["fallbacks"] = ()
+        kwargs["fallbacks"] = ()
     router = router_with_model(args.model, provider=args.provider,
                                samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow, **kwargs)
     backend = router.get("model").backend
@@ -223,7 +222,6 @@ def main() -> int:
         )
         return 2
 
-    run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
     tally: dict[str, int] = {}
     parse_failures = 0
     replayed = 0

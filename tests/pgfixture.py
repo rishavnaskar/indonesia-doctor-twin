@@ -33,7 +33,7 @@ def connection():
         cur.execute(f'CREATE SCHEMA "{schema}"')
         cur.execute(f'SET search_path TO "{schema}"')
     db.migrate(conn)
-    conn._test_schema = schema  # noqa: SLF001 - teardown needs it back
+    conn._test_schema = schema
     return conn
 
 
