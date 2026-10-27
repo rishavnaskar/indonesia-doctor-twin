@@ -57,9 +57,7 @@ def test_silence_is_not_a_report_that_they_take_nothing(rules):
     """With no patient-reported list at all, the record's own entries must not
     be read as 'the patient did not mention this'."""
     state = make_patient(101, controlled=True)
-    assert not any(
-        d.kind == "missing_from_report" for d in reconcile(state, rules).discrepancies
-    )
+    assert not any(d.kind == "missing_from_report" for d in reconcile(state, rules).discrepancies)
 
 
 def test_a_drug_the_patient_did_not_mention_is_flagged_once_they_have_listed_something(rules):
@@ -147,8 +145,13 @@ def test_discrepancies_survive_a_refusal(rules):
             return {}
 
     result = run_encounter(
-        minor, rules, rules.sites["SITE-A"], default_router(), InMemoryRuntime(),
-        thread_id="R1", now=datetime(2026, 8, 29, 10, 0),
+        minor,
+        rules,
+        rules.sites["SITE-A"],
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="R1",
+        now=datetime(2026, 8, 29, 10, 0),
         intake=Intake(adherence="stopped"),
     )
     assert result.outcome.value == "handoff"

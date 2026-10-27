@@ -66,7 +66,6 @@ def runtime():
     return _RUNTIME
 
 
-
 def reset_allowed() -> bool:
     """Whether the surface is permitted to destroy the store.
 
@@ -102,5 +101,3 @@ def reset_everything() -> dict:
         _RUNTIME = None
         _STORE = None
     return counts
-
-

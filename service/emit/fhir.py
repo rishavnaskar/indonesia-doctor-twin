@@ -50,10 +50,14 @@ class Bundle:
 
 
 def _vital_signs_category() -> dict[str, Any]:
-    return {"coding": [{
-        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
-        "code": "vital-signs",
-    }]}
+    return {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "vital-signs",
+            }
+        ]
+    }
 
 
 def _component(systems: dict, spec: dict, observation) -> dict[str, Any]:
@@ -83,7 +87,9 @@ def _pathway_codes(rules) -> list[str]:
     return found
 
 
-def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encounter_id: str) -> Bundle:
+def build_bundle(
+    state, claim, proposal, site, signer_id: str, rules, *, encounter_id: str
+) -> Bundle:
     interop = rules.interop
     systems = interop.get("systems") or {}
     codes = interop.get("observation_codes") or {}
@@ -116,7 +122,8 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
                 # code — a validating server rejects it.
                 "class": {
                     "system": encounter_cfg.get(
-                        "class_system", "http://terminology.hl7.org/CodeSystem/v3-ActCode"),
+                        "class_system", "http://terminology.hl7.org/CodeSystem/v3-ActCode"
+                    ),
                     "code": encounter_cfg.get("class_code", "AMB"),
                     "display": encounter_cfg.get("class_display", "ambulatory"),
                 },
@@ -139,10 +146,14 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
                 {
                     "resourceType": "Condition",
                     "id": f"{encounter_id}-cond-{index}",
-                    "clinicalStatus": {"coding": [{
-                        "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
-                        "code": "active",
-                    }]},
+                    "clinicalStatus": {
+                        "coding": [
+                            {
+                                "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                                "code": "active",
+                            }
+                        ]
+                    },
                     "code": {
                         "coding": [
                             {
@@ -186,8 +197,9 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
                         "id": f"{encounter_id}-obs-{index}",
                         "status": "final",
                         "category": [_vital_signs_category()],
-                        "code": {"coding": [{"system": systems.get("loinc"),
-                                             "code": panel["loinc"]}]},
+                        "code": {
+                            "coding": [{"system": systems.get("loinc"), "code": panel["loinc"]}]
+                        },
                         "subject": {"reference": patient_ref},
                         "encounter": {"reference": encounter_ref},
                         "effectiveDateTime": sys_obs.taken_at.isoformat(),
@@ -249,8 +261,7 @@ def build_bundle(state, claim, proposal, site, signer_id: str, rules, *, encount
                     "dosageInstruction": [
                         {
                             "text": (
-                                f"{change.mg_per_dose:g} mg, "
-                                f"{change.doses_per_day} times daily"
+                                f"{change.mg_per_dose:g} mg, {change.doses_per_day} times daily"
                             ),
                             "timing": {
                                 "repeat": {
@@ -288,7 +299,5 @@ def _key(encounter_id: str, payload: dict[str, Any]) -> str:
     a genuine correction must not be swallowed as a duplicate. Hashing the
     content alongside the encounter id gives both.
     """
-    digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True).encode("utf-8")
-    ).hexdigest()[:16]
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
     return f"{encounter_id}:{digest}"

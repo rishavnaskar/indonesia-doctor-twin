@@ -33,7 +33,12 @@ ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
 
 BOLD, DIM, GREEN, RED, YELLOW, OFF = (
-    "\033[1m", "\033[2m", "\033[32m", "\033[31m", "\033[33m", "\033[0m"
+    "\033[1m",
+    "\033[2m",
+    "\033[32m",
+    "\033[31m",
+    "\033[33m",
+    "\033[0m",
 )
 
 
@@ -50,7 +55,8 @@ def _stage(argv: list[str], *, quiet: bool = False) -> bool:
     """Run one stage. Returns whether it passed."""
     started = time.monotonic()
     result = subprocess.run(
-        argv, cwd=ROOT,
+        argv,
+        cwd=ROOT,
         stdout=subprocess.PIPE if quiet else None,
         stderr=subprocess.STDOUT if quiet else None,
         text=True,
@@ -95,7 +101,9 @@ def _database_up() -> str:
 
     started = subprocess.run(
         ["docker", "compose", "up", "-d", "--wait"],
-        cwd=ROOT, capture_output=True, text=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
     )
 
     from service.store import Store
@@ -107,8 +115,10 @@ def _database_up() -> str:
         # is the same schema. Ask before assuming.
         store = Store()
         if store.backend == "postgres":
-            return (f"postgres at {store.summary()['location']}"
-                    " (already running, not started by this run)")
+            return (
+                f"postgres at {store.summary()['location']}"
+                " (already running, not started by this run)"
+            )
         return f"files ({_compose_failure(started.stderr or started.stdout)})"
 
     store = Store()
@@ -138,53 +148,85 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run everything. --live adds a real model.",
     )
-    parser.add_argument("--live", action="store_true",
-                        help="draft with a real model instead of the reference reasoner")
-    parser.add_argument("--ci", action="store_true",
-                        help="the gates only: no walkthrough, no browser, no model")
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="draft with a real model instead of the reference reasoner",
+    )
+    parser.add_argument(
+        "--ci", action="store_true", help="the gates only: no walkthrough, no browser, no model"
+    )
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
     sys.path.insert(0, str(ROOT))
 
     stages: list[tuple[str, str, list[str], bool]] = [
-        ("Architecture rules",
-         "no country, payer, drug or guideline named in the engine",
-         [PY, "tools/ci_checks.py"], True),
-        ("Test suite",
-         "every safety property, three storage backends",
-         # No -q here: pytest.ini already sets it in addopts, and a second one
-         # is -qq, which suppresses the "N passed" line this stage reports.
-         [PY, "-m", "pytest", "tests/"], True),
-        ("Scorecard",
-         "the seven gates that decide whether this is allowed to run",
-         [PY, "-m", "eval.scorecard"], False),
-        ("Pressure suite",
-         "hostile input against the deterministic gate",
-         [PY, "-m", "eval.pressure"], False),
-        ("FHIR conformance",
-         "official HL7 validator, if it has been downloaded",
-         [PY, "-m", "tools.validate_fhir"], False),
+        (
+            "Architecture rules",
+            "no country, payer, drug or guideline named in the engine",
+            [PY, "tools/ci_checks.py"],
+            True,
+        ),
+        (
+            "Test suite",
+            "every safety property, three storage backends",
+            # No -q here: pytest.ini already sets it in addopts, and a second one
+            # is -qq, which suppresses the "N passed" line this stage reports.
+            [PY, "-m", "pytest", "tests/"],
+            True,
+        ),
+        (
+            "Scorecard",
+            "the seven gates that decide whether this is allowed to run",
+            [PY, "-m", "eval.scorecard"],
+            False,
+        ),
+        (
+            "Pressure suite",
+            "hostile input against the deterministic gate",
+            [PY, "-m", "eval.pressure"],
+            False,
+        ),
+        (
+            "FHIR conformance",
+            "official HL7 validator, if it has been downloaded",
+            [PY, "-m", "tools.validate_fhir"],
+            False,
+        ),
     ]
     if not args.ci:
         stages.append(
-            ("Walkthrough", "one narrated encounter per outcome",
-             [PY, "-m", "tools.walkthrough"], False))
+            (
+                "Walkthrough",
+                "one narrated encounter per outcome",
+                [PY, "-m", "tools.walkthrough"],
+                False,
+            )
+        )
     if args.live and not args.ci:
         stages.append(
-            ("Live encounters",
-             "real model, real refusals, real provenance, replayed once stored",
-             [PY, "-m", "tools.live", "--n", "5"], False))
+            (
+                "Live encounters",
+                "real model, real refusals, real provenance, replayed once stored",
+                [PY, "-m", "tools.live", "--n", "5"],
+                False,
+            )
+        )
 
     total = len(stages) + (0 if args.ci else 1)
 
     _say()
     _say(f"{BOLD}  A digital twin of a doctor's work, not a doctor.{OFF}")
-    _say(f"  {DIM}Drafting is a model's job. Deciding whether a draft is allowed"
-         f" to exist is not.{OFF}")
+    _say(
+        f"  {DIM}Drafting is a model's job. Deciding whether a draft is allowed"
+        f" to exist is not.{OFF}"
+    )
     _say()
     _say(f"  storage    {_database_up()}")
-    _say(f"  drafting   {'a real model over the network' if args.live else 'the reference reasoner (no network, no cost)'}")
+    _say(
+        f"  drafting   {'a real model over the network' if args.live else 'the reference reasoner (no network, no cost)'}"
+    )
 
     for index, (title, detail, argv, quiet) in enumerate(stages, start=1):
         _heading(index, total, title, detail)
@@ -198,8 +240,7 @@ def main() -> int:
         _say(f"{GREEN}{BOLD}  All gates green.{OFF}")
         return 0
 
-    _heading(total, total, "Clinician surface",
-             f"http://localhost:{args.port} (ctrl-c to stop)")
+    _heading(total, total, "Clinician surface", f"http://localhost:{args.port} (ctrl-c to stop)")
     _say()
     surface = [PY, "-m", "tools.demo", "--port", str(args.port)]
     if args.live:

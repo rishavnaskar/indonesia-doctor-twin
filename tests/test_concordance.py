@@ -34,8 +34,9 @@ def test_out_of_scope_visits_are_counted_apart():
     rules = load_pack("id")
     minor = generate(1, seed=900)[0]
     minor["age"] = 14
-    result = score([Case(patient=minor, adjudicated="continue")], rules,
-                   source="test", circular=True)
+    result = score(
+        [Case(patient=minor, adjudicated="continue")], rules, source="test", circular=True
+    )
     assert result.out_of_scope == 1
     assert result.compared == 0
 

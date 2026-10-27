@@ -79,7 +79,8 @@ def _interacting(rules, drug_class: str | None, record_molecules: list[str]) -> 
     if not classes_at_risk:
         return ()
     return tuple(
-        molecule for molecule in record_molecules
+        molecule
+        for molecule in record_molecules
         if rules.drug_class_of(molecule) in classes_at_risk
     )
 
@@ -101,28 +102,35 @@ def reconcile(state, rules, intake=None) -> Reconciliation:
         counterpart = by_molecule.get(entry.molecule)
         if counterpart is None:
             spec = derived.get("not_in_record") or {}
-            found.append(Discrepancy(
-                kind="not_in_record",
-                text=spec.get("text", ""), gloss=spec.get("gloss", ""),
-                molecule=entry.molecule,
-                drug_class=rules.drug_class_of(entry.molecule),
-                record_says="not on the record",
-                patient_says=f"{entry.molecule} {entry.mg_daily:g} mg daily",
-                interacts_with=_interacting(
-                    rules, rules.drug_class_of(entry.molecule), record_molecules),
-                material=True,
-            ))
+            found.append(
+                Discrepancy(
+                    kind="not_in_record",
+                    text=spec.get("text", ""),
+                    gloss=spec.get("gloss", ""),
+                    molecule=entry.molecule,
+                    drug_class=rules.drug_class_of(entry.molecule),
+                    record_says="not on the record",
+                    patient_says=f"{entry.molecule} {entry.mg_daily:g} mg daily",
+                    interacts_with=_interacting(
+                        rules, rules.drug_class_of(entry.molecule), record_molecules
+                    ),
+                    material=True,
+                )
+            )
         elif abs(counterpart.mg_daily - entry.mg_daily) > 1e-6:
             spec = derived.get("dose_differs") or {}
-            found.append(Discrepancy(
-                kind="dose_differs",
-                text=spec.get("text", ""), gloss=spec.get("gloss", ""),
-                molecule=entry.molecule,
-                drug_class=rules.drug_class_of(entry.molecule),
-                record_says=f"{counterpart.mg_daily:g} mg daily",
-                patient_says=f"{entry.mg_daily:g} mg daily",
-                material=True,
-            ))
+            found.append(
+                Discrepancy(
+                    kind="dose_differs",
+                    text=spec.get("text", ""),
+                    gloss=spec.get("gloss", ""),
+                    molecule=entry.molecule,
+                    drug_class=rules.drug_class_of(entry.molecule),
+                    record_says=f"{counterpart.mg_daily:g} mg daily",
+                    patient_says=f"{entry.mg_daily:g} mg daily",
+                    material=True,
+                )
+            )
 
     # Only meaningful when the patient actually listed something. Silence is not
     # a report that they take nothing.
@@ -131,15 +139,18 @@ def reconcile(state, rules, intake=None) -> Reconciliation:
         for entry in record:
             if entry.molecule not in reported_molecules:
                 spec = derived.get("missing_from_report") or {}
-                found.append(Discrepancy(
-                    kind="missing_from_report",
-                    text=spec.get("text", ""), gloss=spec.get("gloss", ""),
-                    molecule=entry.molecule,
-                    drug_class=rules.drug_class_of(entry.molecule),
-                    record_says=f"{entry.molecule} {entry.mg_daily:g} mg daily",
-                    patient_says="not mentioned",
-                    material=True,
-                ))
+                found.append(
+                    Discrepancy(
+                        kind="missing_from_report",
+                        text=spec.get("text", ""),
+                        gloss=spec.get("gloss", ""),
+                        molecule=entry.molecule,
+                        drug_class=rules.drug_class_of(entry.molecule),
+                        record_says=f"{entry.molecule} {entry.mg_daily:g} mg daily",
+                        patient_says="not mentioned",
+                        material=True,
+                    )
+                )
 
     # ---- the bounded interview's answers ----------------------------------
     answers = dict(getattr(intake, "answers", {}) or {})
@@ -151,14 +162,17 @@ def reconcile(state, rules, intake=None) -> Reconciliation:
         if not spec:
             continue
         drug_class = spec.get("implicates_class")
-        found.append(Discrepancy(
-            kind=spec.get("kind", field_name),
-            text=spec.get("text", ""), gloss=spec.get("gloss", ""),
-            drug_class=drug_class,
-            record_says="",
-            patient_says=str(value),
-            interacts_with=_interacting(rules, drug_class, record_molecules),
-            material=bool(spec.get("material", False)) or bool(drug_class),
-        ))
+        found.append(
+            Discrepancy(
+                kind=spec.get("kind", field_name),
+                text=spec.get("text", ""),
+                gloss=spec.get("gloss", ""),
+                drug_class=drug_class,
+                record_says="",
+                patient_says=str(value),
+                interacts_with=_interacting(rules, drug_class, record_molecules),
+                material=bool(spec.get("material", False)) or bool(drug_class),
+            )
+        )
 
     return Reconciliation(discrepancies=found)

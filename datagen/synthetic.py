@@ -53,8 +53,7 @@ BENIGN_SYMPTOMS = ["cough", "dizziness", "swelling"]
 
 
 def _obs(code, value, days_ago, source=Source.EMR, unit="") -> Observation:
-    units = {"sbp": "mmHg", "dbp": "mmHg", "k": "mmol/L",
-             "egfr": "mL/min/1.73m2", "hba1c": "%"}
+    units = {"sbp": "mmHg", "dbp": "mmHg", "k": "mmol/L", "egfr": "mL/min/1.73m2", "hba1c": "%"}
     return Observation(
         code=code,
         value=float(value),
@@ -91,8 +90,9 @@ def _regimen(rng, rungs: int) -> list[Medication]:
 DM_LADDER = [("metformin", [500.0, 850.0, 1000.0], 2), ("glimepiride", [1.0, 2.0], 1)]
 
 
-def make_diabetic(seed: int, *, controlled: bool | None = None,
-                  profile: str = "clean") -> PatientState:
+def make_diabetic(
+    seed: int, *, controlled: bool | None = None, profile: str = "clean"
+) -> PatientState:
     """One type 2 diabetes follow-up patient.
 
     The same shape as make_patient and deliberately not folded into it: the two
@@ -105,8 +105,12 @@ def make_diabetic(seed: int, *, controlled: bool | None = None,
     age = rng.randint(28, 64)
     flags: dict[str, bool] = {"has_dm": True}
     symptoms: dict[str, bool] = {}
-    diagnoses = [Diagnosis(code=rng.choice(["E11.9", "E11.6", "E11.8"]),
-                           onset=TODAY - timedelta(days=rng.randint(300, 5000)))]
+    diagnoses = [
+        Diagnosis(
+            code=rng.choice(["E11.9", "E11.6", "E11.8"]),
+            onset=TODAY - timedelta(days=rng.randint(300, 5000)),
+        )
+    ]
     allergies: list[Allergy] = []
 
     if controlled is None:
@@ -141,18 +145,21 @@ def make_diabetic(seed: int, *, controlled: bool | None = None,
     elif profile == "excluded_first_presentation":
         flags["is_first_presentation"] = True
 
-    observations = [_obs("hba1c", hba1c, lab_age),
-                    _obs("egfr", egfr_value, lab_age)]
+    observations = [_obs("hba1c", hba1c, lab_age), _obs("egfr", egfr_value, lab_age)]
     for n in range(1, rng.randint(2, 5)):
         drift = round(rng.uniform(-0.5, 0.5), 1)
         prior = min(hba1c + drift, 6.9) if controlled else max(hba1c + drift, 7.1)
         observations.append(_obs("hba1c", round(prior, 1), lab_age + 120 * n))
 
     medications = [
-        Medication(molecule=molecule, mg_per_dose=rng.choice(doses),
-                   doses_per_day=per_day, source=Source.EMR,
-                   since=TODAY - timedelta(days=rng.randint(90, 1600)),
-                   adherence_signal=rng.choice(["good", "good", "gaps"]))
+        Medication(
+            molecule=molecule,
+            mg_per_dose=rng.choice(doses),
+            doses_per_day=per_day,
+            source=Source.EMR,
+            since=TODAY - timedelta(days=rng.randint(90, 1600)),
+            adherence_signal=rng.choice(["good", "good", "gaps"]),
+        )
         for molecule, doses, per_day in DM_LADDER[:rungs]
     ]
 
@@ -166,10 +173,12 @@ def make_diabetic(seed: int, *, controlled: bool | None = None,
         allergies=allergies,
         observations=observations,
         encounters=[
-            PriorEncounter(encounter_id=f"D{seed}-{n}",
-                           encounter_date=TODAY - timedelta(days=120 * n),
-                           decision=rng.choice(["continue", "titrate_up"]),
-                           signed_by=f"PRAC-A-00{rng.randint(1, 2)}")
+            PriorEncounter(
+                encounter_id=f"D{seed}-{n}",
+                encounter_date=TODAY - timedelta(days=120 * n),
+                decision=rng.choice(["continue", "titrate_up"]),
+                signed_by=f"PRAC-A-00{rng.randint(1, 2)}",
+            )
             for n in range(1, 4)
         ],
         flags=flags,
@@ -230,8 +239,12 @@ def make_patient(
     # One in six carries a painkiller allergy. Never a drug this pathway would
     # propose, so it varies the record without blocking a correct plan.
     if rng.random() < 0.17:
-        allergies.append(Allergy(substance=rng.choice(["ibuprofen", "diclofenac"]),
-                                 reaction=rng.choice(["rash", "wheeze", None])))
+        allergies.append(
+            Allergy(
+                substance=rng.choice(["ibuprofen", "diclofenac"]),
+                reaction=rng.choice(["rash", "wheeze", None]),
+            )
+        )
 
     # One in four has a second coded condition, which is what gives the claim
     # draft a secondary code to find.
@@ -267,18 +280,31 @@ def make_patient(
 
     elif profile == "red_flag":
         sbp, dbp = rng.randint(182, 215), rng.randint(118, 132)
-        symptoms[rng.choice(["chest_pain", "dyspnoea", "severe_headache",
-                             "visual_disturbance", "focal_neurological_deficit"])] = True
+        symptoms[
+            rng.choice(
+                [
+                    "chest_pain",
+                    "dyspnoea",
+                    "severe_headache",
+                    "visual_disturbance",
+                    "focal_neurological_deficit",
+                ]
+            )
+        ] = True
 
     elif profile == "hyperkalaemia":
         k_value = round(rng.uniform(5.6, 6.4), 1)
         rungs = 2  # on a RAAS-acting drug, which is what makes it matter
 
     elif profile == "acei_intolerant":
-        intolerances.append(Intolerance(
-            molecule="captopril", drug_class="acei",
-            documented_at=TODAY - timedelta(days=rng.randint(40, 700)),
-            reaction="persistent dry cough"))
+        intolerances.append(
+            Intolerance(
+                molecule="captopril",
+                drug_class="acei",
+                documented_at=TODAY - timedelta(days=rng.randint(40, 700)),
+                reaction="persistent dry cough",
+            )
+        )
         rungs = 1  # on the CCB only; the ACE inhibitor was stopped
 
     elif profile == "polypharmacy":
@@ -307,8 +333,9 @@ def make_patient(
         egfr_value = rng.randint(9, 28)
 
     elif profile == "excluded_other":
-        flags[rng.choice(["active_oncology", "psychiatric_crisis",
-                          "controlled_substance_request"])] = True
+        flags[
+            rng.choice(["active_oncology", "psychiatric_crisis", "controlled_substance_request"])
+        ] = True
 
     # ---- observations -----------------------------------------------------
     observations += [_obs("sbp", sbp, 0), _obs("dbp", dbp, 0)]
@@ -331,15 +358,19 @@ def make_patient(
     observations.append(_obs("k", k_value, lab_age))
     observations.append(_obs("egfr", egfr_value, lab_age))
     if rng.random() < 0.3:
-        observations.append(_obs("creatinine", round(rng.uniform(0.7, 1.3), 2),
-                                 lab_age, unit="mg/dL"))
+        observations.append(
+            _obs("creatinine", round(rng.uniform(0.7, 1.3), 2), lab_age, unit="mg/dL")
+        )
 
     medications = _regimen(rng, rungs)
     if forced_max_first_line and medications:
         first = medications[0]
         medications[0] = Medication(
-            molecule="amlodipine", mg_per_dose=10.0, doses_per_day=1,
-            source=first.source, since=first.since,
+            molecule="amlodipine",
+            mg_per_dose=10.0,
+            doses_per_day=1,
+            source=first.source,
+            since=first.since,
             adherence_signal=first.adherence_signal,
         )
 

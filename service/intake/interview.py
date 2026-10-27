@@ -98,8 +98,7 @@ class Interviewer:
             # appeal to a relative who is a doctor — lands here.
             if isinstance(value, str) and value.strip():
                 self.result.questions_for_clinician.append(value.strip())
-            return Turn(kind=TurnKind.DEFLECTION, text=self._deflection,
-                        question_id=question["id"])
+            return Turn(kind=TurnKind.DEFLECTION, text=self._deflection, question_id=question["id"])
 
         self.result.answers[question["field"]] = value
         self._index += 1
@@ -118,8 +117,7 @@ class Interviewer:
             return Turn(kind=TurnKind.CLOSING, text=self._closing)
         question = self._questions[self._index]
         if not question.get("optional"):
-            return Turn(kind=TurnKind.DEFLECTION, text=self._deflection,
-                        question_id=question["id"])
+            return Turn(kind=TurnKind.DEFLECTION, text=self._deflection, question_id=question["id"])
         self._index += 1
         if self._index >= len(self._questions):
             self.result.complete = True

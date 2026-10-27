@@ -47,9 +47,15 @@ def _diabetic(seed=400, hba1c=8.2, egfr=88, age=52, mg=500, doses=2, **flags):
 def _run(rules, state, site_id="SITE-A"):
     site = rules.sites[site_id]
     return run_encounter(
-        state, rules, site, default_router(), InMemoryRuntime(),
-        thread_id="P1", signer=Signer(site["practitioners"][0]["practitioner_id"], True),
-        audit=AuditLog(), now=NOW,
+        state,
+        rules,
+        site,
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="P1",
+        signer=Signer(site["practitioners"][0]["practitioner_id"], True),
+        audit=AuditLog(),
+        now=NOW,
     )
 
 
@@ -92,10 +98,11 @@ def test_a_target_is_not_always_a_blood_pressure(rules):
     """The contract that the second pathway broke, now generalised."""
     htn = pathways.with_pathway(rules, "hypertension")
     dm2 = pathways.with_pathway(rules, "diabetes")
-    assert set(resolve_target(htn.guideline, Context(make_patient(301))).target.thresholds) \
-        == {"sbp", "dbp"}
-    assert set(resolve_target(dm2.guideline, Context(_diabetic())).target.thresholds) \
-        == {"hba1c"}
+    assert set(resolve_target(htn.guideline, Context(make_patient(301))).target.thresholds) == {
+        "sbp",
+        "dbp",
+    }
+    assert set(resolve_target(dm2.guideline, Context(_diabetic())).target.thresholds) == {"hba1c"}
 
 
 def test_the_same_engine_drafts_titrates_and_escalates_for_diabetes(rules):

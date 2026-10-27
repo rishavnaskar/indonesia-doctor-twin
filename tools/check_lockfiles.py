@@ -34,7 +34,9 @@ PAIRS = (
 )
 
 # `name[extra1,extra2] == 1.2.3`, with the extras and whitespace optional.
-PIN = re.compile(r"^(?P<name>[A-Za-z0-9._-]+)\s*(?:\[(?P<extras>[^\]]*)\])?\s*==\s*(?P<version>[^\s;#]+)")
+PIN = re.compile(
+    r"^(?P<name>[A-Za-z0-9._-]+)\s*(?:\[(?P<extras>[^\]]*)\])?\s*==\s*(?P<version>[^\s;#]+)"
+)
 
 
 def normalise(name: str) -> str:

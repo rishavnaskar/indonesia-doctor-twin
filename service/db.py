@@ -56,8 +56,7 @@ def connect(url: str | None = None):
     except ModuleNotFoundError:
         return None
     try:
-        return psycopg.connect(url or dsn(), autocommit=True,
-                               connect_timeout=CONNECT_TIMEOUT)
+        return psycopg.connect(url or dsn(), autocommit=True, connect_timeout=CONNECT_TIMEOUT)
     except Exception:  # noqa: BLE001 - every failure means the same thing here
         return None
 
@@ -93,8 +92,10 @@ def migrate(conn) -> list[str]:
             continue
         with conn.cursor() as cur:
             cur.execute(path.read_text(encoding="utf-8"))
-            cur.execute("INSERT INTO schema_migrations (name) VALUES (%s)"
-                        " ON CONFLICT DO NOTHING", (path.name,))
+            cur.execute(
+                "INSERT INTO schema_migrations (name) VALUES (%s) ON CONFLICT DO NOTHING",
+                (path.name,),
+            )
         fresh.append(path.name)
     return fresh
 
@@ -247,9 +248,16 @@ class PostgresAuditLog(AuditLog):
                 "INSERT INTO signatures (practitioner_id, role, licence_expires,"
                 " decision, proposal_provenance, signed_at, rejection_reason, edit_diff)"
                 " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                (record.practitioner_id, record.role, record.licence_expires,
-                 record.decision, _jsonb(list(record.proposal_provenance)),
-                 record.signed_at, record.rejection_reason, record.edit_diff),
+                (
+                    record.practitioner_id,
+                    record.role,
+                    record.licence_expires,
+                    record.decision,
+                    _jsonb(list(record.proposal_provenance)),
+                    record.signed_at,
+                    record.rejection_reason,
+                    record.edit_diff,
+                ),
             )
 
     def _load(self) -> None:
@@ -260,11 +268,18 @@ class PostgresAuditLog(AuditLog):
                 " FROM signatures ORDER BY id"
             )
             for row in cur.fetchall():
-                self.records.append(SignatureRecord(
-                    practitioner_id=row[0], role=row[1], licence_expires=row[2],
-                    decision=row[3], proposal_provenance=tuple(row[4]),
-                    signed_at=row[5], rejection_reason=row[6], edit_diff=row[7],
-                ))
+                self.records.append(
+                    SignatureRecord(
+                        practitioner_id=row[0],
+                        role=row[1],
+                        licence_expires=row[2],
+                        decision=row[3],
+                        proposal_provenance=tuple(row[4]),
+                        signed_at=row[5],
+                        rejection_reason=row[6],
+                        edit_diff=row[7],
+                    )
+                )
 
 
 @dataclass
@@ -291,8 +306,15 @@ class PostgresQueue(OutboundQueue):
                 "INSERT INTO outbound (idempotency_key, kind, payload, status,"
                 " attempts, last_error, enqueued_at)"
                 " VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (item.idempotency_key, item.kind, _jsonb(item.payload),
-                 item.status.value, item.attempts, item.last_error, item.enqueued_at),
+                (
+                    item.idempotency_key,
+                    item.kind,
+                    _jsonb(item.payload),
+                    item.status.value,
+                    item.attempts,
+                    item.last_error,
+                    item.enqueued_at,
+                ),
             )
 
     def _load(self) -> None:
@@ -311,8 +333,12 @@ class PostgresQueue(OutboundQueue):
         # Ordered by arrival, not by key, because a queue is a queue.
         for row in sorted(rows, key=lambda r: r[7]):
             item = QueueItem(
-                idempotency_key=row[0], kind=row[1], payload=row[2],
-                status=ItemStatus(row[3]), attempts=row[4], last_error=row[5],
+                idempotency_key=row[0],
+                kind=row[1],
+                payload=row[2],
+                status=ItemStatus(row[3]),
+                attempts=row[4],
+                last_error=row[5],
                 enqueued_at=row[6],
             )
             if item.idempotency_key not in self.items:

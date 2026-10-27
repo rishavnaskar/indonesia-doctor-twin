@@ -64,11 +64,16 @@ def test_a_signature_outlives_the_process(tmp_path):
     disappears on restart is not a record."""
     path = tmp_path / "audit.jsonl"
     log = AuditLog(path=path)
-    log.append(SignatureRecord(
-        practitioner_id="PRAC-A-001", role="internist",
-        licence_expires=date(2027, 3, 31), decision="accepted",
-        proposal_provenance=("m@1", "p@1", "c@1"),
-        signed_at=datetime(2026, 8, 29, 10, 30)))
+    log.append(
+        SignatureRecord(
+            practitioner_id="PRAC-A-001",
+            role="internist",
+            licence_expires=date(2027, 3, 31),
+            decision="accepted",
+            proposal_provenance=("m@1", "p@1", "c@1"),
+            signed_at=datetime(2026, 8, 29, 10, 30),
+        )
+    )
 
     reopened = AuditLog(path=path)
     assert len(reopened.records) == 1
@@ -83,9 +88,16 @@ def test_a_signature_outlives_the_process(tmp_path):
 def test_a_damaged_signature_line_does_not_lose_the_rest(tmp_path):
     path = tmp_path / "audit.jsonl"
     log = AuditLog(path=path)
-    log.append(SignatureRecord("PRAC-A-001", "internist", date(2027, 3, 31),
-                               "accepted", ("m@1", "p@1", "c@1"),
-                               datetime(2026, 8, 29, 10, 30)))
+    log.append(
+        SignatureRecord(
+            "PRAC-A-001",
+            "internist",
+            date(2027, 3, 31),
+            "accepted",
+            ("m@1", "p@1", "c@1"),
+            datetime(2026, 8, 29, 10, 30),
+        )
+    )
     with path.open("a", encoding="utf-8") as fh:
         fh.write('{"practitioner_id": "PRA')
 
@@ -97,8 +109,16 @@ def test_a_damaged_signature_line_does_not_lose_the_rest(tmp_path):
 def test_an_in_memory_log_still_works_without_a_path(tmp_path):
     """Persistence is opt-in; the tests and the scorecard must not need a disk."""
     log = AuditLog()
-    log.append(SignatureRecord("P", "r", date(2027, 1, 1), "accepted",
-                               ("m@1", "p@1", "c@1"), datetime(2026, 8, 29, 10, 0)))
+    log.append(
+        SignatureRecord(
+            "P",
+            "r",
+            date(2027, 1, 1),
+            "accepted",
+            ("m@1", "p@1", "c@1"),
+            datetime(2026, 8, 29, 10, 0),
+        )
+    )
     assert len(log.records) == 1
 
 
@@ -106,10 +126,17 @@ def test_the_store_reports_what_it_holds(tmp_path):
     store = Store(tmp_path / "s")
     runtime, log = store.runtime(), store.audit_log()
     runtime.start("ENC-9", {"step": 0})
-    log.append(SignatureRecord("P", "r", date(2027, 1, 1), "accepted",
-                               ("m@1", "p@1", "c@1"), datetime(2026, 8, 29, 10, 0)))
-    store.outbound().enqueue("encounter_bundle", {"n": 1}, "k1",
-                             datetime(2026, 8, 29, 10, 0))
+    log.append(
+        SignatureRecord(
+            "P",
+            "r",
+            date(2027, 1, 1),
+            "accepted",
+            ("m@1", "p@1", "c@1"),
+            datetime(2026, 8, 29, 10, 0),
+        )
+    )
+    store.outbound().enqueue("encounter_bundle", {"n": 1}, "k1", datetime(2026, 8, 29, 10, 0))
 
     facts = Store(tmp_path / "s").summary()
     assert facts["encounters_checkpointed"] == 1

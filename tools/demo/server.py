@@ -24,7 +24,6 @@ import html as html_lib
 import http.server
 import json
 import socketserver
-import threading
 import time
 import webbrowser
 
@@ -33,154 +32,12 @@ from service.logging import get_logger
 from tools.demo import templates
 from tools.demo.clinic import clinic_page
 from tools.demo.health import health
-from tools.demo.render import render
-from tools.demo.run import collect, compare_sites, run_patients, vocabulary
-from tools.live import load_env
+from tools.demo.jobs import Build, RunJob, router_for
+from tools.demo.run import compare_sites, vocabulary
 
 log = get_logger(__name__)
 
 _JOBS: dict[str, RunJob] = {}
-
-
-def _router_for(args, live: bool):
-    """A model-backed router, or None for the reference reasoner."""
-    if not live:
-        return None
-    load_env()
-    from service.router.router import router_with_model
-
-    return router_with_model(
-        args.model, provider=args.provider, samples=args.samples,
-        critic=args.critic, use_tools=args.tools, shadow=args.shadow,
-    )
-
-
-class RunJob:
-    """One interactive run, watched while it happens."""
-
-    def __init__(self, patients, site_id, live, args):
-        self.patients = patients
-        self.site_id = site_id
-        self.live = live
-        self.args = args
-        self.lock = threading.Lock()
-        self.steps: dict[int, str] = {}
-        self.done: dict[int, str] = {}
-        self.result: dict | None = None
-        self.error: str | None = None
-        self.started_at = time.time()
-        threading.Thread(target=self._run, daemon=True).start()
-
-    def _run(self) -> None:
-        log.info("clinic.run.started",
-                 extra={"patients": len(self.patients), "site_id": self.site_id,
-                        "live": bool(self.live)})
-        try:
-            router = _router_for(self.args, self.live)
-
-            def on_step(index, name):
-                with self.lock:
-                    self.steps[index] = name
-
-            def on_progress(index, total, title, outcome):
-                with self.lock:
-                    self.done[index] = str(outcome)
-                    self.steps.pop(index, None)
-                log.info("clinic.run.visit",
-                         extra={"index": index, "total": total, "outcome": str(outcome)})
-
-            result = run_patients(
-                self.patients, site_id=self.site_id, pack_id=self.args.pack,
-                router=router, on_progress=on_progress, on_step=on_step,
-            )
-            with self.lock:
-                self.result = result
-            log.info("clinic.run.finished",
-                     extra={"patients": len(self.patients), "site_id": self.site_id,
-                            "declined": result.get("declined"),
-                            "elapsed_s": round(time.time() - self.started_at, 1)})
-        except Exception as exc:
-            with self.lock:
-                self.error = f"{type(exc).__name__}: {exc}"
-            log.error("clinic.run.failed", exc_info=True,
-                      extra={"site_id": self.site_id, "live": bool(self.live)})
-
-    def status(self) -> dict:
-        with self.lock:
-            return {
-                "ready": self.result is not None,
-                "error": self.error,
-                "total": len(self.patients),
-                "steps": {str(k): v for k, v in self.steps.items()},
-                "finished": {str(k): v for k, v in self.done.items()},
-                "elapsed": round(time.time() - self.started_at),
-                "result": self.result,
-            }
-
-
-class Build:
-    """One run of the scenarios, built once and reused."""
-
-    def __init__(self, args):
-        self.args = args
-        self.lock = threading.Lock()
-        self.html: str | None = None
-        self.error: str | None = None
-        self.progress: list[dict] = []
-        self.done = 0
-        self.total = 0
-        self.started_at = 0.0
-        self.thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        with self.lock:
-            if self.thread and self.thread.is_alive():
-                return
-            self.html = None
-            self.error = None
-            self.progress = []
-            self.done = 0
-            self.total = 0
-            self.started_at = time.time()
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
-
-    def _note(self, done, total, title, outcome) -> None:
-        with self.lock:
-            self.done, self.total = done, total
-            self.progress.append({"title": title, "outcome": str(outcome)})
-        log.info("scenario.finished",
-                 extra={"done": done, "total": total, "title": title,
-                        "outcome": str(outcome)})
-
-    def _run(self) -> None:
-        log.info("build.started", extra={"pack": self.args.pack,
-                                         "live": bool(self.args.live)})
-        try:
-            router = _router_for(self.args, bool(self.args.live))
-            data = collect(self.args.pack, router=router, on_progress=self._note)
-            page = render(data)
-        except Exception as exc:
-            with self.lock:
-                self.error = f"{type(exc).__name__}: {exc}"
-            log.error("build.failed", exc_info=True, extra={"pack": self.args.pack})
-            return
-        with self.lock:
-            self.html = page
-        log.info("build.ready", extra={"pack": self.args.pack,
-                                       "elapsed_s": round(time.time() - self.started_at, 1)})
-
-    def status(self) -> dict:
-        with self.lock:
-            return {
-                "ready": self.html is not None,
-                "error": self.error,
-                "done": self.done,
-                "total": self.total,
-                "elapsed": round(time.time() - self.started_at),
-                "progress": list(self.progress),
-                "live": bool(self.args.live),
-            }
 
 
 def make_handler(args, build: Build):
@@ -207,7 +64,7 @@ def make_handler(args, build: Build):
             self._send(json.dumps(payload).encode("utf-8"), "application/json", code)
 
         def _router(self, live: bool):
-            return _router_for(args, live)
+            return router_for(args, live)
 
         def do_POST(self):
             path = self.path.split("?", 1)[0]
@@ -222,11 +79,15 @@ def make_handler(args, build: Build):
                 if path == "/api/generate":
                     from tools.demo.patients import generate
 
-                    self._json({"patients": generate(
-                        int(body.get("n", 3)),
-                        seed=int(body.get("seed", 0)),
-                        profile=str(body.get("profile", "clean")),
-                    )})
+                    self._json(
+                        {
+                            "patients": generate(
+                                int(body.get("n", 3)),
+                                seed=int(body.get("seed", 0)),
+                                profile=str(body.get("profile", "clean")),
+                            )
+                        }
+                    )
                     return
 
                 if path == "/api/compare":
@@ -234,10 +95,13 @@ def make_handler(args, build: Build):
                     if not patients:
                         self._json({"error": "no patients to compare"}, 400)
                         return
-                    self._json(compare_sites(
-                        patients, pack_id=args.pack,
-                        router=self._router(bool(body.get("live"))),
-                    ))
+                    self._json(
+                        compare_sites(
+                            patients,
+                            pack_id=args.pack,
+                            router=self._router(bool(body.get("live"))),
+                        )
+                    )
                     return
 
                 if path == "/api/reset":
@@ -249,9 +113,14 @@ def make_handler(args, build: Build):
                     from tools.demo.run import reset_allowed, reset_everything
 
                     if not reset_allowed():
-                        self._json({"error": "Reset is switched off on this "
-                                             "deployment. Set CLINICIAN_ALLOW_RESET=1 "
-                                             "to enable it."}, 403)
+                        self._json(
+                            {
+                                "error": "Reset is switched off on this "
+                                "deployment. Set CLINICIAN_ALLOW_RESET=1 "
+                                "to enable it."
+                            },
+                            403,
+                        )
                         return
                     if body.get("confirm") != "DELETE":
                         self._json({"error": "confirmation missing"}, 400)
@@ -275,8 +144,10 @@ def make_handler(args, build: Build):
                         return
                     job_id = f"j{len(_JOBS) + 1}-{int(time.time() * 1000) % 100000}"
                     _JOBS[job_id] = RunJob(
-                        patients, str(body.get("site_id", "SITE-A")),
-                        bool(body.get("live")), args,
+                        patients,
+                        str(body.get("site_id", "SITE-A")),
+                        bool(body.get("live")),
+                        args,
                     )
                     self._json({"job_id": job_id})
                     return
@@ -284,9 +155,10 @@ def make_handler(args, build: Build):
                 # Including ResidencyError, which is the guard doing its job and
                 # therefore belongs on screen with its own words rather than as
                 # a 500 the browser renders as "something went wrong".
-                log.warning("request.refused",
-                            extra={"path": path, "error": type(exc).__name__,
-                                   "detail": str(exc)[:200]})
+                log.warning(
+                    "request.refused",
+                    extra={"path": path, "error": type(exc).__name__, "detail": str(exc)[:200]},
+                )
                 self._json({"error": f"{type(exc).__name__}: {exc}"}, 400)
                 return
 
@@ -337,8 +209,9 @@ def make_handler(args, build: Build):
                 from tools.demo.run import sites_view
                 from tools.demo.sites import render_sites
 
-                self._send(render_sites(sites_view(args.pack)).encode("utf-8"),
-                           "text/html; charset=utf-8")
+                self._send(
+                    render_sites(sites_view(args.pack)).encode("utf-8"), "text/html; charset=utf-8"
+                )
                 return
             if path == "/api/sites":
                 from tools.demo.run import sites_view
@@ -363,19 +236,20 @@ def make_handler(args, build: Build):
             if path == "/api/history":
                 from tools.demo.run import clinic_history, store
 
-                self._json({
-                    "visits": clinic_history(),
-                    "backend": store().backend,
-                    "location": store().summary()["location"],
-                })
+                self._json(
+                    {
+                        "visits": clinic_history(),
+                        "backend": store().backend,
+                        "location": store().summary()["location"],
+                    }
+                )
                 return
             if path == "/status":
                 self._send(json.dumps(build.status()).encode(), "application/json")
                 return
             if path == "/rerun":
                 build.start()
-                self._send(templates.load("building.html").encode(),
-                           "text/html; charset=utf-8")
+                self._send(templates.load("building.html").encode(), "text/html; charset=utf-8")
                 return
             if path != "/":
                 self._send(b"not found", "text/plain", 404)
@@ -385,20 +259,19 @@ def make_handler(args, build: Build):
             if status["error"]:
                 self._send(
                     f"<pre>{html_lib.escape(status['error'])}</pre>".encode(),
-                    "text/html; charset=utf-8", 500,
+                    "text/html; charset=utf-8",
+                    500,
                 )
             elif status["ready"]:
                 self._send(build.html.encode("utf-8"), "text/html; charset=utf-8")
             else:
-                self._send(templates.load("building.html").encode(),
-                           "text/html; charset=utf-8")
+                self._send(templates.load("building.html").encode(), "text/html; charset=utf-8")
 
         def log_message(self, fmt, *a):
             # The stdlib writes an unstructured line straight to stderr, which
             # would interleave with the JSON. Demoted to debug and given the
             # same shape as everything else.
-            log.debug("http.request", extra={"client": self.address_string(),
-                                             "line": fmt % a})
+            log.debug("http.request", extra={"client": self.address_string(), "line": fmt % a})
 
     return Handler
 
@@ -427,15 +300,21 @@ def serve(args) -> int:
         print("  this. Stop it, or pick another port:\n")
         print(f"      make PORT={args.port + 1}\n")
         print(f"  ({type(exc).__name__}: {exc})\n")
-        log.error("server.bind_failed", extra={"port": args.port,
-                                               "error": type(exc).__name__})
+        log.error("server.bind_failed", extra={"port": args.port, "error": type(exc).__name__})
         return 1
 
     with server as httpd:
         url = f"http://{args.host}:{args.port}/"
-        log.info("server.listening", extra={"host": args.host, "port": args.port,
-                                            "pack": args.pack, "live": bool(args.live),
-                                            "version": __version__})
+        log.info(
+            "server.listening",
+            extra={
+                "host": args.host,
+                "port": args.port,
+                "pack": args.pack,
+                "live": bool(args.live),
+                "version": __version__,
+            },
+        )
         print(f"\n  Serving the clinician surface at {url}")
         if args.host in ("127.0.0.1", "localhost"):
             print("  Bound to localhost only. The page answers straight away and shows")

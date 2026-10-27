@@ -108,8 +108,9 @@ def test_resume_records_the_decision_and_returns_what_was_paused_on(runtime):
         runtime.interrupt("T4", {"proposal": "draft"})
 
     assert runtime.resume("T4", "accepted") == {"proposal": "draft"}
-    assert any(c.state.get("decision") == "accepted"
-               for c in runtime.checkpoints["T4"]), "the decision must be checkpointed"
+    assert any(c.state.get("decision") == "accepted" for c in runtime.checkpoints["T4"]), (
+        "the decision must be checkpointed"
+    )
 
 
 def test_resuming_a_thread_that_was_never_interrupted_raises(runtime):
@@ -169,10 +170,15 @@ def test_the_workflow_actually_exercises_the_contract(rules_pack):
 
     site = rules_pack.sites["SITE-A"]
     run_encounter(
-        make_patient(101, controlled=True), rules_pack, site, default_router(),
-        Recording(), thread_id="W1",
+        make_patient(101, controlled=True),
+        rules_pack,
+        site,
+        default_router(),
+        Recording(),
+        thread_id="W1",
         signer=Signer(site["practitioners"][0]["practitioner_id"], True),
-        audit=AuditLog(), now=datetime(2026, 8, 29, 10, 0),
+        audit=AuditLog(),
+        now=datetime(2026, 8, 29, 10, 0),
     )
     assert "start" in seen
     assert any(s.startswith("checkpoint:") for s in seen)

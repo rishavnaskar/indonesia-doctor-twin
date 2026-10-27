@@ -63,9 +63,7 @@ def assess(state, rules) -> ReferralBackAssessment:
             unmet.append(f"at target for {streak} of the {needed} visits required")
 
     # 3 — the right drugs
-    offenders = [
-        m.molecule for m in state.medications if not rules.is_prescribable(m.molecule)
-    ]
+    offenders = [m.molecule for m in state.medications if not rules.is_prescribable(m.molecule)]
     if offenders:
         unmet.append(f"regimen includes items outside the programme list: {', '.join(offenders)}")
     else:
@@ -110,8 +108,7 @@ def _at_target_streak(state, target) -> int:
 
 def _draft(state) -> str:
     medications = ", ".join(
-        f"{m.molecule} {m.mg_per_dose:g} mg {m.doses_per_day}x/hari"
-        for m in state.medications
+        f"{m.molecule} {m.mg_per_dose:g} mg {m.doses_per_day}x/hari" for m in state.medications
     )
     return (
         "SURAT RUJUK BALIK (draf, menunggu tanda tangan dokter spesialis)\n"

@@ -499,7 +499,7 @@ moved out of Python string literals at the same time: a 1,100-line r-string is
 not readable as the HTML it is, and no editor highlights it.
 
 
-## The six rules CI enforces
+## The seven rules CI enforces
 
 1. Nothing under `/service` names a country, payer, drug or guideline. The
    banned vocabulary is read from the packs, so adding a drug automatically
@@ -517,6 +517,10 @@ not readable as the HTML it is, and no editor highlights it.
    into `tools/demo/templates/` would otherwise have quietly dropped 1,200
    lines of rendered text out of a check whose whole point is reading what
    actually ships.
+7. No Python file over 500 lines. Three were, all in the demo surface. The
+   number is arbitrary; having one is not, and it is checked rather than
+   written down because the formatter alone pushed two of those files back
+   over the line on the day they were split.
 
 Rules 1 and 4 are cheap today and impossible to retrofit. Rule 4 is a compliance
 landmine, not a preference: tracing is on by default in many setups and would

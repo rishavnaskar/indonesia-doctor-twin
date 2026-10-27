@@ -15,10 +15,8 @@ NAME = "contraindication"
 
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Contraindications'
-DESCRIPTION = (
-    'Is any proposed drug one this specific patient must not receive, given their allergies, intolerances and conditions?'
-)
+TITLE = "Contraindications"
+DESCRIPTION = "Is any proposed drug one this specific patient must not receive, given their allergies, intolerances and conditions?"
 
 
 def run(ctx: GateContext) -> list[Finding]:
@@ -43,9 +41,7 @@ def run(ctx: GateContext) -> list[Finding]:
                 Finding(
                     check=NUMBER,
                     check_name=NAME,
-                    severity=Severity.BLOCK
-                    if rule.get("severity") == "block"
-                    else Severity.WARN,
+                    severity=Severity.BLOCK if rule.get("severity") == "block" else Severity.WARN,
                     message=f"{rule['message'].strip()} Present: {', '.join(offending)}.",
                     rule_id=rule.get("id"),
                     citation=rule.get("citation"),

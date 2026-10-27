@@ -48,8 +48,15 @@ def test_some_patients_report_something():
 def test_a_clean_cohort_reports_nothing_alarming():
     """Benign complaints only. A red flag hiding in the clean set would make the
     false-block rate measure the generator rather than the gate."""
-    red = {"chest_pain", "dyspnoea", "severe_headache", "visual_disturbance",
-           "focal_neurological_deficit", "syncope", "altered_consciousness"}
+    red = {
+        "chest_pain",
+        "dyspnoea",
+        "severe_headache",
+        "visual_disturbance",
+        "focal_neurological_deficit",
+        "syncope",
+        "altered_consciousness",
+    }
     assert not [p for p in COHORT if red & {k for k, v in p.symptoms.items() if v}]
 
 
@@ -94,21 +101,25 @@ def test_the_diabetes_cohort_varies_too():
     assert len(values) >= 15
 
 
-@pytest.mark.parametrize("profile,expected", [
-    ("clean", "committed"),
-    ("red_flag", "escalate"),
-    ("hyperkalaemia", "escalate"),
-    ("excluded_minor", "handoff"),
-    ("excluded_first_presentation", "handoff"),
-    ("dm:clean", "committed"),
-    ("dm:red_flag", "escalate"),
-    ("dm:excluded_insulin", "handoff"),
-])
+@pytest.mark.parametrize(
+    "profile,expected",
+    [
+        ("clean", "committed"),
+        ("red_flag", "escalate"),
+        ("hyperkalaemia", "escalate"),
+        ("excluded_minor", "handoff"),
+        ("excluded_first_presentation", "handoff"),
+        ("dm:clean", "committed"),
+        ("dm:red_flag", "escalate"),
+        ("dm:excluded_insulin", "handoff"),
+    ],
+)
 def test_every_offered_profile_lands_where_it_says(profile, expected):
     """A dropdown entry that does not do what its label says is worse than no
     entry: someone demonstrating the system will pick it and be surprised."""
-    encounters = run_patients(generate(2, seed=4100, profile=profile),
-                              site_id="SITE-A")["encounters"]
+    encounters = run_patients(generate(2, seed=4100, profile=profile), site_id="SITE-A")[
+        "encounters"
+    ]
     assert [e["outcome"] for e in encounters] == [expected, expected]
 
 

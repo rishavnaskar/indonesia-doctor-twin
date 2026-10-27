@@ -103,8 +103,7 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
         # A non-null value that is not a number is different: that IS malformed,
         # and it still raises.
         raw_thresholds = {
-            key[:-3]: value for key, value in target_raw.items()
-            if key.endswith("_lt")
+            key[:-3]: value for key, value in target_raw.items() if key.endswith("_lt")
         }
         if raw_thresholds and all(v is not None for v in raw_thresholds.values()):
             try:
@@ -149,8 +148,9 @@ def to_proposal(raw: dict[str, Any], provenance: Provenance) -> Proposal:
                 f"concern urgency {row.get('urgency')!r} is not one of: "
                 + ", ".join(u.value for u in Urgency)
             ) from exc
-        concerns.append(Concern(text=str(row["text"]).strip(), urgency=urgency,
-                                citation=row.get("citation")))
+        concerns.append(
+            Concern(text=str(row["text"]).strip(), urgency=urgency, citation=row.get("citation"))
+        )
 
     assertions = [
         Assertion(text=str(a.get("text", "")), citation=str(a.get("citation", "")))

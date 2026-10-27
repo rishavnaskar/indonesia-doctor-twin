@@ -94,8 +94,8 @@ class Urgency(str, Enum):
     Never quieter than the rules decided. See `Concern`.
     """
 
-    MENTION = "mention"      # worth a line the clinician can read past
-    ESCALATE = "escalate"    # the clinician should look at this now
+    MENTION = "mention"  # worth a line the clinician can read past
+    ESCALATE = "escalate"  # the clinician should look at this now
 
 
 @dataclass(frozen=True)

@@ -20,8 +20,16 @@ from service.contracts.proposal import MedicationChange
 from service.state.models import Diagnosis, Medication, Observation, Source
 
 
-def _diabetic(seed: int, *, hba1c: float, mg: float = 500, doses: int = 2,
-              egfr: float = 88, age: int = 52, symptoms: dict | None = None):
+def _diabetic(
+    seed: int,
+    *,
+    hba1c: float,
+    mg: float = 500,
+    doses: int = 2,
+    egfr: float = 88,
+    age: int = 52,
+    symptoms: dict | None = None,
+):
     """A type 2 diabetes follow-up patient.
 
     Built here rather than in datagen because the generator is hypertension-
@@ -59,9 +67,14 @@ def _ten_times(proposal) -> None:
     if proposal.medication_changes:
         change = proposal.medication_changes[0]
         proposal.medication_changes = [
-            MedicationChange(change.action, change.molecule,
-                             (change.mg_per_dose or 5) * 10, change.doses_per_day,
-                             "tampered for the demo", change.citation)
+            MedicationChange(
+                change.action,
+                change.molecule,
+                (change.mg_per_dose or 5) * 10,
+                change.doses_per_day,
+                "tampered for the demo",
+                change.citation,
+            )
         ]
 
 
@@ -87,82 +100,100 @@ def build(rules) -> list[Scenario]:
 
     return [
         Scenario(
-            "routine", "Controlled patient, routine review",
+            "routine",
+            "Controlled patient, routine review",
             "The common case. Continue, code, schedule.",
-            make_patient(101, controlled=True), site_a,
+            make_patient(101, controlled=True),
+            site_a,
             watch_for="No alert. Green is silent, so the draft is simply present, "
-                      "the way a prepared note would be, and the system does not "
-                      "interrupt to say it found nothing. Most visits are green, "
-                      "and that silence is what makes an amber worth reading.",
+            "the way a prepared note would be, and the system does not "
+            "interrupt to say it found nothing. Most visits are green, "
+            "and that silence is what makes an amber worth reading.",
         ),
         Scenario(
-            "titration", "Above target, titration drafted",
+            "titration",
+            "Above target, titration drafted",
             "The draft a doctor accepts in one click.",
-            make_patient(102, controlled=False), site_a,
+            make_patient(102, controlled=False),
+            site_a,
             watch_for="The work the system actually saves: the draft, the code "
-                      "and the follow-up interval are already filled in. The "
-                      "doctor decides; they do not transcribe.",
+            "and the follow-up interval are already filled in. The "
+            "doctor decides; they do not transcribe.",
         ),
         Scenario(
-            "wrong_dose", "The same case, with the dose out by ten",
+            "wrong_dose",
+            "The same case, with the dose out by ten",
             "What the doctor sees when the model gets it wrong: nothing.",
-            make_patient(102, controlled=False), site_a, tamper=_ten_times,
+            make_patient(102, controlled=False),
+            site_a,
+            tamper=_ten_times,
             watch_for="A decimal-point error is the most plausible failure there "
-                      "is. The draft never reaches the clinician, and the reason "
-                      "is in the audit view rather than on their screen.",
+            "is. The draft never reaches the clinician, and the reason "
+            "is in the audit view rather than on their screen.",
         ),
         Scenario(
-            "no_target", "Diabetic patient, target not yet extracted",
+            "no_target",
+            "Diabetic patient, target not yet extracted",
             "Diabetes present only as a code. The system declines rather than guessing.",
-            diabetic, site_a,
+            diabetic,
+            site_a,
             watch_for="The comorbidity is present only as a diagnosis code, with "
-                      "no flag set. The system notices, finds no target it is "
-                      "entitled to use, and abstains instead of applying the "
-                      "general adult one.",
+            "no flag set. The system notices, finds no target it is "
+            "entitled to use, and abstains instead of applying the "
+            "general adult one.",
         ),
         Scenario(
-            "emergency", "Hypertensive emergency",
+            "emergency",
+            "Hypertensive emergency",
             "No draft. The clinician is alerted and the encounter leaves the pathway.",
-            emergency, site_a,
+            emergency,
+            site_a,
             watch_for="The one case where the system interrupts a clinician who "
-                      "has not asked. Red, and it cannot be dismissed without "
-                      "acknowledgement.",
+            "has not asked. Red, and it cannot be dismissed without "
+            "acknowledgement.",
         ),
         Scenario(
-            "remote_site", "Remote basic-tier site, plan needs a test it cannot run",
+            "remote_site",
+            "Remote basic-tier site, plan needs a test it cannot run",
             "A plan is only a plan if this hospital can actually carry it out.",
-            remote, site_c,
+            remote,
+            site_c,
             watch_for="The plan is correct and undeliverable here. That is a "
-                      "referral, not a recommendation, and getting this wrong "
-                      "is how a tool loses a clinician's trust for good.",
+            "referral, not a recommendation, and getting this wrong "
+            "is how a tool loses a clinician's trust for good.",
         ),
-
         # --- a second disease, through the identical engine -----------------
         Scenario(
-            "dm_routine", "Diabetes: at target, routine review",
+            "dm_routine",
+            "Diabetes: at target, routine review",
             "A different disease. Same nine checks, same gate, same signature.",
-            _diabetic(410, hba1c=6.4), site_a,
+            _diabetic(410, hba1c=6.4),
+            site_a,
             watch_for="Nothing under /service was written for diabetes. The "
-                      "pathway is two pack files; the engine reads whichever one "
-                      "the router picked and does not know there are others.",
+            "pathway is two pack files; the engine reads whichever one "
+            "the router picked and does not know there are others.",
         ),
         Scenario(
-            "dm_titration", "Diabetes: above target, metformin increased",
+            "dm_titration",
+            "Diabetes: above target, metformin increased",
             "The ladder, the formulary limits and the site's stock all apply unchanged.",
-            _diabetic(411, hba1c=8.2, mg=500, doses=2), site_a,
+            _diabetic(411, hba1c=8.2, mg=500, doses=2),
+            site_a,
             watch_for="The target here is a single HbA1c, not a blood pressure. "
-                      "That is what broke the Target contract when this pathway "
-                      "was added: the engine had one disease's measurement "
-                      "baked into its idea of a target.",
+            "That is what broke the Target contract when this pathway "
+            "was added: the engine had one disease's measurement "
+            "baked into its idea of a target.",
         ),
         Scenario(
-            "dm_hypo", "Diabetes: patient reports hypoglycaemia",
+            "dm_hypo",
+            "Diabetes: patient reports hypoglycaemia",
             "A red flag belonging to this pathway alone.",
-            _diabetic(412, hba1c=7.4, symptoms={"hypoglycaemia": True}), site_a,
+            _diabetic(412, hba1c=7.4, symptoms={"hypoglycaemia": True}),
+            site_a,
             watch_for="This is the case that exposed the second leak. Refusal "
-                      "routing matched rule ids against `R<digit>`, so a pack "
-                      "numbering its red flags D1..D4 had them caught correctly "
-                      "and then reported as a quiet abstention instead of "
-                      "alerting anyone. It routes on the check number now.",
+            "routing matched rule ids against `R<digit>`, so a pack "
+            "numbering its red flags D1..D4 had them caught correctly "
+            "and then reported as a quiet abstention instead of "
+            "alerting anyone. It routes on the check number now.",
         ),
     ]

@@ -19,10 +19,8 @@ NAME = "formulary"
 
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Formulary'
-DESCRIPTION = (
-    'Is every drug real, prescribable here, and on the approved list? A drug the system invented dies here.'
-)
+TITLE = "Formulary"
+DESCRIPTION = "Is every drug real, prescribable here, and on the approved list? A drug the system invented dies here."
 
 _PRESCRIBING_ACTIONS = (
     ChangeAction.START,
@@ -86,9 +84,7 @@ def _check_restriction(ctx: GateContext, molecule: str, restriction: dict) -> Fi
         if recent:
             newest = max(i.documented_at for i in recent)
             days = (state.as_of - newest).days
-            detail = (
-                f"the recorded intolerance is {days} days old and {min_days} are required"
-            )
+            detail = f"the recorded intolerance is {days} days old and {min_days} are required"
         else:
             detail = f"no {target_class} intolerance is documented for this patient"
 

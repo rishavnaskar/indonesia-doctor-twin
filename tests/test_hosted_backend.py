@@ -51,7 +51,10 @@ class _Response(io.BytesIO):
 def _rejects_response_format() -> urllib.error.HTTPError:
     detail = json.dumps({"error": {"message": "response_format is not supported"}})
     return urllib.error.HTTPError(
-        "https://example.invalid", 400, "Bad Request", {},
+        "https://example.invalid",
+        400,
+        "Bad Request",
+        {},
         io.BytesIO(detail.encode("utf-8")),
     )
 
@@ -83,7 +86,9 @@ def test_a_provider_that_rejects_a_schema_is_retried_without_one(backend, monkey
 
 def test_the_degradation_bottoms_out_rather_than_looping(backend, monkeypatch):
     transport = _Transport(
-        _rejects_response_format(), _rejects_response_format(), ANSWER,
+        _rejects_response_format(),
+        _rejects_response_format(),
+        ANSWER,
     )
     monkeypatch.setattr("urllib.request.urlopen", transport)
 
@@ -97,7 +102,10 @@ def test_a_400_about_anything_else_is_raised(backend, monkeypatch):
     """Degrading on every 400 would hide a bad request as a model limitation."""
     detail = json.dumps({"error": {"message": "context length exceeded"}})
     error = urllib.error.HTTPError(
-        "https://example.invalid", 400, "Bad Request", {},
+        "https://example.invalid",
+        400,
+        "Bad Request",
+        {},
         io.BytesIO(detail.encode("utf-8")),
     )
     monkeypatch.setattr("urllib.request.urlopen", _Transport(error))

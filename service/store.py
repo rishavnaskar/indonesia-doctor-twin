@@ -41,6 +41,7 @@ def default_dir() -> Path:
     """
     return Path(os.environ.get("CLINICIAN_STORE", ".store"))
 
+
 def forced_fresh() -> bool:
     """CLINICIAN_FRESH=1 re-runs work even when a stored result matches.
 
@@ -152,15 +153,18 @@ class Store:
         if self._conn is not None:
             from service.db import reset
 
-            return {"backend": "postgres", "location": self._location(),
-                    **reset(self._conn)}
+            return {"backend": "postgres", "location": self._location(), **reset(self._conn)}
 
         counts: dict[str, Any] = {"backend": "files", "location": str(self.dir)}
-        for name, path in (("checkpoints", self.checkpoints),
-                           ("signatures", self.audit), ("outbound", self.queue)):
+        for name, path in (
+            ("checkpoints", self.checkpoints),
+            ("signatures", self.audit),
+            ("outbound", self.queue),
+        ):
             counts[name] = (
                 sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
-                if path.exists() else 0
+                if path.exists()
+                else 0
             )
             path.unlink(missing_ok=True)
         return counts

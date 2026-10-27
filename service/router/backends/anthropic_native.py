@@ -75,16 +75,16 @@ class AnthropicBackend:
             import anthropic
         except ImportError as exc:  # pragma: no cover
             raise BackendError(
-                "the anthropic package is not installed. "
-                "pip install -r requirements-model.txt"
+                "the anthropic package is not installed. pip install -r requirements-model.txt"
             ) from exc
         # Zero-arg constructor: resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN,
         # or a CLI auth profile. We never read or hold the key ourselves.
         self._client = anthropic.Anthropic(timeout=self.timeout_s)
         return self._client
 
-    def complete(self, system: str, user: str, *, allow_egress: bool,
-                 schema: dict[str, Any] | None = None) -> str:
+    def complete(
+        self, system: str, user: str, *, allow_egress: bool, schema: dict[str, Any] | None = None
+    ) -> str:
         if not allow_egress:
             raise ResidencyError(
                 "Refusing to send patient data to a hosted endpoint. Only "

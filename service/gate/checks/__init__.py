@@ -30,6 +30,7 @@ ALL_CHECKS = (
     c9_executable,
 )
 
+
 def catalogue() -> list[dict]:
     """The nine checks, described. For any surface that has to explain itself.
 

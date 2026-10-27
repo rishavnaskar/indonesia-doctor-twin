@@ -230,13 +230,12 @@ def _validate(rs: RuleSet) -> None:
     for name, pathway in rs.pathways.items():
         for index, step in enumerate((pathway.get("escalation_ladder") or {}).get("steps") or []):
             missing = [
-                key for key in ("drug_class", "preferred_molecule", "start_mg", "doses_per_day")
+                key
+                for key in ("drug_class", "preferred_molecule", "start_mg", "doses_per_day")
                 if step.get(key) is None
             ]
             if missing:
-                raise PackError(
-                    f"pathway {name!r} ladder step {index + 1} is missing {missing}"
-                )
+                raise PackError(f"pathway {name!r} ladder step {index + 1} is missing {missing}")
             molecule = step["preferred_molecule"]
             if molecule not in rs.molecules:
                 raise PackError(

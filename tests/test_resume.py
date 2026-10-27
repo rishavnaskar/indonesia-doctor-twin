@@ -17,7 +17,9 @@ import pytest
 from service.packs.loader import load_pack
 from service.router.router import default_router
 from tools import scenarios as scenario_module
+from tools.demo import resume as demo_resume
 from tools.demo import run as demo_run
+from tools.demo import scripted as demo_scripted
 from tools.demo import store_access
 
 
@@ -52,8 +54,7 @@ def test_the_second_run_replays_instead_of_re_running(rules, scenario):
     assert second["outcome"] == first["outcome"]
     assert second["presentation"] == first["presentation"]
     assert second["signature"] == first["signature"], (
-        "a replayed encounter must carry the signature that was actually given, "
-        "not a fresh one"
+        "a replayed encounter must carry the signature that was actually given, not a fresh one"
     )
 
 
@@ -69,22 +70,26 @@ def test_a_new_process_resumes_from_what_is_on_disk(rules, scenario):
     assert demo_run._encounter(scenario, rules, _labels(rules), router)["resumed"] is True
 
 
-@pytest.mark.parametrize("field,value", [
-    ("version", "id-9999-99-99"),
-    ("pack_id", "other"),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("version", "id-9999-99-99"),
+        ("pack_id", "other"),
+    ],
+)
 def test_editing_the_pack_invalidates_the_stored_run(rules, scenario, field, value):
     """Editing a pack file and refreshing has to show the rules moving. A cache
     that survived a guideline change would be showing the old guideline's
     answer under the new guideline's name."""
     router = default_router()
-    before = demo_run.thread_id_for(scenario, rules, router)
+    before = demo_resume.thread_id_for(scenario, rules, router)
 
     import copy
+
     edited = copy.copy(rules)
     setattr(edited, field, value)
 
-    assert demo_run.thread_id_for(scenario, edited, router) != before
+    assert demo_resume.thread_id_for(scenario, edited, router) != before
 
 
 def test_a_different_patient_is_a_different_encounter(rules, scenario):
@@ -97,13 +102,15 @@ def test_a_different_patient_is_a_different_encounter(rules, scenario):
     other.state = copy.deepcopy(scenario.state)
     other.state.age = scenario.state.age + 1
 
-    assert demo_run.thread_id_for(other, rules, router) != demo_run.thread_id_for(
-        scenario, rules, router)
+    assert demo_resume.thread_id_for(other, rules, router) != demo_resume.thread_id_for(
+        scenario, rules, router
+    )
 
 
 def test_swapping_the_drafter_invalidates_the_stored_run(rules, scenario):
     """The expensive case. A page drafted by the reference reasoner must never
     be served as though a model had written it."""
+
     class _Backend:
         model = "some-vendor/some-model"
 
@@ -119,14 +126,16 @@ def test_swapping_the_drafter_invalidates_the_stored_run(rules, scenario):
         def get(self, _name):
             return _Route()
 
-    assert demo_run.thread_id_for(scenario, rules, _Router()) != demo_run.thread_id_for(
-        scenario, rules, default_router())
+    assert demo_resume.thread_id_for(scenario, rules, _Router()) != demo_resume.thread_id_for(
+        scenario, rules, default_router()
+    )
 
 
 def test_the_drafter_key_does_not_move_once_a_model_has_answered(rules, scenario):
     """`version()` on a hosted backend rewrites itself to `model@served_by`
     after its first reply. Keying on that would give the first encounter of a
     run a different id from the second, and nothing would ever resume."""
+
     class _Backend:
         model = "some-vendor/some-model"
 
@@ -134,8 +143,9 @@ def test_the_drafter_key_does_not_move_once_a_model_has_answered(rules, scenario
             self._answered = False
 
         def version(self):
-            return ("some-vendor/some-model@somewhere" if self._answered
-                    else "some-vendor/some-model")
+            return (
+                "some-vendor/some-model@somewhere" if self._answered else "some-vendor/some-model"
+            )
 
     backend = _Backend()
 
@@ -151,9 +161,9 @@ def test_the_drafter_key_does_not_move_once_a_model_has_answered(rules, scenario
             return _Route()
 
     router = _Router()
-    before = demo_run.thread_id_for(scenario, rules, router)
+    before = demo_resume.thread_id_for(scenario, rules, router)
     backend._answered = True
-    assert demo_run.thread_id_for(scenario, rules, router) == before
+    assert demo_resume.thread_id_for(scenario, rules, router) == before
 
 
 def test_fresh_forces_a_re_run(rules, scenario, monkeypatch):
@@ -192,14 +202,16 @@ def test_a_drafter_that_cannot_be_named_does_not_borrow_another_one_s_key(rules,
     the reference reasoner's successful results and the page reported zero
     failures. Caught by an unrelated test, in the suite but not on its own.
     """
+
     class AlwaysFails:
         default = "model"
 
         def get(self, *args, **kwargs):
             raise KeyError("no backend")
 
-    assert demo_run.thread_id_for(scenario, rules, AlwaysFails()) != demo_run.thread_id_for(
-        scenario, rules, default_router())
+    assert demo_resume.thread_id_for(scenario, rules, AlwaysFails()) != demo_resume.thread_id_for(
+        scenario, rules, default_router()
+    )
 
 
 def test_clinic_runs_fresh_every_time(rules, scenario):
@@ -234,9 +246,9 @@ def test_a_resumed_page_reports_who_actually_drafted_it(rules):
     provenance is already on file."""
     encounters = [{"proposal": {"provenance": ["some/model@somewhere", "p@1", "c@1"]}}]
 
-    assert demo_run._reported_drafter(encounters, "some/model") == "some/model@somewhere"
+    assert demo_scripted._reported_drafter(encounters, "some/model") == "some/model@somewhere"
     # Nothing on file: the live object is all there is.
-    assert demo_run._reported_drafter([{"proposal": None}], "some/model") == "some/model"
+    assert demo_scripted._reported_drafter([{"proposal": None}], "some/model") == "some/model"
 
 
 # ------------------------------------------------------- /clinic, across sessions
@@ -261,8 +273,7 @@ def test_clinic_visits_come_back_in_a_later_session():
     restored = demo_run.clinic_history()
     assert {v["key"] for v in restored} == {e["key"] for e in ran["encounters"]}
     # Newest first, so the last thing you did is the first thing you see.
-    assert [v["ran_at"] for v in restored] == sorted(
-        (v["ran_at"] for v in restored), reverse=True)
+    assert [v["ran_at"] for v in restored] == sorted((v["ran_at"] for v in restored), reverse=True)
     assert all(v["outcome"] for v in restored)
     assert all(v["signature"] or v["outcome"] != "committed" for v in restored)
 
@@ -305,9 +316,12 @@ def test_clearing_hides_the_list_without_deleting_anything():
     demo_run.clear_clinic_history()
     assert demo_run.clinic_history() == []
 
-    stored = [e for history in demo_run.runtime().checkpoints.values() for e in history
-              if e.step == "rendered" and isinstance(e.state, dict)
-              and e.state.get("origin") == "clinic"]
+    stored = [
+        e
+        for history in demo_run.runtime().checkpoints.values()
+        for e in history
+        if e.step == "rendered" and isinstance(e.state, dict) and e.state.get("origin") == "clinic"
+    ]
     assert stored, "the visits must still be on the record after a clear"
 
 
@@ -325,8 +339,9 @@ def test_a_run_after_a_clear_shows_up_again():
 def _live_args(**over):
     import argparse
 
-    return argparse.Namespace(**{"samples": 1, "critic": False, "tools": False,
-                                 "shadow": False, **over})
+    return argparse.Namespace(
+        **{"samples": 1, "critic": False, "tools": False, "shadow": False, **over}
+    )
 
 
 def test_the_live_runner_keys_on_the_same_things_the_surface_does(rules):
@@ -342,8 +357,7 @@ def test_the_live_runner_keys_on_the_same_things_the_surface_does(rules):
 
     assert base == live._thread_id(state, rules, site, "some/model", _live_args())
     assert base != live._thread_id(state, rules, site, "other/model", _live_args())
-    assert base != live._thread_id(state, rules, rules.sites["SITE-C"], "some/model",
-                                   _live_args())
+    assert base != live._thread_id(state, rules, rules.sites["SITE-C"], "some/model", _live_args())
 
 
 @pytest.mark.parametrize("option", ["samples", "critic", "tools", "shadow"])
@@ -357,7 +371,8 @@ def test_a_sampling_option_is_a_different_question(rules, option):
     changed = {"samples": 3} if option == "samples" else {option: True}
 
     assert live._thread_id(state, rules, site, "m", _live_args()) != live._thread_id(
-        state, rules, site, "m", _live_args(**changed))
+        state, rules, site, "m", _live_args(**changed)
+    )
 
 
 def test_only_a_finished_live_encounter_is_replayable(rules):
@@ -370,8 +385,9 @@ def test_only_a_finished_live_encounter_is_replayable(rules):
     runtime.start("L1", {"a": 1})
     assert live._stored(runtime, "L1") is None, "only a 'rendered' entry counts"
 
-    runtime.checkpoint("L1", "rendered", {"origin": "live", "outcome": "committed",
-                                          "lines": ["      coded: I10"]})
+    runtime.checkpoint(
+        "L1", "rendered", {"origin": "live", "outcome": "committed", "lines": ["      coded: I10"]}
+    )
     assert live._stored(runtime, "L1")["outcome"] == "committed"
 
 
@@ -381,8 +397,7 @@ def test_fresh_bypasses_the_live_runner_too(rules, monkeypatch):
 
     runtime = InMemoryRuntime()
     runtime.start("L2", {"a": 1})
-    runtime.checkpoint("L2", "rendered", {"origin": "live", "outcome": "committed",
-                                          "lines": []})
+    runtime.checkpoint("L2", "rendered", {"origin": "live", "outcome": "committed", "lines": []})
     assert live._stored(runtime, "L2") is not None
 
     monkeypatch.setenv("CLINICIAN_FRESH", "1")

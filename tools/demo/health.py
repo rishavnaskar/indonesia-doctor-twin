@@ -60,8 +60,7 @@ def health(args, build) -> tuple[dict[str, Any], int]:
             report["status"] = "degraded"
     except Exception as exc:
         log.error("health.store_unreachable", exc_info=True)
-        report["store"] = {"reachable": False,
-                           "error": f"{type(exc).__name__}: {exc}"}
+        report["store"] = {"reachable": False, "error": f"{type(exc).__name__}: {exc}"}
         report["status"] = "unhealthy"
 
     if build.status()["error"] and report["status"] == "ok":

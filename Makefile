@@ -48,6 +48,7 @@ check: .venv-dev lint types test
 
 lint: .venv-dev
 	@./.venv/bin/ruff check .
+	@./.venv/bin/ruff format --check .
 
 types: .venv-dev
 	@./.venv/bin/mypy

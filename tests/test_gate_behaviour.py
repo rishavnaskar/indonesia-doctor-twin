@@ -46,6 +46,7 @@ def _fired(decision):
 
 # ----------------------------------------------------------- the happy path
 
+
 def test_a_controlled_patient_gets_a_rendered_draft(rules):
     state = make_patient(1, controlled=True)
     decision = _decide(rules, state, propose(state, rules))
@@ -53,6 +54,7 @@ def test_a_controlled_patient_gets_a_rendered_draft(rules):
 
 
 # --------------------------------------------------- the restriction that matters
+
 
 def test_arb_is_blocked_without_documented_intolerance(rules):
     state = make_patient(2, controlled=False)
@@ -89,6 +91,7 @@ def test_arb_is_blocked_when_the_intolerance_is_too_recent(rules):
 
 # ------------------------------------------------------------ abstention
 
+
 def test_no_target_group_abstains_rather_than_defaulting(rules):
     """A diabetic must not silently get the general adult target."""
     state = make_patient(5, controlled=False)
@@ -102,8 +105,9 @@ def test_stale_labs_produce_a_request_not_a_recommendation(rules):
     state = make_patient(6, controlled=False, profile="stale_labs")
     proposal = propose(state, rules)
     proposal.medication_changes = [
-        MedicationChange(ChangeAction.INCREASE, "captopril", 25.0, 2, "test",
-                         "fornas-prb-2025-12-31#captopril")
+        MedicationChange(
+            ChangeAction.INCREASE, "captopril", 25.0, 2, "test", "fornas-prb-2025-12-31#captopril"
+        )
     ]
     decision = _decide(rules, state, proposal)
     assert not decision.rendered
@@ -112,12 +116,11 @@ def test_stale_labs_produce_a_request_not_a_recommendation(rules):
 
 # ------------------------------------------------------------- executability
 
+
 def test_unstocked_drug_becomes_a_referral(rules):
     state = make_patient(7, controlled=False)
     proposal = propose(state, rules)
-    proposal.medication_changes = [
-        _change("ramipril", 5.0, 1, "fornas-prb-2025-12-31#ramipril")
-    ]
+    proposal.medication_changes = [_change("ramipril", 5.0, 1, "fornas-prb-2025-12-31#ramipril")]
     decision = _decide(rules, state, proposal, site="SITE-B")
     assert not decision.rendered
     assert decision.referral, "an undeliverable plan is a referral, not a rejection"
@@ -134,6 +137,7 @@ def test_missing_site_record_is_not_treated_as_available(rules):
 
 # ----------------------------------------------------------------- red flags
 
+
 def test_hypertensive_emergency_blocks_everything(rules):
     state = make_patient(9, controlled=False)
     state.observations.append(Observation("sbp", 205, "mmHg", TODAY, Source.EMR))
@@ -149,16 +153,19 @@ def test_over_treatment_cannot_be_answered_with_an_increase(rules):
     state.observations.append(Observation("sbp", 82, "mmHg", TODAY, Source.EMR))
     proposal = propose(state, rules)
     proposal.medication_changes = [
-        MedicationChange(ChangeAction.INCREASE, "amlodipine", 10.0, 1, "test",
-                         "fornas-prb-2025-12-31#amlodipine")
+        MedicationChange(
+            ChangeAction.INCREASE, "amlodipine", 10.0, 1, "test", "fornas-prb-2025-12-31#amlodipine"
+        )
     ]
     from service.contracts.proposal import Recommendation
+
     proposal.recommendation = Recommendation.TITRATE_UP
     decision = _decide(rules, state, proposal)
     assert {"R3", "R3-consistency"} & _fired(decision)
 
 
 # ------------------------------------------------------------ fail closed
+
 
 def test_a_broken_rule_blocks_rather_than_passes(rules):
     """A malformed pack must not open the gate."""
@@ -173,6 +180,7 @@ def test_a_broken_rule_blocks_rather_than_passes(rules):
 
 
 # ------------------------------------------------------- prompt injection (F11)
+
 
 def test_injected_text_cannot_change_the_verdict(rules):
     """The structural answer to prompt injection.
@@ -197,10 +205,18 @@ def test_injected_text_cannot_change_the_verdict(rules):
 
 # ------------------------------------------------------------- eligibility
 
+
 @pytest.mark.parametrize(
     "profile",
-    ["excluded_pregnancy", "excluded_minor", "excluded_first_presentation",
-     "excluded_secondary", "excluded_resistant", "excluded_renal", "excluded_other"],
+    [
+        "excluded_pregnancy",
+        "excluded_minor",
+        "excluded_first_presentation",
+        "excluded_secondary",
+        "excluded_resistant",
+        "excluded_renal",
+        "excluded_other",
+    ],
 )
 def test_excluded_patients_are_routed_out_before_any_model_call(rules, profile):
     state = make_patient(13, profile=profile)
@@ -238,7 +254,7 @@ def test_derived_flags_never_clear_an_upstream_flag(rules):
     from service.state.derive import derive_flags
 
     state = make_patient(21, controlled=True)
-    state.flags["has_ckd"] = True          # known upstream, no code recorded
+    state.flags["has_ckd"] = True  # known upstream, no code recorded
     derive_flags(state, rules)
     assert state.flags["has_ckd"] is True
 
@@ -260,8 +276,14 @@ def test_a_plan_naming_one_drug_twice_is_rejected(rules):
     change = proposal.medication_changes[0]
     proposal.medication_changes = [
         change,
-        MedicationChange(ChangeAction.CONTINUE, change.molecule,
-                         change.mg_per_dose, change.doses_per_day, "", change.citation),
+        MedicationChange(
+            ChangeAction.CONTINUE,
+            change.molecule,
+            change.mg_per_dose,
+            change.doses_per_day,
+            "",
+            change.citation,
+        ),
     ]
     findings = c3_drug_safety.run(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
@@ -301,7 +323,8 @@ def test_a_future_dated_reading_is_not_a_reading(rules):
     state = make_patient(1)
     state.observations = [o for o in state.observations if o.code != "k"]
     state.observations.append(
-        Observation("k", 4.2, "mmol/L", TODAY + timedelta(days=500), Source.EMR))
+        Observation("k", 4.2, "mmol/L", TODAY + timedelta(days=500), Source.EMR)
+    )
 
     assert state.latest("k") is None, "a reading from the future was not available"
     assert state.observation_age_days("k") is None
@@ -319,7 +342,10 @@ def test_a_drug_we_do_not_recognise_is_declared_unchecked(rules):
     state = make_patient(1, controlled=False)
     proposal = propose(state, rules)
 
-    state.medications = [*state.medications, Medication("unobtainium", 5.0, 1, Source.PATIENT_REPORTED)]
+    state.medications = [
+        *state.medications,
+        Medication("unobtainium", 5.0, 1, Source.PATIENT_REPORTED),
+    ]
     findings = c3_drug_safety.run(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )
@@ -338,7 +364,10 @@ def test_a_recognised_but_unprescribable_drug_stays_silent(rules):
 
     state = make_patient(1, controlled=False)
     proposal = propose(state, rules)
-    state.medications = [*state.medications, Medication("ibuprofen", 400.0, 3, Source.PATIENT_REPORTED)]
+    state.medications = [
+        *state.medications,
+        Medication("ibuprofen", 400.0, 3, Source.PATIENT_REPORTED),
+    ]
     findings = c3_drug_safety.run(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )

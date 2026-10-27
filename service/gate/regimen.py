@@ -47,11 +47,15 @@ def resulting_regimen(state: PatientState, proposal: Proposal) -> dict[str, Regi
             continue
 
         existing = regimen.get(change.molecule)
-        mg = change.mg_per_dose if change.mg_per_dose is not None else (
-            existing.mg_per_dose if existing else None
+        mg = (
+            change.mg_per_dose
+            if change.mg_per_dose is not None
+            else (existing.mg_per_dose if existing else None)
         )
-        per_day = change.doses_per_day if change.doses_per_day is not None else (
-            existing.doses_per_day if existing else None
+        per_day = (
+            change.doses_per_day
+            if change.doses_per_day is not None
+            else (existing.doses_per_day if existing else None)
         )
         regimen[change.molecule] = RegimenDrug(change.molecule, mg, per_day, changed=True)
 
@@ -86,7 +90,5 @@ def patient_classes(state: PatientState, rules: RuleSet) -> set[str]:
 
 def touches_raas(regimen: dict[str, RegimenDrug], rules: RuleSet) -> bool:
     return any(
-        rules.drug_class_of(d.molecule) in RAAS_CLASSES
-        for d in regimen.values()
-        if d.changed
+        rules.drug_class_of(d.molecule) in RAAS_CLASSES for d in regimen.values() if d.changed
     )

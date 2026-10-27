@@ -213,7 +213,7 @@ def _required_investigations(state, rules, change) -> list[str]:
 
 
 def _instructions(rules, situation: str) -> str:
-    templates = (rules.guideline.get("patient_instructions") or {})
+    templates = rules.guideline.get("patient_instructions") or {}
     return templates.get(situation, "")
 
 

@@ -25,15 +25,31 @@ def labels():
 
 
 def _red():
-    return GateDecision(findings=[Finding(
-        check=1, check_name="red_flags", severity=Severity.BLOCK,
-        message="Hypertensive emergency.", rule_id="R1")])
+    return GateDecision(
+        findings=[
+            Finding(
+                check=1,
+                check_name="red_flags",
+                severity=Severity.BLOCK,
+                message="Hypertensive emergency.",
+                rule_id="R1",
+            )
+        ]
+    )
 
 
 def _blocked():
-    return GateDecision(findings=[Finding(
-        check=3, check_name="drug_safety", severity=Severity.BLOCK,
-        message="Dose exceeds the maximum.", rule_id="dose_daily")])
+    return GateDecision(
+        findings=[
+            Finding(
+                check=3,
+                check_name="drug_safety",
+                severity=Severity.BLOCK,
+                message="Dose exceeds the maximum.",
+                rule_id="dose_daily",
+            )
+        ]
+    )
 
 
 def test_a_quiet_visit_stays_quiet_without_a_concern(labels):
@@ -44,8 +60,9 @@ def test_a_quiet_visit_stays_quiet_without_a_concern(labels):
 def test_a_mention_lifts_a_silent_visit_to_amber(labels):
     """Silence is what the concern is objecting to, so a green visit that gains
     one needs a headline as well as a band."""
-    view = present("committed", labels,
-                   concerns=(Concern("Blood pressure creeping up across three visits"),))
+    view = present(
+        "committed", labels, concerns=(Concern("Blood pressure creeping up across three visits"),)
+    )
     assert view.band is Band.AMBER
     assert view.headline and not view.silent
     assert any("creeping up" in line.text for line in view.lines)
@@ -53,9 +70,11 @@ def test_a_mention_lifts_a_silent_visit_to_amber(labels):
 
 
 def test_an_escalate_concern_reaches_red_and_must_be_acknowledged(labels):
-    view = present("committed", labels,
-                   concerns=(Concern("eGFR has fallen at every visit this year",
-                                     Urgency.ESCALATE),))
+    view = present(
+        "committed",
+        labels,
+        concerns=(Concern("eGFR has fallen at every visit this year", Urgency.ESCALATE),),
+    )
     assert view.band is Band.RED
     assert view.requires_acknowledgement
 
@@ -63,8 +82,9 @@ def test_an_escalate_concern_reaches_red_and_must_be_acknowledged(labels):
 def test_a_concern_can_never_lower_the_band(labels):
     """The property that makes this safe. A model that could quieten an alert
     would be a model with veto over the safety rules."""
-    with_concern = present("escalate", labels, decision=_red(),
-                           concerns=(Concern("looks fine to me"),))
+    with_concern = present(
+        "escalate", labels, decision=_red(), concerns=(Concern("looks fine to me"),)
+    )
     without = present("escalate", labels, decision=_red())
     assert with_concern.band is Band.RED is without.band
     assert with_concern.requires_acknowledgement
@@ -72,8 +92,12 @@ def test_a_concern_can_never_lower_the_band(labels):
 
 
 def test_a_concern_cannot_turn_a_refusal_into_a_draft(labels):
-    view = present("abstain", labels, decision=_blocked(),
-                   concerns=(Concern("I still think this is right", Urgency.ESCALATE),))
+    view = present(
+        "abstain",
+        labels,
+        decision=_blocked(),
+        concerns=(Concern("I still think this is right", Urgency.ESCALATE),),
+    )
     assert view.shows_draft is False
 
 
@@ -83,9 +107,12 @@ def test_a_concern_can_break_the_silence_of_an_abstention(labels):
     quiet = present("abstain", labels, decision=_blocked())
     assert quiet.band is Band.GREEN and quiet.silent
 
-    loud = present("abstain", labels, decision=_blocked(),
-                   concerns=(Concern("Weight loss and thirst across two visits",
-                                     Urgency.ESCALATE),))
+    loud = present(
+        "abstain",
+        labels,
+        decision=_blocked(),
+        concerns=(Concern("Weight loss and thirst across two visits", Urgency.ESCALATE),),
+    )
     assert loud.band is Band.RED
     assert not loud.silent
 
@@ -101,8 +128,12 @@ def test_a_bare_string_concern_does_not_get_promoted():
     from service.reason.parse import to_proposal
 
     proposal = to_proposal(
-        {"assessment": "controlled", "recommendation": "continue", "confidence": 0.9,
-         "concerns": ["something odd"]},
+        {
+            "assessment": "controlled",
+            "recommendation": "continue",
+            "confidence": 0.9,
+            "concerns": ["something odd"],
+        },
         Provenance(model="m@1", prompt_template="p@1", corpus="c@1"),
     )
     assert proposal.concerns[0].urgency is Urgency.MENTION
@@ -115,7 +146,11 @@ def test_an_unknown_urgency_is_refused_rather_than_defaulted():
 
     with pytest.raises(ProposalParseError, match="urgency"):
         to_proposal(
-            {"assessment": "controlled", "recommendation": "continue", "confidence": 0.9,
-             "concerns": [{"text": "x", "urgency": "panic"}]},
+            {
+                "assessment": "controlled",
+                "recommendation": "continue",
+                "confidence": 0.9,
+                "concerns": [{"text": "x", "urgency": "panic"}],
+            },
             Provenance(model="m@1", prompt_template="p@1", corpus="c@1"),
         )

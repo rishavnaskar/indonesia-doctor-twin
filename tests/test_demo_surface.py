@@ -32,8 +32,7 @@ def test_the_refusal_ratio_is_counted_not_asserted():
     expected = sum(1 for e in data["encounters"] if not e["committed"])
     assert data["declined"] == expected
     assert data["declined"] >= 1, (
-        "a demo where the assistant always has an answer is a demo of a system "
-        "nobody should deploy"
+        "a demo where the assistant always has an answer is a demo of a system nobody should deploy"
     )
 
 
@@ -42,8 +41,7 @@ def test_a_silent_encounter_still_carries_its_audit_trail():
     indistinguishable from a broken one."""
     data = collect()
     silent_refusals = [
-        e for e in data["encounters"]
-        if e["presentation"]["silent"] and e["findings"]
+        e for e in data["encounters"] if e["presentation"]["silent"] and e["findings"]
     ]
     assert silent_refusals, "expected at least one refusal the clinician never sees"
     for encounter in silent_refusals:
@@ -98,7 +96,7 @@ def test_one_bad_draft_does_not_take_down_the_page():
 
 
 def test_the_page_states_where_this_deployment_keeps_its_state():
-    """"Durable" is the kind of claim that should be checkable from the thing
+    """ "Durable" is the kind of claim that should be checkable from the thing
     itself. The page carries the backend, its location and what it holds, so a
     reader can restart the process and watch the counts survive."""
     page = collect()

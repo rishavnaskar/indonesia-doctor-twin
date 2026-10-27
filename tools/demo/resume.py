@@ -47,7 +47,6 @@ def drafter_identity(router) -> str:
     return f"{kind}/{getattr(backend, 'model', None) or backend.version()}"
 
 
-
 def thread_id_for(scenario, rules, router) -> str:
     """A thread id derived from everything that could change the answer.
 
@@ -65,17 +64,21 @@ def thread_id_for(scenario, rules, router) -> str:
     the first time, none the second, and an edit to a guideline file costs them
     again. `tools/live.py` does the same for the run's other five.
     """
-    material = json.dumps({
-        "view": VIEW_VERSION,
-        "scenario": scenario.key,
-        "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
-        "site": scenario.site.get("site_id", ""),
-        "drafter": drafter_identity(router),
-        "tampered": bool(scenario.tamper),
-        # The patient itself, because /clinic builds them in the browser and two
-        # patients under one scenario key are two different encounters.
-        "patient": plain(scenario.state),
-    }, sort_keys=True, default=str)
+    material = json.dumps(
+        {
+            "view": VIEW_VERSION,
+            "scenario": scenario.key,
+            "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
+            "site": scenario.site.get("site_id", ""),
+            "drafter": drafter_identity(router),
+            "tampered": bool(scenario.tamper),
+            # The patient itself, because /clinic builds them in the browser and two
+            # patients under one scenario key are two different encounters.
+            "patient": plain(scenario.state),
+        },
+        sort_keys=True,
+        default=str,
+    )
     return f"DEMO-{scenario.key}-{hashlib.sha256(material.encode()).hexdigest()[:12]}"
 
 
@@ -88,7 +91,6 @@ def stored(thread_id: str) -> dict | None:
         if entry.step == "rendered" and isinstance(entry.state, dict):
             return {**entry.state, "resumed": True}
     return None
-
 
 
 class Tampered:
@@ -110,5 +112,3 @@ class Tampered:
         proposal = self._router.propose(state, rules, site, **kwargs)
         self._tamper(proposal)
         return proposal
-
-

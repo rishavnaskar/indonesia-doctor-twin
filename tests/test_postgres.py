@@ -28,9 +28,14 @@ def conn():
 
 def _signature(**overrides) -> SignatureRecord:
     fields = {
-        "practitioner_id": "DR-1", "role": "doctor", "licence_expires": date(2027, 1, 1),
-        "decision": "accepted", "proposal_provenance": ("m@s", "p@1", "c@1"),
-        "signed_at": datetime(2026, 8, 30, 10, 0), "rejection_reason": None, "edit_diff": None,
+        "practitioner_id": "DR-1",
+        "role": "doctor",
+        "licence_expires": date(2027, 1, 1),
+        "decision": "accepted",
+        "proposal_provenance": ("m@s", "p@1", "c@1"),
+        "signed_at": datetime(2026, 8, 30, 10, 0),
+        "rejection_reason": None,
+        "edit_diff": None,
     }
     fields.update(overrides)
     return SignatureRecord(**fields)
@@ -83,8 +88,9 @@ def test_signatures_survive_a_new_connection(conn):
     from service.db import PostgresAuditLog, connect
 
     PostgresAuditLog(conn=conn).append(_signature())
-    PostgresAuditLog(conn=conn).append(_signature(practitioner_id="DR-2", decision="rejected",
-                                                  rejection_reason="disagreed"))
+    PostgresAuditLog(conn=conn).append(
+        _signature(practitioner_id="DR-2", decision="rejected", rejection_reason="disagreed")
+    )
 
     reopened = connect()
     with reopened.cursor() as cur:
@@ -109,8 +115,9 @@ def test_the_queue_keeps_every_attempt_not_just_the_outcome(conn):
     queue.mark("K1", ItemStatus.SENT)
 
     with conn.cursor() as cur:
-        cur.execute("SELECT status, last_error FROM outbound"
-                    " WHERE idempotency_key = 'K1' ORDER BY id")
+        cur.execute(
+            "SELECT status, last_error FROM outbound WHERE idempotency_key = 'K1' ORDER BY id"
+        )
         history = cur.fetchall()
 
     assert [row[0] for row in history] == ["pending", "pending", "sent"]
@@ -209,8 +216,9 @@ def test_the_location_never_carries_the_password(monkeypatch):
     """summary() is printed by the demo surface and by `tools.store`."""
     from service.store import Store
 
-    monkeypatch.setenv("CLINICIAN_DATABASE_URL",
-                       "postgresql://someone:hunter2@db.example:5544/clinician")
+    monkeypatch.setenv(
+        "CLINICIAN_DATABASE_URL", "postgresql://someone:hunter2@db.example:5544/clinician"
+    )
     store = Store(connection=object())
     assert "hunter2" not in store._location()
     assert store._location() == "db.example:5544/clinician"

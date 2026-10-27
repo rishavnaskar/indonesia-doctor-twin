@@ -21,10 +21,8 @@ NAME = "uncertainty"
 
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Uncertainty'
-DESCRIPTION = (
-    'Is the system confident enough to draft anything? Below the floor it abstains rather than guessing.'
-)
+TITLE = "Uncertainty"
+DESCRIPTION = "Is the system confident enough to draft anything? Below the floor it abstains rather than guessing."
 
 
 def run(ctx: GateContext) -> list[Finding]:
@@ -63,8 +61,9 @@ def run(ctx: GateContext) -> list[Finding]:
                     f"Confidence {float(confidence):.2f} is below the abstention floor "
                     f"of {float(floor):.2f}. Escalating rather than drafting."
                 ),
-                message_local=localise(ctx.rules, "below_floor",
-                                        confidence=float(confidence), floor=float(floor)),
+                message_local=localise(
+                    ctx.rules, "below_floor", confidence=float(confidence), floor=float(floor)
+                ),
                 rule_id="below_floor",
             )
         ]

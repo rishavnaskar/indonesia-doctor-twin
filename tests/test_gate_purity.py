@@ -23,7 +23,5 @@ def test_gate_imports_nothing_it_should_not():
 
 
 def test_ci_checks_pass():
-    result = subprocess.run(
-        [sys.executable, "tools/ci_checks.py"], capture_output=True, text=True
-    )
+    result = subprocess.run([sys.executable, "tools/ci_checks.py"], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout

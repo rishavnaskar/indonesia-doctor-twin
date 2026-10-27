@@ -31,8 +31,13 @@ from service.rules.eligibility import check_eligibility
 from service.rules.predicates import Context
 
 EXCLUDED_PROFILES = [
-    "excluded_pregnancy", "excluded_minor", "excluded_first_presentation",
-    "excluded_secondary", "excluded_resistant", "excluded_renal", "excluded_other",
+    "excluded_pregnancy",
+    "excluded_minor",
+    "excluded_first_presentation",
+    "excluded_secondary",
+    "excluded_resistant",
+    "excluded_renal",
+    "excluded_other",
 ]
 
 
@@ -71,8 +76,9 @@ def run(clean_n: int = 400, per_mutation: int = 8, verbose: bool = False) -> lis
             if verbose:
                 print(f"    unexpected block, seed {seed}: {decision.reasons()}")
     metrics.append(
-        Metric("Set A false-block rate", 100.0 * false_blocks / clean_n, 2.0,
-               higher_is_better=False)
+        Metric(
+            "Set A false-block rate", 100.0 * false_blocks / clean_n, 2.0, higher_is_better=False
+        )
     )
 
     # ---- Set B: planted errors must be caught, for the right reason -------
@@ -97,7 +103,9 @@ def run(clean_n: int = 400, per_mutation: int = 8, verbose: bool = False) -> lis
         if fired & case.expected_rules:
             right_reason += 1
         elif verbose:
-            print(f"    {case.name}: blocked on {sorted(fired)}, expected {sorted(case.expected_rules)}")
+            print(
+                f"    {case.name}: blocked on {sorted(fired)}, expected {sorted(case.expected_rules)}"
+            )
 
     total = len(cases)
     metrics.append(Metric("Set B catch rate", 100.0 * caught / total, 99.0))
@@ -115,7 +123,9 @@ def run(clean_n: int = 400, per_mutation: int = 8, verbose: bool = False) -> lis
         )
         if any(f.rule_id == "no_target_defined" for f in decision.blocking):
             abstained += 1
-    metrics.append(Metric("Abstention when no target is defined", 100.0 * abstained / abstain_n, 95.0))
+    metrics.append(
+        Metric("Abstention when no target is defined", 100.0 * abstained / abstain_n, 95.0)
+    )
 
     # ---- Exclusion routing -------------------------------------------------
     routed = 0

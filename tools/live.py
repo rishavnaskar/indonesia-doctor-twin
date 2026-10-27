@@ -58,17 +58,21 @@ def _thread_id(state, rules, site, model: str, args) -> str:
     agreed by three samples and checked by a critic is not the draft one call
     produced, and serving one for the other would misreport what was run.
     """
-    material = json.dumps({
-        "patient": state.patient_id,
-        "age": state.age,
-        "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
-        "site": site.get("site_id", ""),
-        "model": model,
-        "samples": getattr(args, "samples", 1),
-        "critic": bool(getattr(args, "critic", False)),
-        "tools": bool(getattr(args, "tools", False)),
-        "shadow": bool(getattr(args, "shadow", False)),
-    }, sort_keys=True, default=str)
+    material = json.dumps(
+        {
+            "patient": state.patient_id,
+            "age": state.age,
+            "pack": f"{rules.pack_id}@{rules.version}+{rules.content_digest}",
+            "site": site.get("site_id", ""),
+            "model": model,
+            "samples": getattr(args, "samples", 1),
+            "critic": bool(getattr(args, "critic", False)),
+            "tools": bool(getattr(args, "tools", False)),
+            "shadow": bool(getattr(args, "shadow", False)),
+        },
+        sort_keys=True,
+        default=str,
+    )
     return f"LIVE-{state.patient_id}-{hashlib.sha256(material.encode()).hexdigest()[:12]}"
 
 
@@ -102,33 +106,58 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run encounters through a real model.")
     parser.add_argument("--n", type=int, default=5, help="encounters (each one API call)")
     parser.add_argument("--model", default=None, help="model slug")
-    parser.add_argument("--provider", default="openrouter",
-                        choices=["anthropic", "openrouter"],
-                        help="which backend (default: openrouter, which has free models)")
-    parser.add_argument("--list-free", action="store_true",
-                        help="list models that cost nothing right now, then exit")
-    parser.add_argument("--no-thinking", action="store_true",
-                        help="disable adaptive thinking (cheaper, faster)")
-    parser.add_argument("--no-fallback", action="store_true",
-                        help="do not fall back to another free model when one is "
-                             "rate-limited; fail loudly instead")
-    parser.add_argument("--shadow", action="store_true",
-                        help="with --samples: measure agreement but do not apply "
-                             "it to the confidence, so its value can be tested")
-    parser.add_argument("--tools", action="store_true",
-                        help="let the drafter request what it needs (read-only "
-                             "lookups) instead of being handed the whole pack")
-    parser.add_argument("--critic", action="store_true",
-                        help="have a second model review each draft; it may only "
-                             "lower the confidence, never raise it")
-    parser.add_argument("--samples", type=int, default=1,
-                        help="draft this many times and use the agreement between "
-                             "them as the confidence, instead of the model's own "
-                             "opinion of itself (costs one call per sample)")
+    parser.add_argument(
+        "--provider",
+        default="openrouter",
+        choices=["anthropic", "openrouter"],
+        help="which backend (default: openrouter, which has free models)",
+    )
+    parser.add_argument(
+        "--list-free",
+        action="store_true",
+        help="list models that cost nothing right now, then exit",
+    )
+    parser.add_argument(
+        "--no-thinking", action="store_true", help="disable adaptive thinking (cheaper, faster)"
+    )
+    parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help="do not fall back to another free model when one is rate-limited; fail loudly instead",
+    )
+    parser.add_argument(
+        "--shadow",
+        action="store_true",
+        help="with --samples: measure agreement but do not apply "
+        "it to the confidence, so its value can be tested",
+    )
+    parser.add_argument(
+        "--tools",
+        action="store_true",
+        help="let the drafter request what it needs (read-only "
+        "lookups) instead of being handed the whole pack",
+    )
+    parser.add_argument(
+        "--critic",
+        action="store_true",
+        help="have a second model review each draft; it may only "
+        "lower the confidence, never raise it",
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=1,
+        help="draft this many times and use the agreement between "
+        "them as the confidence, instead of the model's own "
+        "opinion of itself (costs one call per sample)",
+    )
     parser.add_argument("--pack", default="id")
-    parser.add_argument("--store", default=None,
-                        help="directory for checkpoints, signatures and the outbound "
-                             "queue (default .store; --store '' disables persistence)")
+    parser.add_argument(
+        "--store",
+        default=None,
+        help="directory for checkpoints, signatures and the outbound "
+        "queue (default .store; --store '' disables persistence)",
+    )
     parser.add_argument("--site", default="SITE-A")
     parser.add_argument("--show-prompt", action="store_true")
     args = parser.parse_args()
@@ -167,8 +196,15 @@ def main() -> int:
         # corrupt the experiment, so naming a model turns fallback off unless
         # nothing was named.
         kwargs["fallbacks"] = ()
-    router = router_with_model(args.model, provider=args.provider,
-                               samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow, **kwargs)
+    router = router_with_model(
+        args.model,
+        provider=args.provider,
+        samples=args.samples,
+        critic=args.critic,
+        use_tools=args.tools,
+        shadow=args.shadow,
+        **kwargs,
+    )
     backend = router.get("model").backend
     from service.store import Store
 
@@ -184,8 +220,10 @@ def main() -> int:
             print(f"  Falling back through: {', '.join(chain)}")
         print(f"  Synthetic patients only. The residency guard enforces it.\n{RULE}")
     else:
-        print(f"\n{RULE}\n  The exact prompt, for {args.site}. No request is made and no key "
-              f"is needed.\n{RULE}")
+        print(
+            f"\n{RULE}\n  The exact prompt, for {args.site}. No request is made and no key "
+            f"is needed.\n{RULE}"
+        )
 
     if args.show_prompt:
         # Inspecting the prompt costs nothing and needs no credentials.
@@ -243,15 +281,21 @@ def main() -> int:
             # Marked on every line that reports one. A replayed encounter that
             # reads like a fresh one is a demo claiming an API call it did not
             # make, which is the one thing this stage exists to prove.
-            print(f"\n  [{index}] {label:12s} -> {stored['outcome'].upper()}"
-                  f"  [replayed from the store, no model call]")
+            print(
+                f"\n  [{index}] {label:12s} -> {stored['outcome'].upper()}"
+                f"  [replayed from the store, no model call]"
+            )
             for line in stored["lines"]:
                 print(line)
             continue
 
         try:
             result = run_encounter(
-                state, rules, site, router, runtime,
+                state,
+                rules,
+                site,
+                router,
+                runtime,
                 # Derived from the inputs, not from a position in a run. Two
                 # runs both used LIVE-0 and, once checkpoints persisted,
                 # appended two different encounters to one audit trail — which
@@ -260,8 +304,9 @@ def main() -> int:
                 # which is what lets the run above skip it.
                 thread_id=thread_id,
                 signer=Signer(site["practitioners"][0]["practitioner_id"], True),
-                audit=audit, now=now, queue=queue,
-
+                audit=audit,
+                now=now,
+                queue=queue,
             )
         except ProposalParseError as exc:
             parse_failures += 1
@@ -304,11 +349,15 @@ def main() -> int:
         lines: list[str] = []
         if result.proposal is not None:
             proposal = result.proposal
-            lines.append(f"      draft: {proposal.recommendation.value}, "
-                         f"confidence {proposal.confidence:.2f}")
+            lines.append(
+                f"      draft: {proposal.recommendation.value}, "
+                f"confidence {proposal.confidence:.2f}"
+            )
             for change in proposal.medication_changes:
-                lines.append(f"             {change.action.value} {change.molecule} "
-                             f"{change.mg_per_dose:g} mg x{change.doses_per_day}")
+                lines.append(
+                    f"             {change.action.value} {change.molecule} "
+                    f"{change.mg_per_dose:g} mg x{change.doses_per_day}"
+                )
         if result.decision and result.decision.blocking:
             for reason in result.decision.reasons():
                 lines.append(f"      gate:  {reason}")
@@ -317,25 +366,33 @@ def main() -> int:
         for line in lines:
             print(line)
 
-        runtime.checkpoint(thread_id, "rendered", {
-            "origin": "live",
-            "outcome": result.outcome.value,
-            "answered_by": answered_by,
-            "lines": lines,
-        })
+        runtime.checkpoint(
+            thread_id,
+            "rendered",
+            {
+                "origin": "live",
+                "outcome": result.outcome.value,
+                "answered_by": answered_by,
+                "lines": lines,
+            },
+        )
 
     print(f"\n{RULE}")
     print("  " + " · ".join(f"{k}: {v}" for k, v in sorted(tally.items())))
     if replayed:
-        print(f"  {replayed} of {args.n} replayed from the store, "
-              f"{args.n - replayed} model call(s) made.")
+        print(
+            f"  {replayed} of {args.n} replayed from the store, "
+            f"{args.n - replayed} model call(s) made."
+        )
         print("  CLINICIAN_FRESH=1 to call the model for every one of them.")
     print(f"  queued for submission: {len(queue)}")
     if store:
         facts = store.summary()
-        print(f"  persisted to {facts['backend']} ({facts['location']}), "
-              f"{facts['encounters_checkpointed']} encounter(s) checkpointed, "
-              f"{facts['signatures']} signature(s), {facts['queued']} queued")
+        print(
+            f"  persisted to {facts['backend']} ({facts['location']}), "
+            f"{facts['encounters_checkpointed']} encounter(s) checkpointed, "
+            f"{facts['signatures']} signature(s), {facts['queued']} queued"
+        )
     if parse_failures:
         print(f"  {parse_failures} response(s) did not parse. That is a gate failure by")
         print("  design, not a retry. A malformed clinical output is not made correct")

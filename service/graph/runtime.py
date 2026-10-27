@@ -153,12 +153,18 @@ class FileRuntime(InMemoryRuntime):
         path = Path(self.path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({
-                "thread_id": entry.thread_id,
-                "step": entry.step,
-                "sequence": entry.sequence,
-                "state": entry.state,
-            }, default=str) + "\n")
+            fh.write(
+                json.dumps(
+                    {
+                        "thread_id": entry.thread_id,
+                        "step": entry.step,
+                        "sequence": entry.sequence,
+                        "state": entry.state,
+                    },
+                    default=str,
+                )
+                + "\n"
+            )
 
     def _load(self) -> None:
         if self.path is None:
@@ -168,8 +174,7 @@ class FileRuntime(InMemoryRuntime):
                 continue
             try:
                 row = json.loads(line)
-                entry = Checkpoint(row["thread_id"], row["step"],
-                                   row["state"], row["sequence"])
+                entry = Checkpoint(row["thread_id"], row["step"], row["state"], row["sequence"])
             except (json.JSONDecodeError, KeyError, TypeError):
                 # A truncated final line is what a power cut leaves behind.
                 # Losing every checkpoint behind it would defeat the point.

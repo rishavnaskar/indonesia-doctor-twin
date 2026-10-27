@@ -46,12 +46,12 @@ from service.state.derive import derive_flags
 
 
 class Outcome(str, Enum):
-    HANDOFF = "handoff"            # not our patient. success.
-    ESCALATE = "escalate"          # red flag. success.
+    HANDOFF = "handoff"  # not our patient. success.
+    ESCALATE = "escalate"  # red flag. success.
     REQUEST_INFO = "request_info"  # not enough to advise. success.
-    ABSTAIN = "abstain"            # gate refused. success.
-    PRESENTED = "presented"        # awaiting a signature
-    COMMITTED = "committed"        # signed, coded, ready to emit
+    ABSTAIN = "abstain"  # gate refused. success.
+    PRESENTED = "presented"  # awaiting a signature
+    COMMITTED = "committed"  # signed, coded, ready to emit
 
 
 @dataclass
@@ -258,7 +258,12 @@ def run_encounter(
     # inline: at a site that loses power or signal mid-consultation, an inline
     # send is how an encounter goes missing.
     bundle = build_bundle(
-        state, claim, proposal, site, signer.practitioner_id, rules,
+        state,
+        claim,
+        proposal,
+        site,
+        signer.practitioner_id,
+        rules,
         encounter_id=thread_id,
     )
     if queue is not None:

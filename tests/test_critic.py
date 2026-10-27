@@ -78,8 +78,9 @@ def _run(rules, proposal, verdict):
 
 
 def test_a_worried_critic_lowers_the_confidence(rules):
-    result, _ = _run(rules, _draft(0.9), {"acceptable_as_drafted": 0.3,
-                                          "concerns": ["ignores the falling eGFR"]})
+    result, _ = _run(
+        rules, _draft(0.9), {"acceptable_as_drafted": 0.3, "concerns": ["ignores the falling eGFR"]}
+    )
     assert result.confidence == pytest.approx(0.3)
     assert "ignores the falling eGFR" in result.uncertainty_notes
 
@@ -127,9 +128,7 @@ def test_the_critic_is_inside_the_residency_boundary(rules):
     state = make_patient(3, controlled=False)
     state.is_synthetic = False
     critic = Critic({"acceptable_as_drafted": 0.5})
-    CriticReviewedReasoner(Inner(_draft()), critic).propose(
-        state, rules, rules.sites["SITE-A"]
-    )
+    CriticReviewedReasoner(Inner(_draft()), critic).propose(state, rules, rules.sites["SITE-A"])
     assert critic.saw_egress is False, "a real record must not be sent for review either"
 
 

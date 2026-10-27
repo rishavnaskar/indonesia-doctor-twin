@@ -42,6 +42,9 @@ jobs:
       - name: ruff
         run: ruff check --output-format=github .
 
+      - name: ruff format
+        run: ruff format --check --diff .
+
       - name: mypy
         run: mypy
 

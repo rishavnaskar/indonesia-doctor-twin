@@ -61,8 +61,9 @@ def clear_clinic_history() -> str:
 
 def _cleared_at() -> str:
     history = runtime().checkpoints.get(CLEAR_MARKER) or []
-    stamps = [e.state.get("ran_at", "") for e in history
-              if isinstance(e.state, dict) and e.state.get("origin") == "cleared"]
+    stamps = [
+        e.state.get("ran_at", "")
+        for e in history
+        if isinstance(e.state, dict) and e.state.get("origin") == "cleared"
+    ]
     return max(stamps) if stamps else ""
-
-

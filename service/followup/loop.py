@@ -36,10 +36,10 @@ from service.state.models import Observation
 
 
 class Action(str, Enum):
-    ACCEPT = "accept"            # stored, nothing more to do
-    CONFIRM = "confirm"          # alarming, but unconfirmed: ask for a repeat
-    ESCALATE = "escalate"        # confirmed red flag; a clinician is alerted
-    REFILL_GAP = "refill_gap"    # medication not collected on schedule
+    ACCEPT = "accept"  # stored, nothing more to do
+    CONFIRM = "confirm"  # alarming, but unconfirmed: ask for a repeat
+    ESCALATE = "escalate"  # confirmed red flag; a clinician is alerted
+    REFILL_GAP = "refill_gap"  # medication not collected on schedule
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class LoopResult:
 
 
 def _policy(rules) -> dict[str, Any]:
-    return (rules.guideline.get("between_visits") or {})
+    return rules.guideline.get("between_visits") or {}
 
 
 def _red_flags(state, rules) -> list[dict]:
@@ -112,9 +112,8 @@ def ingest(state, rules, readings: list[Observation], *, now: date | None = None
             continue
 
         rule = fired[0]
-        needs_confirmation = (
-            reading.source.value in noisy_sources
-            and not _corroborated(state, rules, reading, window, noisy_sources)
+        needs_confirmation = reading.source.value in noisy_sources and not _corroborated(
+            state, rules, reading, window, noisy_sources
         )
 
         if needs_confirmation:
@@ -150,8 +149,9 @@ def _fires(state, rules, observations: list[Observation]) -> bool:
     return bool(_red_flags(replace(state, observations=list(observations)), rules))
 
 
-def _corroborated(state, rules, reading: Observation, window: timedelta,
-                  noisy_sources: set[str]) -> bool:
+def _corroborated(
+    state, rules, reading: Observation, window: timedelta, noisy_sources: set[str]
+) -> bool:
     """Is there independent evidence, or is this one reading the whole case?
 
     An earlier version counted any recent reading of the same measurement as
@@ -171,7 +171,8 @@ def _corroborated(state, rules, reading: Observation, window: timedelta,
         return True
 
     recent = [
-        o for o in others
+        o
+        for o in others
         if o.code == reading.code
         and o.source.value in noisy_sources
         and abs(_days(o.taken_at, reading.taken_at)) <= max(window.days, 1)
@@ -190,7 +191,7 @@ def refill_check(state, rules, *, last_collected: date | None, now: date) -> Loo
     A missed refill is an adherence signal the next visit would otherwise
     discover months later, and it needs no patient to type anything.
     """
-    refill = (_policy(rules).get("refill") or {})
+    refill = _policy(rules).get("refill") or {}
     if not refill or last_collected is None:
         return None
     due = int(refill.get("expected_every_days", 30)) + int(refill.get("grace_days", 0))

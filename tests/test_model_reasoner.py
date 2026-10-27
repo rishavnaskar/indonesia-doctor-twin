@@ -65,6 +65,7 @@ def rules():
 
 # ------------------------------------------------------------- residency
 
+
 def test_a_non_synthetic_record_is_never_sent(rules):
     fake = Fake(json.dumps(VALID))
     state = make_patient(1, controlled=False)
@@ -88,6 +89,7 @@ def test_the_guard_defaults_to_refusing(rules):
 
 # ---------------------------------------------------------------- parsing
 
+
 def test_a_malformed_response_raises_rather_than_retrying(rules):
     fake = Fake("I'm sorry, I can't help with that.")
     with pytest.raises(ProposalParseError):
@@ -95,7 +97,7 @@ def test_a_malformed_response_raises_rather_than_retrying(rules):
 
 
 def test_json_is_recovered_from_a_fenced_block():
-    assert extract_json("```json\n{\"a\": 1}\n```") == {"a": 1}
+    assert extract_json('```json\n{"a": 1}\n```') == {"a": 1}
 
 
 def test_a_hallucinated_dose_is_still_parsed_then_blocked_by_the_gate(rules):
@@ -104,9 +106,7 @@ def test_a_hallucinated_dose_is_still_parsed_then_blocked_by_the_gate(rules):
     bad["medication_changes"][0]["mg_per_dose"] = 100
 
     state = make_patient(3, controlled=False)
-    proposal = ModelReasoner(Fake(json.dumps(bad))).propose(
-        state, rules, rules.sites["SITE-A"]
-    )
+    proposal = ModelReasoner(Fake(json.dumps(bad))).propose(state, rules, rules.sites["SITE-A"])
     decision = run_gate(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )
@@ -119,9 +119,7 @@ def test_an_invented_drug_is_blocked(rules):
     bad["medication_changes"][0]["molecule"] = "telmisartan"
 
     state = make_patient(4, controlled=False)
-    proposal = ModelReasoner(Fake(json.dumps(bad))).propose(
-        state, rules, rules.sites["SITE-A"]
-    )
+    proposal = ModelReasoner(Fake(json.dumps(bad))).propose(state, rules, rules.sites["SITE-A"])
     decision = run_gate(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )
@@ -133,9 +131,7 @@ def test_an_invented_citation_is_blocked(rules):
     bad["assertions"] = [{"text": "Made up.", "citation": "nonexistent#1"}]
 
     state = make_patient(5, controlled=False)
-    proposal = ModelReasoner(Fake(json.dumps(bad))).propose(
-        state, rules, rules.sites["SITE-A"]
-    )
+    proposal = ModelReasoner(Fake(json.dumps(bad))).propose(state, rules, rules.sites["SITE-A"])
     decision = run_gate(
         GateContext(state=state, proposal=proposal, rules=rules, site=rules.sites["SITE-A"])
     )
@@ -143,6 +139,7 @@ def test_an_invented_citation_is_blocked(rules):
 
 
 # ---------------------------------------------------------------- prompt
+
 
 def test_provenance_pins_model_and_prompt_template(rules):
     proposal = ModelReasoner(Fake(json.dumps(VALID))).propose(
@@ -165,16 +162,15 @@ def test_untrusted_text_is_fenced_and_labelled(rules):
 
 def test_the_prompt_carries_pack_rules_not_baked_in_knowledge(rules):
     fake = Fake(json.dumps(VALID))
-    ModelReasoner(fake).propose(
-        make_patient(8, controlled=False), rules, rules.sites["SITE-A"]
-    )
+    ModelReasoner(fake).propose(make_patient(8, controlled=False), rules, rules.sites["SITE-A"])
     prompt = fake.last_user_prompt
-    assert "amlodipine" in prompt          # from the pack
+    assert "amlodipine" in prompt  # from the pack
     assert "requires_documented_intolerance" in prompt
     assert "perki_htn_cv#targets" in prompt
 
 
 # ---------------------------------------------------------------- backend
+
 
 def test_a_missing_key_is_a_clear_error(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
@@ -235,9 +231,7 @@ def test_the_backend_is_offered_a_schema_built_from_the_pack(rules):
     produced `titraate_up` — a typo the parser correctly rejected, at the cost
     of a wasted call and a visit with no draft."""
     backend = Fake(json.dumps(VALID))
-    ModelReasoner(backend).propose(
-        make_patient(3, controlled=False), rules, rules.sites["SITE-A"]
-    )
+    ModelReasoner(backend).propose(make_patient(3, controlled=False), rules, rules.sites["SITE-A"])
 
     schema = backend.last_schema
     assert schema is not None
@@ -278,8 +272,15 @@ def test_an_error_arriving_with_http_200_is_still_an_error():
     # Punctuation varies between providers and between messages from the same
     # provider. Match the word, not the hyphen.
     with _pytest.raises(RateLimited):
-        check({"error": {"message": "Provider returned error",
-                         "metadata": {"raw": "temporarily rate-limited upstream"}}}, "m")
+        check(
+            {
+                "error": {
+                    "message": "Provider returned error",
+                    "metadata": {"raw": "temporarily rate-limited upstream"},
+                }
+            },
+            "m",
+        )
 
     with _pytest.raises(BackendError):
         check({"error": {"message": "model not found"}}, "m")
@@ -303,14 +304,12 @@ def test_the_prompt_shows_the_measurements_this_pathway_actually_reads(rules):
     from service.rules.targets import resolve_target
 
     htn = pathways.with_pathway(rules, "hypertension")
-    htn_codes = _relevant_codes(
-        htn, resolve_target(htn.guideline, Context(make_patient(1))).target)
+    htn_codes = _relevant_codes(htn, resolve_target(htn.guideline, Context(make_patient(1))).target)
     assert {"sbp", "dbp"} <= set(htn_codes)
     assert "hba1c" not in htn_codes
 
     dm2 = pathways.with_pathway(rules, "diabetes")
-    dm_codes = _relevant_codes(
-        dm2, resolve_target(dm2.guideline, Context(make_diabetic(1))).target)
+    dm_codes = _relevant_codes(dm2, resolve_target(dm2.guideline, Context(make_diabetic(1))).target)
     assert "hba1c" in dm_codes, "the measurement that defines control on this pathway"
     assert "sbp" not in dm_codes
 

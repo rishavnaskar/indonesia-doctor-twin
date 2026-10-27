@@ -55,9 +55,7 @@ def test_prose_in_the_investigations_field_is_a_malformed_proposal(rules):
     assert len(findings) == 1
     assert findings[0].rule_id == "unrecognised_investigation"
     assert findings[0].severity is Severity.BLOCK
-    assert not findings[0].converts_to_referral, (
-        "there is nowhere to refer a sentence to"
-    )
+    assert not findings[0].converts_to_referral, "there is nowhere to refer a sentence to"
     assert "not available at" not in findings[0].message
 
 
@@ -75,9 +73,13 @@ def test_a_pack_whose_halves_disagree_fails_at_load(rules, tmp_path, monkeypatch
     bad = dict(rules.sites["SITE-A"])
     bad["labs_available"] = ["k", "not_in_catalogue"]
     broken = loader.RuleSet(
-        pack_id="x", version="1", review_status="unknown",
-        molecules=rules.molecules, guideline=rules.guideline,
-        sites={"SITE-A": bad}, investigations=rules.investigations,
+        pack_id="x",
+        version="1",
+        review_status="unknown",
+        molecules=rules.molecules,
+        guideline=rules.guideline,
+        sites={"SITE-A": bad},
+        investigations=rules.investigations,
     )
     with pytest.raises(loader.PackError, match="absent from the catalogue"):
         loader._validate(broken)

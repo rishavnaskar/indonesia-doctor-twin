@@ -155,14 +155,23 @@ def _lines(findings: list[Finding], english_first: bool = True) -> tuple[Line, .
     def pair(finding: Finding) -> tuple[str, str]:
         if english_first:
             return finding.message, finding.message_local
-        return (finding.message_local or finding.message,
-                finding.message if finding.message_local else "")
+        return (
+            finding.message_local or finding.message,
+            finding.message if finding.message_local else "",
+        )
 
     lines = []
     for finding in findings:
         text, gloss = pair(finding)
-        lines.append(Line(text=text, gloss=gloss, rule_id=finding.rule_id,
-                          citation=finding.citation, check=finding.check))
+        lines.append(
+            Line(
+                text=text,
+                gloss=gloss,
+                rule_id=finding.rule_id,
+                citation=finding.citation,
+                check=finding.check,
+            )
+        )
     return tuple(lines)
 
 
@@ -181,9 +190,11 @@ def _raise_for_concerns(view: Presentation, concerns: tuple, labels: Labels) -> 
     if not concerns:
         return view
 
-    wanted = Band.RED if any(
-        getattr(c, "urgency", None) and c.urgency.value == "escalate" for c in concerns
-    ) else Band.AMBER
+    wanted = (
+        Band.RED
+        if any(getattr(c, "urgency", None) and c.urgency.value == "escalate" for c in concerns)
+        else Band.AMBER
+    )
     band = view.band if _BAND_ORDER[view.band] >= _BAND_ORDER[wanted] else wanted
 
     lines = view.lines + tuple(
@@ -229,62 +240,81 @@ def present(
     # clinician can act on it, and nobody else in the room can.
     def _discrepancy_line(d) -> Line:
         suffix = f" Interacts with {', '.join(d.interacts_with)}." if d.interacts_with else ""
-        lead, under = (d.gloss or d.text, d.text if d.gloss else "") if labels.english_first \
+        lead, under = (
+            (d.gloss or d.text, d.text if d.gloss else "")
+            if labels.english_first
             else (d.text, d.gloss)
+        )
         return Line(text=lead + suffix, gloss=under)
 
-    material = tuple(
-        _discrepancy_line(d) for d in discrepancies if getattr(d, "material", False)
+    material = tuple(_discrepancy_line(d) for d in discrepancies if getattr(d, "material", False))
+    audit = audit + tuple(
+        Line(text=d.gloss or d.text, gloss=d.text if d.gloss else "") for d in discrepancies
     )
-    audit = audit + tuple(Line(text=d.gloss or d.text, gloss=d.text if d.gloss else "")
-                          for d in discrepancies)
 
     # A red flag is not a suggestion and is not suppressible. It is the one
     # case where the system interrupts a clinician who has not asked.
     if outcome == _ESCALATE:
-        return _raise_for_concerns(Presentation(
-            band=Band.RED,
-            headline=labels.primary(_ESCALATE),
-            gloss=labels.secondary(_ESCALATE),
-            lines=_lines(blocking, labels.english_first) or audit,
-            requires_acknowledgement=True,
-            shows_draft=False,
-            audit=audit,
-        ), concerns, labels)
+        return _raise_for_concerns(
+            Presentation(
+                band=Band.RED,
+                headline=labels.primary(_ESCALATE),
+                gloss=labels.secondary(_ESCALATE),
+                lines=_lines(blocking, labels.english_first) or audit,
+                requires_acknowledgement=True,
+                shows_draft=False,
+                audit=audit,
+            ),
+            concerns,
+            labels,
+        )
 
     # A plan that cannot be delivered at this site is not a bad plan. It is a
     # referral, and the clinician has to see it, because the alternative is a
     # patient sent home waiting for a test that will never be run here.
     if decision is not None and decision.referral:
-        return _raise_for_concerns(Presentation(
-            band=Band.RED,
-            headline=labels.primary("referral"),
-            gloss=labels.secondary("referral"),
-            lines=_lines([f for f in blocking if f.converts_to_referral], labels.english_first),
-            requires_acknowledgement=True,
-            shows_draft=False,
-            audit=audit,
-        ), concerns, labels)
+        return _raise_for_concerns(
+            Presentation(
+                band=Band.RED,
+                headline=labels.primary("referral"),
+                gloss=labels.secondary("referral"),
+                lines=_lines([f for f in blocking if f.converts_to_referral], labels.english_first),
+                requires_acknowledgement=True,
+                shows_draft=False,
+                audit=audit,
+            ),
+            concerns,
+            labels,
+        )
 
     if outcome == _HANDOFF:
-        return _raise_for_concerns(Presentation(
-            band=Band.AMBER,
-            headline=labels.primary(_HANDOFF),
-            gloss=labels.secondary(_HANDOFF),
-            lines=_lines(blocking, labels.english_first),
-            shows_draft=False,
-            audit=audit,
-        ), concerns, labels)
+        return _raise_for_concerns(
+            Presentation(
+                band=Band.AMBER,
+                headline=labels.primary(_HANDOFF),
+                gloss=labels.secondary(_HANDOFF),
+                lines=_lines(blocking, labels.english_first),
+                shows_draft=False,
+                audit=audit,
+            ),
+            concerns,
+            labels,
+        )
 
     if outcome == _REQUEST_INFO:
-        return _raise_for_concerns(Presentation(
-            band=Band.AMBER,
-            headline=labels.primary(_REQUEST_INFO),
-            gloss=labels.secondary(_REQUEST_INFO),
-            lines=tuple(Line(text=q) for q in questions) or _lines(blocking, labels.english_first),
-            shows_draft=False,
-            audit=audit,
-        ), concerns, labels)
+        return _raise_for_concerns(
+            Presentation(
+                band=Band.AMBER,
+                headline=labels.primary(_REQUEST_INFO),
+                gloss=labels.secondary(_REQUEST_INFO),
+                lines=tuple(Line(text=q) for q in questions)
+                or _lines(blocking, labels.english_first),
+                shows_draft=False,
+                audit=audit,
+            ),
+            concerns,
+            labels,
+        )
 
     if outcome == _ABSTAIN or blocking:
         # The gate refused and there is nothing here the clinician must act on.
@@ -296,30 +326,42 @@ def present(
         # This is the direction to fail in. A system that cannot produce a safe
         # draft has nothing useful to say, and saying it anyway trains people to
         # skim.
-        return _raise_for_concerns(Presentation(
-            band=Band.GREEN,
-            headline=labels.primary(_ABSTAIN),
-            gloss=labels.secondary(_ABSTAIN),
-            lines=(),
-            shows_draft=False,
-            audit=audit,
-        ), concerns, labels)
+        return _raise_for_concerns(
+            Presentation(
+                band=Band.GREEN,
+                headline=labels.primary(_ABSTAIN),
+                gloss=labels.secondary(_ABSTAIN),
+                lines=(),
+                shows_draft=False,
+                audit=audit,
+            ),
+            concerns,
+            labels,
+        )
 
     if warnings or material:
-        return _raise_for_concerns(Presentation(
-            band=Band.AMBER,
-            headline=labels.primary("warnings"),
-            gloss=labels.secondary("warnings"),
-            lines=_lines(warnings, labels.english_first) + material,
+        return _raise_for_concerns(
+            Presentation(
+                band=Band.AMBER,
+                headline=labels.primary("warnings"),
+                gloss=labels.secondary("warnings"),
+                lines=_lines(warnings, labels.english_first) + material,
+                shows_draft=True,
+                audit=audit,
+            ),
+            concerns,
+            labels,
+        )
+
+    return _raise_for_concerns(
+        Presentation(
+            band=Band.GREEN,
+            headline=labels.primary("clean"),
+            gloss=labels.secondary("clean"),
+            lines=(),
             shows_draft=True,
             audit=audit,
-        ), concerns, labels)
-
-    return _raise_for_concerns(Presentation(
-        band=Band.GREEN,
-        headline=labels.primary("clean"),
-            gloss=labels.secondary("clean"),
-        lines=(),
-        shows_draft=True,
-        audit=audit,
-    ), concerns, labels)
+        ),
+        concerns,
+        labels,
+    )

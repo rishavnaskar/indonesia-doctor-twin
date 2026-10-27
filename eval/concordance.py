@@ -85,9 +85,13 @@ class Concordance:
 
     @property
     def measured_stability(self) -> bool:
-        return bool(self.stable_matched or self.stable_differed
-                    or self.unstable_matched or self.unstable_differed
-                    or self.unstable_abstained)
+        return bool(
+            self.stable_matched
+            or self.stable_differed
+            or self.unstable_matched
+            or self.unstable_differed
+            or self.unstable_abstained
+        )
 
     def _rate(self, matched: int, differed: int) -> float | None:
         total = matched + differed
@@ -114,14 +118,17 @@ def load_cases(path: Path) -> list[Case]:
     ]
 
 
-def score(cases: list[Case], rules=None, router=None, source: str = "unknown",
-          circular: bool = True) -> Concordance:
+def score(
+    cases: list[Case], rules=None, router=None, source: str = "unknown", circular: bool = True
+) -> Concordance:
     from service.reason import reference
     from tools.demo.patients import from_wire
 
     rules = rules or load_pack("id")
-    propose = router.propose if router is not None else (
-        lambda state, rs, site=None: reference.propose(state, rs, site)
+    propose = (
+        router.propose
+        if router is not None
+        else (lambda state, rs, site=None: reference.propose(state, rs, site))
     )
     site = rules.sites["SITE-A"]
     result = Concordance(source=source, circular=circular)
@@ -140,9 +147,7 @@ def score(cases: list[Case], rules=None, router=None, source: str = "unknown",
             result.abstained += 1
             continue
 
-        decision = run_gate(
-            GateContext(state=state, proposal=proposal, rules=rules, site=site)
-        )
+        decision = run_gate(GateContext(state=state, proposal=proposal, rules=rules, site=site))
         stable = proposal.agreement is None or proposal.agreement >= 1.0
 
         if not decision.rendered:

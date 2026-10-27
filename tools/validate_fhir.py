@@ -37,8 +37,7 @@ RESULT = re.compile(r"(?:Success|\*FAILURE\*): (\d+) errors?, (\d+) warnings?")
 # Gitignored: 190 MB does not belong in a repository, and it is the same file
 # for everyone.
 DEFAULT_JAR = Path(__file__).resolve().parents[1] / ".tools" / "validator_cli.jar"
-JAR_URL = ("https://github.com/hapifhir/org.hl7.fhir.core/releases/latest/"
-           "download/validator_cli.jar")
+JAR_URL = "https://github.com/hapifhir/org.hl7.fhir.core/releases/latest/download/validator_cli.jar"
 
 
 def download(destination: Path = DEFAULT_JAR) -> int:
@@ -50,9 +49,7 @@ def download(destination: Path = DEFAULT_JAR) -> int:
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
     print(f"\n  Downloading the HL7 FHIR validator (~190 MB) to {destination} ...")
-    result = subprocess.run(
-        ["curl", "-L", "--progress-bar", "-o", str(destination), JAR_URL]
-    )
+    result = subprocess.run(["curl", "-L", "--progress-bar", "-o", str(destination), JAR_URL])
     if result.returncode != 0:
         print("  Download failed. It is a plain file, so fetch it by hand from:")
         print(f"      {JAR_URL}\n")
@@ -82,8 +79,12 @@ def sample_bundles(rules) -> dict[str, dict]:
         view = pathways.with_pathway(rules, pathway)
         site = view.sites[site_id]
         out[name] = build_bundle(
-            state, build_claim(state, view), reference.propose(state, view, site),
-            site, site["practitioners"][0]["practitioner_id"], view,
+            state,
+            build_claim(state, view),
+            reference.propose(state, view, site),
+            site,
+            site["practitioners"][0]["practitioner_id"],
+            view,
             encounter_id=f"ENC-{name}",
         ).payload
     return out
@@ -95,7 +96,9 @@ def validate(jar: Path, payload: dict, name: str) -> tuple[int, int, str]:
         path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         proc = subprocess.run(
             ["java", "-jar", str(jar), str(path), "-version", "4.0.1"],
-            capture_output=True, text=True, timeout=900,
+            capture_output=True,
+            text=True,
+            timeout=900,
         )
     output = proc.stdout + proc.stderr
     match = RESULT.search(output)
@@ -107,8 +110,9 @@ def validate(jar: Path, payload: dict, name: str) -> tuple[int, int, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate emitted bundles against HL7 R4.")
     parser.add_argument("--jar", default=None)
-    parser.add_argument("--download", action="store_true",
-                        help="fetch the validator once (~190 MB, gitignored)")
+    parser.add_argument(
+        "--download", action="store_true", help="fetch the validator once (~190 MB, gitignored)"
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -147,8 +151,10 @@ def main() -> int:
                 if "Error @" in line:
                     print(f"        {line.split('Error @ ')[-1][:140]}")
     print("  " + "=" * 58)
-    print("  Remaining warnings are best-practice recommendations (narrative text\n"
-          "  and UCUM annotations), not conformance failures.\n")
+    print(
+        "  Remaining warnings are best-practice recommendations (narrative text\n"
+        "  and UCUM annotations), not conformance failures.\n"
+    )
     return 1 if failed else 0
 
 

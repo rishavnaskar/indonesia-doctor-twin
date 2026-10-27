@@ -63,13 +63,18 @@ def test_a_residency_refusal_is_contained_to_one_visit():
     assert result["residency_refused"] == 1
     assert result["drafter_failures"] == 0
     assert encounter["outcome"] == "residency_refused"
-    assert "nothing left the machine" in encounter["outcome_plain"].lower() or \
-        "Nothing left the machine" in encounter["outcome_plain"]
+    assert (
+        "nothing left the machine" in encounter["outcome_plain"].lower()
+        or "Nothing left the machine" in encounter["outcome_plain"]
+    )
 
 
 def test_a_hand_built_emergency_routes_out_of_the_pathway():
     patient = {
-        "patient_id": "HAND-1", "age": 58, "sex": "M", "is_synthetic": True,
+        "patient_id": "HAND-1",
+        "age": 58,
+        "sex": "M",
+        "is_synthetic": True,
         "diagnoses": ["I10"],
         "medications": [{"molecule": "amlodipine", "mg_per_dose": 5, "doses_per_day": 1}],
         "observations": [
@@ -95,7 +100,10 @@ def test_the_same_missing_lab_means_different_things_at_different_hospitals():
     for them. SITE-C cannot, so asking would strand the patient — it is a
     referral instead. Same patient, same gap, two right answers."""
     patient = {
-        "patient_id": "MOVE-1", "age": 60, "sex": "M", "is_synthetic": True,
+        "patient_id": "MOVE-1",
+        "age": 60,
+        "sex": "M",
+        "is_synthetic": True,
         "diagnoses": ["I10"],
         "medications": [{"molecule": "amlodipine", "mg_per_dose": 10, "doses_per_day": 1}],
         "observations": [
@@ -116,8 +124,13 @@ def test_the_same_missing_lab_means_different_things_at_different_hospitals():
 
 
 def test_a_measurement_left_blank_is_a_measurement_not_taken():
-    row = {"patient_id": "B", "age": 50, "sex": "M", "is_synthetic": True,
-           "observations": [{"code": "k", "value": ""}, {"code": "sbp", "value": 150}]}
+    row = {
+        "patient_id": "B",
+        "age": 50,
+        "sex": "M",
+        "is_synthetic": True,
+        "observations": [{"code": "k", "value": ""}, {"code": "sbp", "value": 150}],
+    }
     state = from_wire(row)
     assert state.latest("k") is None
     assert state.latest("sbp") is not None
@@ -165,10 +178,16 @@ def test_the_workflow_reports_the_phase_it_is_entering():
     rules = load_pack("id")
     seen: list[str] = []
     result = run_encounter(
-        make_patient(101, controlled=True), rules, rules.sites["SITE-A"],
-        default_router(), InMemoryRuntime(), thread_id="T",
-        signer=Signer("PRAC-A-001", True), audit=AuditLog(),
-        now=datetime(2026, 8, 29, 10, 0), on_step=seen.append,
+        make_patient(101, controlled=True),
+        rules,
+        rules.sites["SITE-A"],
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="T",
+        signer=Signer("PRAC-A-001", True),
+        audit=AuditLog(),
+        now=datetime(2026, 8, 29, 10, 0),
+        on_step=seen.append,
     )
     assert seen[:6] == ["ROUTE", "ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE", "GATE"]
     # `on_step` says what is starting; `trail` says what finished. Conflating
@@ -190,9 +209,16 @@ def test_a_step_signal_fires_for_an_encounter_that_leaves_the_pathway():
     minor = make_patient(1, controlled=True)
     minor.age = 14
     seen: list[str] = []
-    run_encounter(minor, rules, rules.sites["SITE-A"], default_router(),
-                  InMemoryRuntime(), thread_id="T2",
-                  now=datetime(2026, 8, 29, 10, 0), on_step=seen.append)
+    run_encounter(
+        minor,
+        rules,
+        rules.sites["SITE-A"],
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="T2",
+        now=datetime(2026, 8, 29, 10, 0),
+        on_step=seen.append,
+    )
     assert seen[-1] == "HANDOFF"
 
 

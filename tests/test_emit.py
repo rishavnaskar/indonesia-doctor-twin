@@ -31,6 +31,7 @@ def rules():
 
 # ------------------------------------------------------------------ coding
 
+
 def test_a_code_without_evidence_cannot_be_constructed(rules):
     """Not a policy. Not representable."""
     with pytest.raises(ValueError, match="evidence"):
@@ -60,11 +61,13 @@ def test_secondary_codes_come_only_from_the_recorded_problem_list(rules):
 
 # -------------------------------------------------------------------- fhir
 
+
 def test_bundle_carries_evidence_and_provenance(rules):
     state = make_patient(302, controlled=True)
     claim = build_claim(state, rules)
-    bundle = build_bundle(state, claim, None, rules.sites["SITE-A"], "PRAC-A-001",
-                          rules, encounter_id="E1")
+    bundle = build_bundle(
+        state, claim, None, rules.sites["SITE-A"], "PRAC-A-001", rules, encounter_id="E1"
+    )
 
     resources = [e["resource"] for e in bundle.payload["entry"]]
     conditions = [r for r in resources if r["resourceType"] == "Condition"]
@@ -86,17 +89,32 @@ def test_the_same_content_produces_the_same_key(rules):
 
 def test_changed_content_produces_a_different_key(rules):
     state = make_patient(304, controlled=True)
-    before = build_bundle(state, build_claim(state, rules), None,
-                          rules.sites["SITE-A"], "PRAC-A-001", rules, encounter_id="E1")
+    before = build_bundle(
+        state,
+        build_claim(state, rules),
+        None,
+        rules.sites["SITE-A"],
+        "PRAC-A-001",
+        rules,
+        encounter_id="E1",
+    )
     state.diagnoses.append(Diagnosis(code="E78.5"))
-    after = build_bundle(state, build_claim(state, rules), None,
-                         rules.sites["SITE-A"], "PRAC-A-001", rules, encounter_id="E1")
+    after = build_bundle(
+        state,
+        build_claim(state, rules),
+        None,
+        rules.sites["SITE-A"],
+        "PRAC-A-001",
+        rules,
+        encounter_id="E1",
+    )
     assert before.idempotency_key != after.idempotency_key, (
         "a correction must not be swallowed as a duplicate"
     )
 
 
 # ------------------------------------------------------------------- queue
+
 
 def test_replaying_an_encounter_does_not_duplicate_it(tmp_path):
     queue = OutboundQueue(path=tmp_path / "q.jsonl")
@@ -148,9 +166,16 @@ def test_a_committed_encounter_is_enqueued_exactly_once(rules, tmp_path):
     queue = OutboundQueue(path=tmp_path / "q.jsonl")
     state = make_patient(305, controlled=True)
     result = run_encounter(
-        state, rules, rules.sites["SITE-A"], default_router(), InMemoryRuntime(),
-        thread_id="ENC-9", signer=Signer("PRAC-A-001", True), audit=AuditLog(),
-        now=NOW, queue=queue,
+        state,
+        rules,
+        rules.sites["SITE-A"],
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="ENC-9",
+        signer=Signer("PRAC-A-001", True),
+        audit=AuditLog(),
+        now=NOW,
+        queue=queue,
     )
     assert result.outcome is Outcome.COMMITTED
     assert len(queue) == 1
@@ -162,15 +187,23 @@ def test_a_refused_encounter_enqueues_nothing(rules, tmp_path):
     state = make_patient(306, controlled=False)
     state.diagnoses.append(Diagnosis(code="E11.9"))
     result = run_encounter(
-        state, rules, rules.sites["SITE-A"], default_router(), InMemoryRuntime(),
-        thread_id="ENC-10", signer=Signer("PRAC-A-001", True), audit=AuditLog(),
-        now=NOW, queue=queue,
+        state,
+        rules,
+        rules.sites["SITE-A"],
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="ENC-10",
+        signer=Signer("PRAC-A-001", True),
+        audit=AuditLog(),
+        now=NOW,
+        queue=queue,
     )
     assert result.outcome is Outcome.ABSTAIN
     assert len(queue) == 0
 
 
 # ------------------------------------------------------- queue durability
+
 
 def test_a_truncated_final_line_does_not_lose_the_queue(tmp_path):
     """The log is append-only and written a line at a time, so a power cut
@@ -185,8 +218,7 @@ def test_a_truncated_final_line_does_not_lose_the_queue(tmp_path):
     path = tmp_path / "q.jsonl"
     queue = OutboundQueue(path)
     for index in range(4):
-        queue.enqueue("encounter_bundle", {"n": index}, f"k{index}",
-                      datetime(2026, 8, 29, 10, 0))
+        queue.enqueue("encounter_bundle", {"n": index}, f"k{index}", datetime(2026, 8, 29, 10, 0))
     with path.open("a", encoding="utf-8") as fh:
         fh.write('{"idempotency_key": "k4", "kind": "b", "pay')
 

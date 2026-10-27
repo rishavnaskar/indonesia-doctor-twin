@@ -46,13 +46,15 @@ def test_readings_keep_the_provenance_they_arrived_with(rules):
     """Retrofitting `source` onto readings already stored is exactly the
     mistake SPEC §3 exists to prevent."""
     state = _calm()
-    ingest(state, rules, [
-        _reading("sbp", 130, Source.PATIENT_REPORTED),
-        _reading("sbp", 132, Source.DEVICE),
-    ])
-    assert [o.source for o in state.observations[-2:]] == [
-        Source.PATIENT_REPORTED, Source.DEVICE
-    ]
+    ingest(
+        state,
+        rules,
+        [
+            _reading("sbp", 130, Source.PATIENT_REPORTED),
+            _reading("sbp", 132, Source.DEVICE),
+        ],
+    )
+    assert [o.source for o in state.observations[-2:]] == [Source.PATIENT_REPORTED, Source.DEVICE]
 
 
 def test_one_alarming_self_reported_reading_asks_for_a_repeat(rules):
@@ -116,16 +118,16 @@ def test_escalation_uses_the_pathway_that_is_in_force(rules):
 def test_a_missed_refill_is_reported(rules):
     """Twelve dispensing touchpoints a year against four visits. The next visit
     would otherwise discover this months later."""
-    event = refill_check(_calm(), rules,
-                         last_collected=date(2026, 6, 1), now=date(2026, 8, 29))
+    event = refill_check(_calm(), rules, last_collected=date(2026, 6, 1), now=date(2026, 8, 29))
     assert event is not None
     assert event.action is Action.REFILL_GAP
     assert "days ago" in event.reason
 
 
 def test_a_refill_inside_the_grace_window_is_not_a_signal(rules):
-    assert refill_check(_calm(), rules,
-                        last_collected=date(2026, 8, 5), now=date(2026, 8, 29)) is None
+    assert (
+        refill_check(_calm(), rules, last_collected=date(2026, 8, 5), now=date(2026, 8, 29)) is None
+    )
 
 
 def test_no_refill_history_is_not_a_missed_refill(rules):

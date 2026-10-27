@@ -50,12 +50,32 @@ DEFAULT_LEVEL = "info"
 
 # Field names whose values never reach a log line, whatever a caller passes.
 # Patient content, credentials and anything that could carry either.
-_NEVER_LOG = frozenset({
-    "api_key", "authorization", "token", "password", "secret", "dsn",
-    "patient", "patient_state", "record", "note", "notes", "utterance",
-    "free_text", "instructions", "patient_instructions", "observations",
-    "medications", "diagnoses", "symptoms", "allergies", "wire", "proposal",
-})
+_NEVER_LOG = frozenset(
+    {
+        "api_key",
+        "authorization",
+        "token",
+        "password",
+        "secret",
+        "dsn",
+        "patient",
+        "patient_state",
+        "record",
+        "note",
+        "notes",
+        "utterance",
+        "free_text",
+        "instructions",
+        "patient_instructions",
+        "observations",
+        "medications",
+        "diagnoses",
+        "symptoms",
+        "allergies",
+        "wire",
+        "proposal",
+    }
+)
 
 REDACTED = "[redacted]"
 
@@ -98,13 +118,14 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(record.created))
-                  + f".{int(record.msecs):03d}Z",
+            + f".{int(record.msecs):03d}Z",
             "level": record.levelname.lower(),
             "logger": record.name,
             "event": record.getMessage(),
         }
         extra = {
-            k: v for k, v in vars(record).items()
+            k: v
+            for k, v in vars(record).items()
             if k not in self._BUILTIN and k not in ("message", "asctime")
         }
         payload.update(redact(extra))

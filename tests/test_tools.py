@@ -32,8 +32,18 @@ def test_no_tool_can_change_anything():
 
     names = {t["function"]["name"] for t in tool_specs(_load("id"))}
     assert names == {"get_measurement", "get_drug", "get_site_capability", "get_history"}
-    forbidden = ("write", "prescribe", "order", "send", "schedule", "sign", "commit",
-                 "update", "delete", "create")
+    forbidden = (
+        "write",
+        "prescribe",
+        "order",
+        "send",
+        "schedule",
+        "sign",
+        "commit",
+        "update",
+        "delete",
+        "create",
+    )
     assert not [n for n in names if any(verb in n for verb in forbidden)]
 
 
@@ -99,12 +109,19 @@ def test_the_loop_records_what_the_drafter_asked_for(rules):
     from service.reason.model_reasoner import ModelReasoner
 
     valid = {
-        "assessment": "uncontrolled", "recommendation": "titrate_up",
+        "assessment": "uncontrolled",
+        "recommendation": "titrate_up",
         "confidence": 0.8,
-        "medication_changes": [{"action": "increase", "molecule": "amlodipine",
-                                "mg_per_dose": 10, "doses_per_day": 1,
-                                "rationale": "above target",
-                                "citation": "fornas-prb-2025-12-31#amlodipine"}],
+        "medication_changes": [
+            {
+                "action": "increase",
+                "molecule": "amlodipine",
+                "mg_per_dose": 10,
+                "doses_per_day": 1,
+                "rationale": "above target",
+                "citation": "fornas-prb-2025-12-31#amlodipine",
+            }
+        ],
     }
 
     class ToolBackend:
@@ -114,8 +131,9 @@ def test_the_loop_records_what_the_drafter_asked_for(rules):
         def complete(self, *a, **k):
             raise AssertionError("should have used the tool path")
 
-        def complete_with_tools(self, system, user, *, allow_egress, schema=None,
-                                tools=None, dispatch=None, max_calls=8):
+        def complete_with_tools(
+            self, system, user, *, allow_egress, schema=None, tools=None, dispatch=None, max_calls=8
+        ):
             dispatch("get_measurement", {"code": "k"})
             dispatch("get_site_capability", {})
             return _json.dumps(valid)
@@ -138,8 +156,9 @@ def test_tools_are_off_unless_asked_for(rules):
             return "fake/model@1"
 
         def complete(self, system, user, *, allow_egress, schema=None):
-            return _json.dumps({"assessment": "controlled", "recommendation": "continue",
-                                "confidence": 0.9})
+            return _json.dumps(
+                {"assessment": "controlled", "recommendation": "continue", "confidence": 0.9}
+            )
 
         def complete_with_tools(self, *a, **k):
             raise AssertionError("tools were not requested")
@@ -167,8 +186,7 @@ def test_tools_mode_withholds_what_the_tools_serve(rules):
     site = rules.sites["SITE-A"]
 
     full = prompt_module.build_user_prompt(state, rules, site, target)
-    trimmed = prompt_module.build_user_prompt(
-        state, rules, site, target, withhold_tool_served=True)
+    trimmed = prompt_module.build_user_prompt(state, rules, site, target, withhold_tool_served=True)
 
     for served in ("observations", "formulary", "site_labs_available"):
         assert served in full
@@ -193,6 +211,6 @@ def test_the_prompt_is_unchanged_when_tools_are_off(rules):
     state = make_patient(1)
     target = resolve_target(rules.guideline, Context(state)).target
     site = rules.sites["SITE-A"]
-    assert prompt_module.build_user_prompt(state, rules, site, target) == \
-        prompt_module.build_user_prompt(state, rules, site, target,
-                                        withhold_tool_served=False)
+    assert prompt_module.build_user_prompt(
+        state, rules, site, target
+    ) == prompt_module.build_user_prompt(state, rules, site, target, withhold_tool_served=False)

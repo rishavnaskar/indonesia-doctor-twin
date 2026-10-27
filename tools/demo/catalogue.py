@@ -30,15 +30,24 @@ def vocabulary(pack_id: str = "id") -> dict:
     glossary = rules.glossary
     return {
         "molecules": [
-            {"molecule": name, "drug_class": mol.drug_class,
-             "forms_mg": mol.forms_mg,
-             "label": (glossary.get("drug_classes") or {}).get(mol.drug_class, {}).get("label", "")}
+            {
+                "molecule": name,
+                "drug_class": mol.drug_class,
+                "forms_mg": mol.forms_mg,
+                "label": (glossary.get("drug_classes") or {})
+                .get(mol.drug_class, {})
+                .get("label", ""),
+            }
             for name, mol in sorted(rules.molecules.items())
         ],
         "sites": [
-            {"site_id": s["site_id"], "label": s.get("label", ""), "tier": s.get("tier", ""),
-             "labs_available": sorted(s.get("labs_available") or []),
-             "stocked": sorted(s.get("stocked_molecules") or [])}
+            {
+                "site_id": s["site_id"],
+                "label": s.get("label", ""),
+                "tier": s.get("tier", ""),
+                "labs_available": sorted(s.get("labs_available") or []),
+                "stocked": sorted(s.get("stocked_molecules") or []),
+            }
             for s in rules.sites.values()
         ],
         "symptoms": [
@@ -48,8 +57,12 @@ def vocabulary(pack_id: str = "id") -> dict:
             {"code": k, "plain": v} for k, v in sorted((glossary.get("flags") or {}).items())
         ],
         "observations": [
-            {"code": k, "label": v.get("label", k), "unit": v.get("unit", ""),
-             "plain": v.get("plain", "")}
+            {
+                "code": k,
+                "label": v.get("label", k),
+                "unit": v.get("unit", ""),
+                "plain": v.get("plain", ""),
+            }
             for k, v in (glossary.get("observations") or {}).items()
         ],
         "diagnoses": glossary.get("diagnoses") or {},
@@ -60,7 +73,10 @@ def vocabulary(pack_id: str = "id") -> dict:
         "profiles": [
             {"key": "clean", "label": "Blood pressure · in scope, should draft"},
             {"key": "polypharmacy", "label": "Blood pressure · already on three drugs"},
-            {"key": "acei_intolerant", "label": "Blood pressure · documented ACE-inhibitor intolerance"},
+            {
+                "key": "acei_intolerant",
+                "label": "Blood pressure · documented ACE-inhibitor intolerance",
+            },
             {"key": "no_target", "label": "Blood pressure · group whose target is not extracted"},
             {"key": "stale_labs", "label": "Blood pressure · labs months out of date"},
             {"key": "hyperkalaemia", "label": "Blood pressure · potassium too high"},
@@ -78,19 +94,22 @@ def vocabulary(pack_id: str = "id") -> dict:
             {"key": "dm:excluded_insulin", "label": "Diabetes · already on insulin"},
             {"key": "dm:excluded_renal", "label": "Diabetes · severe kidney impairment"},
         ],
-        "pack": {"pack_id": rules.pack_id, "version": rules.version,
-                 "language": rules.language.get("output_language", "")},
+        "pack": {
+            "pack_id": rules.pack_id,
+            "version": rules.version,
+            "language": rules.language.get("output_language", ""),
+        },
         "glossary": glossary,
         "checks": check_catalogue(),
     }
 
 
-
 def _can_sign(site, practitioner, when) -> str | None:
     """None if this practitioner could sign here today, else why not."""
     try:
-        verify_signer(site, Signer(practitioner_id=practitioner["practitioner_id"],
-                                   authenticated=True), when)
+        verify_signer(
+            site, Signer(practitioner_id=practitioner["practitioner_id"], authenticated=True), when
+        )
     except SignatureRefused as refusal:
         return str(refusal)
     return None
@@ -118,43 +137,47 @@ def sites_view(pack_id: str = "id") -> dict:
     for site in rules.sites.values():
         labs = set(site.get("labs_available") or [])
         stocked = set(site.get("stocked_molecules") or [])
-        sites.append({
-            "site_id": site["site_id"],
-            "label": site.get("label", ""),
-            "tier": site.get("tier", ""),
-            "service_group": site.get("service_group", ""),
-            "continuous_24h": bool((site.get("hours") or {}).get("continuous_24h")),
-            "as_of": site.get("as_of", ""),
-            "diagnoses": list(site.get("diagnoses") or []),
-            # Asked of the signature line itself rather than by comparing dates
-            # here. SITE-A carries a practitioner whose licence lapsed in
-            # February, and a page that lists them as though they could sign
-            # would contradict the one rule this system enforces hardest.
-            "practitioners": [
-                {**p, "can_sign": _can_sign(site, p, today)}
-                for p in (site.get("practitioners") or [])
-            ],
-            "equipment": list(site.get("equipment") or []),
-            # Both lists are rendered against the full vocabulary rather than
-            # alone, because "SITE-C runs creatinine" is a fact and "SITE-C runs
-            # creatinine and nothing else" is the one that explains a referral.
-            "labs": [
-                {"code": code, "label": label, "available": code in labs,
-                 "gap": evidence_gap(site, code, max_age=max_age, today=today)
-                        if code in labs else None}
-                for code, label in sorted(catalogue.items())
-            ],
-            "molecules": [
-                {"molecule": m, "stocked": m in stocked} for m in prescribable
-            ],
-        })
+        sites.append(
+            {
+                "site_id": site["site_id"],
+                "label": site.get("label", ""),
+                "tier": site.get("tier", ""),
+                "service_group": site.get("service_group", ""),
+                "continuous_24h": bool((site.get("hours") or {}).get("continuous_24h")),
+                "as_of": site.get("as_of", ""),
+                "diagnoses": list(site.get("diagnoses") or []),
+                # Asked of the signature line itself rather than by comparing dates
+                # here. SITE-A carries a practitioner whose licence lapsed in
+                # February, and a page that lists them as though they could sign
+                # would contradict the one rule this system enforces hardest.
+                "practitioners": [
+                    {**p, "can_sign": _can_sign(site, p, today)}
+                    for p in (site.get("practitioners") or [])
+                ],
+                "equipment": list(site.get("equipment") or []),
+                # Both lists are rendered against the full vocabulary rather than
+                # alone, because "SITE-C runs creatinine" is a fact and "SITE-C runs
+                # creatinine and nothing else" is the one that explains a referral.
+                "labs": [
+                    {
+                        "code": code,
+                        "label": label,
+                        "available": code in labs,
+                        "gap": evidence_gap(site, code, max_age=max_age, today=today)
+                        if code in labs
+                        else None,
+                    }
+                    for code, label in sorted(catalogue.items())
+                ],
+                "molecules": [{"molecule": m, "stocked": m in stocked} for m in prescribable],
+            }
+        )
 
     sites.sort(key=lambda s: s["site_id"])
     return {
         "pack": f"{rules.pack_id}@{rules.version}",
         "evidence_max_age_days": max_age,
-        "investigations": [{"code": c, "label": label}
-                           for c, label in sorted(catalogue.items())],
+        "investigations": [{"code": c, "label": label} for c, label in sorted(catalogue.items())],
         "molecules": prescribable,
         "sites": sites,
     }

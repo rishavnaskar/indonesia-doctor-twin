@@ -48,8 +48,16 @@ def test_a_log_line_is_one_json_object():
 
 @pytest.mark.parametrize(
     "field",
-    ["api_key", "authorization", "patient", "observations", "medications",
-     "patient_instructions", "wire", "openrouter_api_key"],
+    [
+        "api_key",
+        "authorization",
+        "patient",
+        "observations",
+        "medications",
+        "patient_instructions",
+        "wire",
+        "openrouter_api_key",
+    ],
 )
 def test_patient_content_and_credentials_never_reach_a_log_line(field):
     """The one rule that makes logging this system safe at all.
@@ -78,8 +86,9 @@ def test_a_traceback_is_logged_without_locals():
     except ValueError:
         import sys
 
-        record = logging.LogRecord("tests", logging.ERROR, __file__, 1,
-                                   "it.failed", (), sys.exc_info())
+        record = logging.LogRecord(
+            "tests", logging.ERROR, __file__, 1, "it.failed", (), sys.exc_info()
+        )
     payload = json.loads(JSONFormatter().format(record))
 
     assert payload["error"] == "ValueError"
@@ -94,8 +103,9 @@ def test_errors_are_counted_by_type():
     except KeyError:
         import sys
 
-        tally.emit(logging.LogRecord("tests", logging.ERROR, __file__, 1,
-                                     "it.failed", (), sys.exc_info()))
+        tally.emit(
+            logging.LogRecord("tests", logging.ERROR, __file__, 1, "it.failed", (), sys.exc_info())
+        )
 
     summary = tally.summary()
     assert summary["total"] == 1
@@ -117,8 +127,7 @@ def test_configure_writes_where_it_is_told():
 
 class _Build:
     def __init__(self, **status):
-        self._status = {"ready": True, "error": None, "done": 9, "total": 9,
-                        **status}
+        self._status = {"ready": True, "error": None, "done": 9, "total": 9, **status}
 
     def status(self):
         return self._status
@@ -165,6 +174,7 @@ def test_an_unreachable_store_is_unhealthy(monkeypatch):
 
 def test_health_never_triggers_a_build():
     """A probe that starts work can take a deployment down by being polled."""
+
     class Counting(_Build):
         started = 0
 

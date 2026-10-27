@@ -33,7 +33,6 @@ def plain(value: Any) -> Any:
     return value
 
 
-
 def patient_view(state, site, rules) -> dict:
     """Everything a reader needs to judge the case for themselves.
 
@@ -59,19 +58,21 @@ def patient_view(state, site, rules) -> dict:
         seen.add(obs.code)
         term = obs_terms.get(obs.code) or {}
         age_days = state.observation_age_days(obs.code)
-        observations.append({
-            "code": obs.code,
-            "label": term.get("label", obs.code),
-            "plain": term.get("plain", ""),
-            "value": obs.value,
-            "unit": obs.unit or term.get("unit", ""),
-            "taken_at": obs.taken_at.isoformat(),
-            "age_days": age_days,
-            "source": plain(obs.source),
-            # Staleness is a clinical fact here, not a display detail: the
-            # sufficiency check refuses to advise on measurements past their age.
-            "stale": bool(age_days is not None and age_days > 90),
-        })
+        observations.append(
+            {
+                "code": obs.code,
+                "label": term.get("label", obs.code),
+                "plain": term.get("plain", ""),
+                "value": obs.value,
+                "unit": obs.unit or term.get("unit", ""),
+                "taken_at": obs.taken_at.isoformat(),
+                "age_days": age_days,
+                "source": plain(obs.source),
+                # Staleness is a clinical fact here, not a display detail: the
+                # sufficiency check refuses to advise on measurements past their age.
+                "stale": bool(age_days is not None and age_days > 90),
+            }
+        )
 
     history = [
         {
@@ -97,10 +98,12 @@ def patient_view(state, site, rules) -> dict:
                 "text": f"{m.molecule} {m.mg_per_dose:g} mg x{m.doses_per_day}/day",
                 "molecule": m.molecule,
                 "drug_class": rules.drug_class_of(m.molecule) or "",
-                "class_label": (class_terms.get(rules.drug_class_of(m.molecule) or "") or {})
-                                .get("label", ""),
-                "plain": (class_terms.get(rules.drug_class_of(m.molecule) or "") or {})
-                          .get("plain", ""),
+                "class_label": (class_terms.get(rules.drug_class_of(m.molecule) or "") or {}).get(
+                    "label", ""
+                ),
+                "plain": (class_terms.get(rules.drug_class_of(m.molecule) or "") or {}).get(
+                    "plain", ""
+                ),
                 "since": m.since.isoformat() if m.since else None,
                 "source": plain(m.source),
             }
@@ -119,15 +122,18 @@ def patient_view(state, site, rules) -> dict:
         ],
         "symptoms": [
             {"code": k, "plain": symptom_terms.get(k, k.replace("_", " "))}
-            for k, v in sorted(state.symptoms.items()) if v
+            for k, v in sorted(state.symptoms.items())
+            if v
         ],
         "symptoms_denied": [
             {"code": k, "plain": symptom_terms.get(k, k.replace("_", " "))}
-            for k, v in sorted(state.symptoms.items()) if not v
+            for k, v in sorted(state.symptoms.items())
+            if not v
         ],
         "flags": [
             {"code": k, "plain": flag_terms.get(k, k.replace("_", " "))}
-            for k, v in sorted(state.flags.items()) if v
+            for k, v in sorted(state.flags.items())
+            if v
         ],
         "allergies": [
             {"substance": a.substance, "reaction": a.reaction or ""} for a in state.allergies
@@ -151,10 +157,12 @@ def patient_view(state, site, rules) -> dict:
         "labs_available": sorted(site.get("labs_available") or []),
         "stocked": sorted(site.get("stocked_molecules") or []),
         "evidence": [
-            {"service": row.get("service"),
-             "label": (obs_terms.get(row.get("service")) or {}).get("label", row.get("service")),
-             "last_performed": row.get("last_performed"),
-             "volume_30d": row.get("volume_30d")}
+            {
+                "service": row.get("service"),
+                "label": (obs_terms.get(row.get("service")) or {}).get("label", row.get("service")),
+                "last_performed": row.get("last_performed"),
+                "volume_30d": row.get("volume_30d"),
+            }
             for row in (site.get("evidence_ref") or [])
         ],
     }
@@ -173,9 +181,9 @@ def proposal_view(proposal, rules) -> dict | None:
             break
     return {
         "recommendation_plain": (glossary.get("recommendations") or {}).get(
-            plain(proposal.recommendation), ""),
-        "assessment_plain": (glossary.get("assessments") or {}).get(
-            plain(proposal.assessment), ""),
+            plain(proposal.recommendation), ""
+        ),
+        "assessment_plain": (glossary.get("assessments") or {}).get(plain(proposal.assessment), ""),
         "patient_instructions_gloss": proposal.patient_instructions_en or gloss,
         "concerns": [
             {"text": c.text, "urgency": c.urgency.value, "citation": c.citation}
@@ -193,10 +201,12 @@ def proposal_view(proposal, rules) -> dict | None:
                 "doses_per_day": c.doses_per_day,
                 "rationale": c.rationale,
                 "citation": c.citation,
-                "class_label": (classes.get(rules.drug_class_of(c.molecule) or "") or {})
-                                .get("label", ""),
-                "class_plain": (classes.get(rules.drug_class_of(c.molecule) or "") or {})
-                                .get("plain", ""),
+                "class_label": (classes.get(rules.drug_class_of(c.molecule) or "") or {}).get(
+                    "label", ""
+                ),
+                "class_plain": (classes.get(rules.drug_class_of(c.molecule) or "") or {}).get(
+                    "plain", ""
+                ),
             }
             for c in proposal.medication_changes
         ],
@@ -212,7 +222,6 @@ def proposal_view(proposal, rules) -> dict | None:
     }
 
 
-
 def unreadable_record(wire: dict, index: int, rules, site, exc: Exception) -> dict:
     """A record that could not be read at all. Named, not silently dropped."""
     identifier = str(wire.get("patient_id") or f"record {index}")
@@ -222,13 +231,28 @@ def unreadable_record(wire: dict, index: int, rules, site, exc: Exception) -> di
         "note": "This record could not be read.",
         "watch_for": "",
         "patient": {
-            "patient_id": identifier, "age": None, "sex": "", "as_of": "",
-            "sbp": None, "dbp": None, "medications": [], "diagnoses": [],
-            "symptoms": [], "symptoms_denied": [], "flags": [], "allergies": [],
-            "intolerances": [], "observations": [], "history": [],
-            "site_id": site.get("site_id", ""), "site_label": site.get("label", ""),
-            "site_tier": site.get("tier", ""), "site_as_of": site.get("as_of", ""),
-            "labs_available": [], "stocked": [], "evidence": [],
+            "patient_id": identifier,
+            "age": None,
+            "sex": "",
+            "as_of": "",
+            "sbp": None,
+            "dbp": None,
+            "medications": [],
+            "diagnoses": [],
+            "symptoms": [],
+            "symptoms_denied": [],
+            "flags": [],
+            "allergies": [],
+            "intolerances": [],
+            "observations": [],
+            "history": [],
+            "site_id": site.get("site_id", ""),
+            "site_label": site.get("label", ""),
+            "site_tier": site.get("tier", ""),
+            "site_as_of": site.get("as_of", ""),
+            "labs_available": [],
+            "stocked": [],
+            "evidence": [],
         },
         "outcome": "unreadable",
         "outcome_plain": (
@@ -237,15 +261,26 @@ def unreadable_record(wire: dict, index: int, rules, site, exc: Exception) -> di
         ),
         "committed": False,
         "error": f"{type(exc).__name__}: {exc}",
-        "message": "", "exclusions": [], "discrepancies": [],
+        "message": "",
+        "exclusions": [],
+        "discrepancies": [],
         "trail": [],
         "presentation": {
-            "band": "green", "band_label": "", "headline": "", "gloss": "",
-            "silent": True, "shows_draft": False, "requires_acknowledgement": False,
-            "lines": [], "audit": [],
+            "band": "green",
+            "band_label": "",
+            "headline": "",
+            "gloss": "",
+            "silent": True,
+            "shows_draft": False,
+            "requires_acknowledgement": False,
+            "lines": [],
+            "audit": [],
         },
         "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
-        "findings": [], "proposal": None, "claim": None, "signature": None,
+        "findings": [],
+        "proposal": None,
+        "claim": None,
+        "signature": None,
         "questions": [],
     }
 
@@ -295,9 +330,15 @@ def failed_shell(scenario, rules) -> dict:
         "committed": False,
         "trail": ["ROUTE", "ELIGIBLE", "INTAKE", "RECONCILE", "PROPOSE"],
         "presentation": {
-            "band": "green", "band_label": "", "headline": "", "gloss": "",
-            "silent": True, "shows_draft": False, "requires_acknowledgement": False,
-            "lines": [], "audit": [],
+            "band": "green",
+            "band_label": "",
+            "headline": "",
+            "gloss": "",
+            "silent": True,
+            "shows_draft": False,
+            "requires_acknowledgement": False,
+            "lines": [],
+            "audit": [],
         },
         "checks": [{**entry, "findings": [], "blocked": False} for entry in check_catalogue()],
         "message": "",
@@ -309,5 +350,3 @@ def failed_shell(scenario, rules) -> dict:
         "signature": None,
         "questions": [],
     }
-
-

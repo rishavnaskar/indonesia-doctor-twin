@@ -40,10 +40,12 @@ def test_availability_matches_the_pack_exactly():
     rules = load_pack("id")
     for site in sites_view()["sites"]:
         raw = rules.sites[site["site_id"]]
-        assert {lab["code"] for lab in site["labs"] if lab["available"]} \
-            == set(raw.get("labs_available") or [])
-        assert {m["molecule"] for m in site["molecules"] if m["stocked"]} \
-            == set(raw.get("stocked_molecules") or []) & set(rules.molecules)
+        assert {lab["code"] for lab in site["labs"] if lab["available"]} == set(
+            raw.get("labs_available") or []
+        )
+        assert {m["molecule"] for m in site["molecules"] if m["stocked"]} == set(
+            raw.get("stocked_molecules") or []
+        ) & set(rules.molecules)
 
 
 def test_evidence_verdicts_come_from_the_gate():
@@ -56,8 +58,7 @@ def test_evidence_verdicts_come_from_the_gate():
         for lab in site["labs"]:
             if not lab["available"]:
                 continue
-            assert lab["gap"] == evidence_gap(raw, lab["code"],
-                                              max_age=max_age, today=today)
+            assert lab["gap"] == evidence_gap(raw, lab["code"], max_age=max_age, today=today)
 
 
 def test_a_lapsed_licence_is_shown_as_unable_to_sign():
@@ -115,11 +116,17 @@ def test_the_english_instructions_survive_the_contract():
     from service.contracts.proposal import Provenance
     from service.reason.parse import to_proposal
 
-    raw = {"assessment": "uncontrolled", "recommendation": "continue",
-           "patient_instructions": "Minum obat setiap hari.",
-           "patient_instructions_en": "Take your medicine every day.",
-           "confidence": 0.8, "medication_changes": [], "investigations": [],
-           "assertions": [], "follow_up_interval_days": 28}
+    raw = {
+        "assessment": "uncontrolled",
+        "recommendation": "continue",
+        "patient_instructions": "Minum obat setiap hari.",
+        "patient_instructions_en": "Take your medicine every day.",
+        "confidence": 0.8,
+        "medication_changes": [],
+        "investigations": [],
+        "assertions": [],
+        "follow_up_interval_days": 28,
+    }
     p = to_proposal(raw, Provenance(model="m@v", prompt_template="t@v", corpus="c@v"))
     assert p.patient_instructions_en == "Take your medicine every day."
     assert p.patient_instructions == "Minum obat setiap hari."

@@ -44,10 +44,12 @@ def decision_key(proposal: Proposal) -> tuple:
     """What two drafts must share to count as the same plan."""
     return (
         proposal.recommendation.value,
-        tuple(sorted(
-            (c.action.value, c.molecule, c.mg_per_dose or 0.0, c.doses_per_day or 0)
-            for c in proposal.medication_changes
-        )),
+        tuple(
+            sorted(
+                (c.action.value, c.molecule, c.mg_per_dose or 0.0, c.doses_per_day or 0)
+                for c in proposal.medication_changes
+            )
+        ),
     )
 
 
@@ -128,7 +130,9 @@ class SelfConsistentReasoner:
             agreement=agreement,
             confidence=min(stated, agreement) if self.apply else winner.confidence,
             uncertainty_notes=(
-                winner.uncertainty_notes + " " + note
+                winner.uncertainty_notes
+                + " "
+                + note
                 + ("" if self.apply else " [shadow: agreement measured, not applied]")
             ).strip(),
             provenance=_pin(winner.provenance, drafts),

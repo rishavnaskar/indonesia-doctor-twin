@@ -90,8 +90,9 @@ class OutboundQueue:
 
     # ------------------------------------------------------------- writing
 
-    def enqueue(self, kind: str, payload: dict[str, Any], idempotency_key: str,
-                now: datetime | None = None) -> QueueItem:
+    def enqueue(
+        self, kind: str, payload: dict[str, Any], idempotency_key: str, now: datetime | None = None
+    ) -> QueueItem:
         existing = self.items.get(idempotency_key)
         if existing is not None:
             # Already known. Re-enqueueing after a dropped connection is a

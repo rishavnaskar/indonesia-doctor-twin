@@ -71,8 +71,7 @@ def _history(state, rules, target, limit: int = 6) -> dict[str, list[dict]]:
                 "source": obs.source.value,
             }
             for obs in sorted(
-                (o for o in state.observations
-                 if o.code == code and o.taken_at <= state.as_of),
+                (o for o in state.observations if o.code == code and o.taken_at <= state.as_of),
                 key=lambda o: o.taken_at,
             )
         ][-limit:]
@@ -104,7 +103,7 @@ def _relevant_codes(rules, target) -> list[str]:
         if code and code not in codes:
             codes.append(code)
 
-    for code in (target.thresholds if target else {}):
+    for code in target.thresholds if target else {}:
         add(code)
     for requirement_set in (rules.guideline.get("sufficiency") or {}).values():
         for row in requirement_set or []:
@@ -113,8 +112,9 @@ def _relevant_codes(rules, target) -> list[str]:
     return codes
 
 
-def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
-                      withhold_tool_served: bool = False) -> str:
+def build_user_prompt(
+    state, rules, site: dict[str, Any] | None, target, withhold_tool_served: bool = False
+) -> str:
     """The context the drafter sees.
 
     `withhold_tool_served` removes the material the read-only tools can fetch —
@@ -143,8 +143,10 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
 
     context = {
         "target": (
-            {**{f"{code}_lt": value for code, value in target.thresholds.items()},
-             "citation": target.citation}
+            {
+                **{f"{code}_lt": value for code, value in target.thresholds.items()},
+                "citation": target.citation,
+            }
             if target
             else None
         ),
@@ -169,16 +171,22 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
                 {"class": i.drug_class, "documented_at": i.documented_at.isoformat()}
                 for i in state.intolerances
             ],
-            **({} if withhold_tool_served else {"observations": [
-                {
-                    "code": code,
-                    "value": obs.value,
-                    "age_days": state.observation_age_days(code),
-                    "source": obs.source.value,
+            **(
+                {}
+                if withhold_tool_served
+                else {
+                    "observations": [
+                        {
+                            "code": code,
+                            "value": obs.value,
+                            "age_days": state.observation_age_days(code),
+                            "source": obs.source.value,
+                        }
+                        for code in _relevant_codes(rules, target)
+                        if (obs := state.latest(code)) is not None
+                    ]
                 }
-                for code in _relevant_codes(rules, target)
-                if (obs := state.latest(code)) is not None
-            ]}),
+            ),
             "reported_symptoms": sorted(k for k, v in state.symptoms.items() if v),
             # The series, not just the latest value.
             #
@@ -196,12 +204,14 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
                     "dbp": e.dbp,
                     "decision": e.decision,
                 }
-                for e in sorted(state.encounters,
-                                key=lambda e: e.encounter_date, reverse=True)[:6]
+                for e in sorted(state.encounters, key=lambda e: e.encounter_date, reverse=True)[:6]
             ],
         },
-        **({} if withhold_tool_served else
-           {"site_labs_available": sorted((site or {}).get("labs_available") or [])}),
+        **(
+            {}
+            if withhold_tool_served
+            else {"site_labs_available": sorted((site or {}).get("labs_available") or [])}
+        ),
         "response_schema": {
             "assessment": "controlled | uncontrolled | over_treated",
             "recommendation": (
@@ -209,8 +219,7 @@ def build_user_prompt(state, rules, site: dict[str, Any] | None, target,
             ),
             "bp_trend_summary": "string",
             "target_used": {
-                **{f"{code}_lt": "number" for code in sorted(
-                    target.thresholds if target else {})},
+                **{f"{code}_lt": "number" for code in sorted(target.thresholds if target else {})},
                 "citation": "string",
             },
             "medication_changes": [

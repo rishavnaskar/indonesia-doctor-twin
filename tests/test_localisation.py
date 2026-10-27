@@ -68,11 +68,18 @@ def test_no_deployment_language_text_lives_under_service():
 def _decision():
     from service.gate.types import Finding, GateDecision, Severity
 
-    return GateDecision(findings=[
-        Finding(check=1, check_name="red_flags", severity=Severity.BLOCK,
-                message="Hypertensive emergency.", rule_id="R1",
-                message_local="Kondisi darurat hipertensi."),
-    ])
+    return GateDecision(
+        findings=[
+            Finding(
+                check=1,
+                check_name="red_flags",
+                severity=Severity.BLOCK,
+                message="Hypertensive emergency.",
+                rule_id="R1",
+                message_local="Kondisi darurat hipertensi.",
+            ),
+        ]
+    )
 
 
 def test_english_leads_by_default_with_the_local_text_beneath(rules):
@@ -99,10 +106,17 @@ def test_an_untranslated_finding_is_visibly_untranslated(rules):
     from service.gate.types import Finding, GateDecision, Severity
 
     labels = Labels.from_pack(rules.language)
-    decision = GateDecision(findings=[
-        Finding(check=3, check_name="drug_safety", severity=Severity.BLOCK,
-                message="Some finding with no translation.", rule_id="whatever"),
-    ])
+    decision = GateDecision(
+        findings=[
+            Finding(
+                check=3,
+                check_name="drug_safety",
+                severity=Severity.BLOCK,
+                message="Some finding with no translation.",
+                rule_id="whatever",
+            ),
+        ]
+    )
     line = present("abstain", labels, decision=decision).audit[0]
     assert line.text == "Some finding with no translation."
     assert line.gloss == "", "an empty gloss is the signal that nothing was translated"

@@ -95,8 +95,9 @@ def router_with_model(
     # and nothing downstream, the gate least of all, is meant to know which
     # one it has. That is the architectural claim; pinning the concrete class
     # here would quietly contradict it.
-    reasoner: Any = ModelReasoner(build_backend(provider, model, **backend_kwargs),
-                                  use_tools=use_tools)
+    reasoner: Any = ModelReasoner(
+        build_backend(provider, model, **backend_kwargs), use_tools=use_tools
+    )
 
     if critic:
         # A second call, reviewing the first. It may only lower confidence, and

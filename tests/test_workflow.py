@@ -29,8 +29,16 @@ def _run(rules, state, site="SITE-A", signer_id="PRAC-A-001", **kwargs):
     audit = kwargs.pop("audit", AuditLog())
     return (
         run_encounter(
-            state, rules, rules.sites[site], default_router(), InMemoryRuntime(),
-            thread_id="t", signer=Signer(signer_id, True), audit=audit, now=NOW, **kwargs
+            state,
+            rules,
+            rules.sites[site],
+            default_router(),
+            InMemoryRuntime(),
+            thread_id="t",
+            signer=Signer(signer_id, True),
+            audit=audit,
+            now=NOW,
+            **kwargs,
         ),
         audit,
     )
@@ -84,8 +92,14 @@ def test_a_coded_only_comorbidity_declines(rules):
 
 def test_nothing_is_committed_without_a_signer(rules):
     result = run_encounter(
-        make_patient(206, controlled=True), rules, rules.sites["SITE-A"],
-        default_router(), InMemoryRuntime(), thread_id="t", signer=None, now=NOW,
+        make_patient(206, controlled=True),
+        rules,
+        rules.sites["SITE-A"],
+        default_router(),
+        InMemoryRuntime(),
+        thread_id="t",
+        signer=None,
+        now=NOW,
     )
     assert result.outcome is Outcome.PRESENTED
     assert result.claim is None, "no coding happens before a signature"
@@ -100,8 +114,7 @@ def test_a_rejected_draft_emits_nothing(rules):
 def test_a_signature_from_another_site_is_refused(rules):
     """Caught a real mistake in the demo script before it caught a real one here."""
     with pytest.raises(SignatureRefused):
-        _run(rules, make_patient(208, controlled=True), site="SITE-C",
-             signer_id="PRAC-A-001")
+        _run(rules, make_patient(208, controlled=True), site="SITE-C", signer_id="PRAC-A-001")
 
 
 def test_secondary_codes_carry_their_evidence(rules):

@@ -58,8 +58,10 @@ def test_health_answers_with_the_store_it_reached(server):
 
 
 def test_healthz_is_the_same_route(server):
-    assert json.loads(get(server, "/healthz")[1])["version"] == \
-           json.loads(get(server, "/health")[1])["version"]
+    assert (
+        json.loads(get(server, "/healthz")[1])["version"]
+        == json.loads(get(server, "/health")[1])["version"]
+    )
 
 
 def test_head_is_answered_rather_than_501(server):
@@ -106,7 +108,9 @@ def test_a_favicon_never_costs_a_rebuild(server):
 
 def test_a_run_with_no_patients_is_refused(server):
     request = urllib.request.Request(
-        f"{server}/api/run", data=b'{"patients": []}', method="POST",
+        f"{server}/api/run",
+        data=b'{"patients": []}',
+        method="POST",
         headers={"Content-Type": "application/json"},
     )
     with pytest.raises(urllib.error.HTTPError) as caught:
@@ -119,7 +123,9 @@ def test_a_run_with_no_patients_is_refused(server):
 
 def test_a_body_that_is_not_json_is_refused_by_name(server):
     request = urllib.request.Request(
-        f"{server}/api/generate", data=b"not json at all", method="POST",
+        f"{server}/api/generate",
+        data=b"not json at all",
+        method="POST",
         headers={"Content-Type": "application/json"},
     )
     with pytest.raises(urllib.error.HTTPError) as caught:

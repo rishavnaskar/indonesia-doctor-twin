@@ -50,12 +50,11 @@ def _duplicate_entries(ctx: GateContext) -> list[Finding]:
         if count > 1
     ]
 
+
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Drug safety'
-DESCRIPTION = (
-    'Is every dose within its limit, and does any drug pairing or missing blood test make this unsafe?'
-)
+TITLE = "Drug safety"
+DESCRIPTION = "Is every dose within its limit, and does any drug pairing or missing blood test make this unsafe?"
 
 
 def _unrecognised_current_drugs(ctx: GateContext) -> list[Finding]:

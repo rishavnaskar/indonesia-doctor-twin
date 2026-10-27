@@ -32,8 +32,11 @@ def _self_labelled(n: int, rules, seed0: int = 600) -> list[Case]:
             label = reference.propose(state, rules, site).recommendation.value
         except Exception:  # noqa: BLE001
             continue
-        cases.append(Case(patient=to_wire(state), adjudicated=label,
-                          note="label from the reference reasoner"))
+        cases.append(
+            Case(
+                patient=to_wire(state), adjudicated=label, note="label from the reference reasoner"
+            )
+        )
     return cases
 
 
@@ -41,24 +44,41 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Plan concordance (SPEC-V1 §8.2).")
     parser.add_argument("--cases", help="adjudicated case file (Set C)")
     parser.add_argument("--n", type=int, default=120)
-    parser.add_argument("--seed", type=int, default=600,
-                        help="first patient seed, so a finding can be replicated "
-                             "on different cases rather than the same ones")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=600,
+        help="first patient seed, so a finding can be replicated "
+        "on different cases rather than the same ones",
+    )
     parser.add_argument("--live", action="store_true", help="draft with a real model")
     parser.add_argument("--model", default=None)
-    parser.add_argument("--shadow", action="store_true",
-                        help="with --samples: measure agreement but do not apply "
-                             "it to the confidence, so its value can be tested")
-    parser.add_argument("--tools", action="store_true",
-                        help="let the drafter request what it needs (read-only "
-                             "lookups) instead of being handed the whole pack")
-    parser.add_argument("--critic", action="store_true",
-                        help="have a second model review each draft; it may only "
-                             "lower the confidence, never raise it")
-    parser.add_argument("--samples", type=int, default=1,
-                        help="draft this many times and use the agreement between "
-                             "them as the confidence, instead of the model's own "
-                             "opinion of itself (costs one call per sample)")
+    parser.add_argument(
+        "--shadow",
+        action="store_true",
+        help="with --samples: measure agreement but do not apply "
+        "it to the confidence, so its value can be tested",
+    )
+    parser.add_argument(
+        "--tools",
+        action="store_true",
+        help="let the drafter request what it needs (read-only "
+        "lookups) instead of being handed the whole pack",
+    )
+    parser.add_argument(
+        "--critic",
+        action="store_true",
+        help="have a second model review each draft; it may only "
+        "lower the confidence, never raise it",
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=1,
+        help="draft this many times and use the agreement between "
+        "them as the confidence, instead of the model's own "
+        "opinion of itself (costs one call per sample)",
+    )
     parser.add_argument("--provider", default="openrouter", choices=["anthropic", "openrouter"])
     args = parser.parse_args()
 
@@ -70,8 +90,14 @@ def main() -> int:
         from tools.live import load_env
 
         load_env()
-        router = router_with_model(args.model, provider=args.provider,
-                                   samples=args.samples, critic=args.critic, use_tools=args.tools, shadow=args.shadow)
+        router = router_with_model(
+            args.model,
+            provider=args.provider,
+            samples=args.samples,
+            critic=args.critic,
+            use_tools=args.tools,
+            shadow=args.shadow,
+        )
 
     if args.cases:
         path = Path(args.cases)

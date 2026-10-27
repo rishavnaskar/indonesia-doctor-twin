@@ -24,10 +24,8 @@ NAME = "red_flags"
 
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Red flags'
-DESCRIPTION = (
-    'Does this patient show a sign that must leave this pathway immediately: an emergency, or a symptom this pathway is not designed to handle?'
-)
+TITLE = "Red flags"
+DESCRIPTION = "Does this patient show a sign that must leave this pathway immediately: an emergency, or a symptom this pathway is not designed to handle?"
 
 _ESCALATING_RECOMMENDATIONS = (Recommendation.TITRATE_UP, Recommendation.ADD_AGENT)
 

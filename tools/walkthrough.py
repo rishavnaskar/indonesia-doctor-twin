@@ -58,16 +58,24 @@ def show(title: str, note: str, state, rules, site, *, tamper=None) -> None:
 
     original = router.propose
     if tamper is not None:
+
         def tampered(st, rs, sit=None, **kw):
             proposal = original(st, rs, sit)
             tamper(proposal)
             return proposal
+
         router.propose = tampered
 
     result = run_encounter(
-        state, rules, site, router, runtime,
-        thread_id=title, signer=Signer(practitioner, True),
-        audit=audit, now=NOW,
+        state,
+        rules,
+        site,
+        router,
+        runtime,
+        thread_id=title,
+        signer=Signer(practitioner, True),
+        audit=audit,
+        now=NOW,
     )
 
     OUTCOMES.append(result.outcome)
@@ -85,18 +93,24 @@ def show(title: str, note: str, state, rules, site, *, tamper=None) -> None:
         proposal = result.proposal
         print(f"\n  draft     {proposal.recommendation.value}")
         for change in proposal.medication_changes:
-            print(f"            {change.action.value} {change.molecule} "
-                  f"{change.mg_per_dose:g} mg x{change.doses_per_day}/day")
+            print(
+                f"            {change.action.value} {change.molecule} "
+                f"{change.mg_per_dose:g} mg x{change.doses_per_day}/day"
+            )
         print(f"  follow-up in {proposal.follow_up_interval_days} days")
         if result.claim:
             secondary = ", ".join(f"{d.code} ({d.evidence_ref})" for d in result.claim.secondary)
-            print(f"  coded     primary {result.claim.primary.code}"
-                  + (f"; secondary {secondary}" if secondary else "; no secondary codes"))
+            print(
+                f"  coded     primary {result.claim.primary.code}"
+                + (f"; secondary {secondary}" if secondary else "; no secondary codes")
+            )
         if result.referral_back and result.referral_back.eligible:
             print("  referral  stability criteria met, referral-back letter drafted")
-        print(f"  signed by {audit.records[-1].practitioner_id} "
-              f"({audit.records[-1].role}), licence to "
-              f"{audit.records[-1].licence_expires}")
+        print(
+            f"  signed by {audit.records[-1].practitioner_id} "
+            f"({audit.records[-1].role}), licence to "
+            f"{audit.records[-1].licence_expires}"
+        )
         print(f"  provenance {' | '.join(audit.records[-1].proposal_provenance)}")
 
 
@@ -105,9 +119,11 @@ def offline_demo(rules, site) -> None:
     import tempfile
     from pathlib import Path
 
-    print(f"\n{RULE}\n  7. The network drops mid-clinic\n"
-          "  One site in five has unreliable connectivity. This is the normal case.\n"
-          f"{RULE}")
+    print(
+        f"\n{RULE}\n  7. The network drops mid-clinic\n"
+        "  One site in five has unreliable connectivity. This is the normal case.\n"
+        f"{RULE}"
+    )
 
     path = Path(tempfile.mkdtemp()) / "outbound.jsonl"
     queue = OutboundQueue(path=path)
@@ -115,9 +131,16 @@ def offline_demo(rules, site) -> None:
     for n in range(3):
         state = make_patient(300 + n, controlled=True)
         run_encounter(
-            state, rules, site, default_router(), InMemoryRuntime(),
-            thread_id=f"OFF-{n}", signer=Signer(site["practitioners"][0]["practitioner_id"], True),
-            audit=AuditLog(), now=NOW, queue=queue,
+            state,
+            rules,
+            site,
+            default_router(),
+            InMemoryRuntime(),
+            thread_id=f"OFF-{n}",
+            signer=Signer(site["practitioners"][0]["practitioner_id"], True),
+            audit=AuditLog(),
+            now=NOW,
+            queue=queue,
         )
     print(f"  three encounters seen with no network   queued: {len(queue)}")
 
@@ -128,8 +151,10 @@ def offline_demo(rules, site) -> None:
     print(f"  attempted to send while still offline   {result}")
 
     reopened = OutboundQueue(path=path)
-    print(f"  power cut, process restarted            recovered: {len(reopened)}, "
-          f"pending: {len(reopened.pending())}")
+    print(
+        f"  power cut, process restarted            recovered: {len(reopened)}, "
+        f"pending: {len(reopened.pending())}"
+    )
 
     result = reopened.drain(lambda item: None)
     print(f"  network returns                         {result}")
@@ -139,12 +164,21 @@ def offline_demo(rules, site) -> None:
     for n in range(3):
         state = make_patient(300 + n, controlled=True)
         run_encounter(
-            state, rules, site, default_router(), InMemoryRuntime(),
-            thread_id=f"OFF-{n}", signer=Signer(site["practitioners"][0]["practitioner_id"], True),
-            audit=AuditLog(), now=NOW, queue=replay,
+            state,
+            rules,
+            site,
+            default_router(),
+            InMemoryRuntime(),
+            thread_id=f"OFF-{n}",
+            signer=Signer(site["practitioners"][0]["practitioner_id"], True),
+            audit=AuditLog(),
+            now=NOW,
+            queue=replay,
         )
-    print(f"  same encounters replayed after recovery queue still {len(replay)} "
-          f"(was {before}), no duplicates in the national record")
+    print(
+        f"  same encounters replayed after recovery queue still {len(replay)} "
+        f"(was {before}), no duplicates in the national record"
+    )
 
 
 def main() -> None:
@@ -163,15 +197,23 @@ def main() -> None:
     print("  Every rule from the pack. Two pathways, one engine.")
 
     for index, scenario in enumerate(build_scenarios(rules), start=1):
-        show(f"{index}. {scenario.title}", scenario.note,
-             scenario.state, rules, scenario.site, tamper=scenario.tamper)
+        show(
+            f"{index}. {scenario.title}",
+            scenario.note,
+            scenario.state,
+            rules,
+            scenario.site,
+            tamper=scenario.tamper,
+        )
 
     offline_demo(rules, rules.sites["SITE-A"])
 
     declined = sum(1 for o in OUTCOMES if o is not Outcome.COMMITTED)
     print(f"\n{RULE}")
-    print(f"  {declined} of {len(OUTCOMES)} ended without a recommendation. "
-          "That is the system working,")
+    print(
+        f"  {declined} of {len(OUTCOMES)} ended without a recommendation. "
+        "That is the system working,"
+    )
     print("  not the system failing. Each refusal names its own reason.")
     print(f"{RULE}\n")
 

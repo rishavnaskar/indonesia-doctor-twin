@@ -19,10 +19,8 @@ NAME = "guideline_conformance"
 
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Guideline conformance'
-DESCRIPTION = (
-    'Does the plan match the guideline the system is allowed to act on, and is there a target it is entitled to use for this patient?'
-)
+TITLE = "Guideline conformance"
+DESCRIPTION = "Does the plan match the guideline the system is allowed to act on, and is there a target it is entitled to use for this patient?"
 
 _TOLERANCE = 0.001
 
@@ -69,8 +67,7 @@ def run(ctx: GateContext) -> list[Finding]:
         return findings
 
     if set(used.thresholds) != set(target.thresholds) or any(
-        abs(used.thresholds[code] - value) > _TOLERANCE
-        for code, value in target.thresholds.items()
+        abs(used.thresholds[code] - value) > _TOLERANCE for code, value in target.thresholds.items()
     ):
         findings.append(
             Finding(

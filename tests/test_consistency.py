@@ -68,9 +68,11 @@ def test_scattered_samples_collapse_the_confidence_below_the_floor():
     disagree. The stated number is not to be believed and the gate must see
     that."""
     reasoner = SelfConsistentReasoner(
-        Scripted(_draft(mg=10.0, confidence=0.95),
-                 _draft(mg=5.0, confidence=0.95),
-                 _draft(recommendation="add_agent", confidence=0.95)),
+        Scripted(
+            _draft(mg=10.0, confidence=0.95),
+            _draft(mg=5.0, confidence=0.95),
+            _draft(recommendation="add_agent", confidence=0.95),
+        ),
         samples=3,
     )
     result = reasoner.propose(None, None)
@@ -114,9 +116,7 @@ def test_the_pin_names_every_model_that_answered():
     """A fallback chain can serve different samples from different models. A pin
     naming only the winner would be a false audit trail in exactly the case
     where the trail matters most."""
-    reasoner = SelfConsistentReasoner(
-        Scripted(_draft(model="a@1"), _draft(model="b@1")), samples=2
-    )
+    reasoner = SelfConsistentReasoner(Scripted(_draft(model="a@1"), _draft(model="b@1")), samples=2)
     pin = reasoner.propose(None, None).provenance.model
     assert pin == "a@1+b@1"
     assert "@" in pin, "gate check 6 requires a version in every pin"
@@ -139,18 +139,23 @@ def test_shadow_mode_measures_without_applying():
     floor and never reaches a clinician — so 'are unstable drafts likelier to
     be wrong?' has no unstable drafts left to measure. Observed at n=30: six
     unstable drafts, none of which reached the comparison."""
-    scattered = Scripted(_draft(mg=10.0, confidence=0.95),
-                         _draft(mg=5.0, confidence=0.95),
-                         _draft(recommendation="add_agent", confidence=0.95))
+    scattered = Scripted(
+        _draft(mg=10.0, confidence=0.95),
+        _draft(mg=5.0, confidence=0.95),
+        _draft(recommendation="add_agent", confidence=0.95),
+    )
 
     applied = SelfConsistentReasoner(scattered, samples=3, apply=True).propose(None, None)
     assert applied.confidence == pytest.approx(1 / 3)
 
     shadow = SelfConsistentReasoner(
-        Scripted(_draft(mg=10.0, confidence=0.95),
-                 _draft(mg=5.0, confidence=0.95),
-                 _draft(recommendation="add_agent", confidence=0.95)),
-        samples=3, apply=False,
+        Scripted(
+            _draft(mg=10.0, confidence=0.95),
+            _draft(mg=5.0, confidence=0.95),
+            _draft(recommendation="add_agent", confidence=0.95),
+        ),
+        samples=3,
+        apply=False,
     ).propose(None, None)
     assert shadow.confidence == pytest.approx(0.95), "untouched, so the draft proceeds"
     assert shadow.agreement == pytest.approx(1 / 3), "but the instability is recorded"

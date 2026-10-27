@@ -30,10 +30,8 @@ NAME = "executable_here"
 
 # One line a clinician can read. Lives with the check rather than in the
 # surface that displays it, so the two cannot drift apart.
-TITLE = 'Executable here'
-DESCRIPTION = (
-    'Can this hospital actually carry out this plan today: is the drug in stock and the test available on site?'
-)
+TITLE = "Executable here"
+DESCRIPTION = "Can this hospital actually carry out this plan today: is the drug in stock and the test available on site?"
 
 _DISPENSING_ACTIONS = (
     ChangeAction.START,
@@ -43,8 +41,7 @@ _DISPENSING_ACTIONS = (
 )
 
 
-def evidence_gap(site: dict, code: str, *, max_age: int | None,
-                 today: date | None) -> str | None:
+def evidence_gap(site: dict, code: str, *, max_age: int | None, today: date | None) -> str | None:
     """Why this site's claim to deliver `code` is not currently backed, or None.
 
     Module level rather than a closure inside the check, because the surface
@@ -102,8 +99,9 @@ def run(ctx: GateContext) -> list[Finding]:
                         f"{change.molecule} is not stocked at {site_id} "
                         f"(stock list as of {as_of}). This is a referral, not a prescription."
                     ),
-                    message_local=localise(ctx.rules, "not_stocked",
-                                          molecule=change.molecule, site_id=site_id),
+                    message_local=localise(
+                        ctx.rules, "not_stocked", molecule=change.molecule, site_id=site_id
+                    ),
                     rule_id="not_stocked",
                     converts_to_referral=True,
                 )
@@ -160,8 +158,12 @@ def run(ctx: GateContext) -> list[Finding]:
                         f"at {site_id} (capability as of {as_of}). "
                         "This is a referral, not an order."
                     ),
-                    message_local=localise(ctx.rules, "test_unavailable",
-                                          label=catalogue[investigation], site_id=site_id),
+                    message_local=localise(
+                        ctx.rules,
+                        "test_unavailable",
+                        label=catalogue[investigation],
+                        site_id=site_id,
+                    ),
                     rule_id="test_unavailable",
                     converts_to_referral=True,
                 )

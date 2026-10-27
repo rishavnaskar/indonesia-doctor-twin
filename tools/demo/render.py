@@ -28,5 +28,4 @@ TEMPLATE = "report.html"
 def render(data: dict[str, Any], *, title: str = "AI clinician, demo") -> str:
     payload = json.dumps(data, ensure_ascii=False, indent=None)
     # `</` inside a <script> block ends the block, whatever it is inside.
-    return fill(TEMPLATE, title=html.escape(title),
-                data=payload.replace("</", "<\\/"))
+    return fill(TEMPLATE, title=html.escape(title), data=payload.replace("</", "<\\/"))

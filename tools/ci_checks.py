@@ -10,6 +10,7 @@ argument for having them on day one.
      library, and no YAML.
   3. Only /service/graph may import the orchestration library.
   4. No hosted tracing endpoint is configured anywhere.
+  5. No Python file is over 500 lines.
 
 Check 1 inspects identifiers and non-docstring string literals — not comments
 and not docstrings. A comment explaining *why* a rule is national is exactly
@@ -31,16 +32,42 @@ SERVICE = ROOT / "service"
 ORCHESTRATION = ("langgraph", "langchain", "langsmith")
 
 STATIC_BANNED = {
-    "indonesia", "indonesian", "bahasa", "jakarta", "papua",
-    "bpjs", "jkn", "inacbg", "ina-cbg", "eklaim", "e-klaim", "idrg",
-    "satusehat", "fornas", "efornas", "khanza", "simrs",
-    "kemenkes", "permenkes", "kepmenkes", "perki", "inash", "persi", "arssi",
-    "puskesmas", "dukcapil", "bpom", "prolanis",
+    "indonesia",
+    "indonesian",
+    "bahasa",
+    "jakarta",
+    "papua",
+    "bpjs",
+    "jkn",
+    "inacbg",
+    "ina-cbg",
+    "eklaim",
+    "e-klaim",
+    "idrg",
+    "satusehat",
+    "fornas",
+    "efornas",
+    "khanza",
+    "simrs",
+    "kemenkes",
+    "permenkes",
+    "kepmenkes",
+    "perki",
+    "inash",
+    "persi",
+    "arssi",
+    "puskesmas",
+    "dukcapil",
+    "bpom",
+    "prolanis",
 }
 
 TRACING_MARKERS = (
-    "langchain_tracing", "langsmith_endpoint", "langsmith_api_key",
-    "langchain_api_key", "smith.langchain.com",
+    "langchain_tracing",
+    "langsmith_endpoint",
+    "langsmith_api_key",
+    "langchain_api_key",
+    "smith.langchain.com",
 )
 
 
@@ -245,9 +272,11 @@ def check_no_em_dashes_in_rendered_text() -> list[str]:
             continue
         exempt = set()
         for node in ast.walk(tree):
-            if (isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
-                                  ast.AsyncFunctionDef)) and node.body
-                    and ast.get_docstring(node, clean=False) is not None):
+            if (
+                isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.body
+                and ast.get_docstring(node, clean=False) is not None
+            ):
                 exempt.add(node.body[0].lineno)
         for node in ast.walk(tree):
             if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
@@ -259,14 +288,41 @@ def check_no_em_dashes_in_rendered_text() -> list[str]:
     return failures
 
 
+# A file this long has stopped being one thing. The number is arbitrary; having
+# one is not. Three files were over it, all in the demo surface, and the split
+# that followed is what tools/demo/ looks like now. Enforced rather than written
+# down, because a convention nothing checks drifts back within a month, and the
+# formatter alone pushed two of those files back over the line the day they were
+# split.
+MAX_FILE_LINES = 500
+
+
+def check_no_long_files() -> list[str]:
+    skip = {".venv", ".git", "__pycache__", ".store", ".tools", ".lockenv", ".eval_out"}
+    failures = []
+    for path in sorted(ROOT.rglob("*.py")):
+        if any(part in skip for part in path.parts):
+            continue
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        if lines > MAX_FILE_LINES:
+            failures.append(
+                f"{path.relative_to(ROOT)}: {lines} lines, over {MAX_FILE_LINES}. "
+                "Split it along whatever seam the file already has."
+            )
+    return failures
+
+
 CHECKS = [
     ("no country/payer/drug/guideline names under /service", check_no_national_names),
     ("gate imports no orchestration library, no YAML, nothing from /reason", check_gate_purity),
     ("orchestration library confined to /service/graph", check_orchestration_confined),
     ("no hosted tracing endpoint configured", check_no_hosted_tracing),
     ("no em-dashes in the docs", check_no_em_dashes_in_docs),
-    ("no em-dashes in rendered text: pack values, printed and HTML strings",
-     check_no_em_dashes_in_rendered_text),
+    (
+        "no em-dashes in rendered text: pack values, printed and HTML strings",
+        check_no_em_dashes_in_rendered_text,
+    ),
+    (f"no Python file over {MAX_FILE_LINES} lines", check_no_long_files),
 ]
 
 

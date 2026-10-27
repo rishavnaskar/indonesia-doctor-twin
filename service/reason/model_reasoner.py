@@ -43,7 +43,10 @@ class ModelReasoner:
         wants_tools = self.use_tools and hasattr(self.backend, "complete_with_tools")
         system = prompt_module.system_prompt()
         user = prompt_module.build_user_prompt(
-            state, rules, site, resolution.target,
+            state,
+            rules,
+            site,
+            resolution.target,
             withhold_tool_served=wants_tools,
         )
 
@@ -54,7 +57,8 @@ class ModelReasoner:
 
             toolbox = Toolbox(state, rules, site)
             raw = self.backend.complete_with_tools(
-                system, user,
+                system,
+                user,
                 allow_egress=bool(state.is_synthetic),
                 schema=proposal_schema(rules),
                 tools=tool_specs(rules),
@@ -63,7 +67,8 @@ class ModelReasoner:
             )
         else:
             raw = self.backend.complete(
-                system, user,
+                system,
+                user,
                 allow_egress=bool(state.is_synthetic),
                 schema=proposal_schema(rules),
             )

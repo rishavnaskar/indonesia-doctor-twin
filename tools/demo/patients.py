@@ -65,14 +65,21 @@ def to_wire(state: PatientState) -> dict[str, Any]:
         "flags": dict(state.flags),
         "allergies": [a.substance for a in state.allergies],
         "intolerances": [
-            {"molecule": i.molecule, "drug_class": i.drug_class,
-             "age_days": (state.as_of - i.documented_at).days}
+            {
+                "molecule": i.molecule,
+                "drug_class": i.drug_class,
+                "age_days": (state.as_of - i.documented_at).days,
+            }
             for i in state.intolerances
         ],
         "history": [
-            {"encounter_id": e.encounter_id,
-             "age_days": (state.as_of - e.encounter_date).days,
-             "sbp": e.sbp, "dbp": e.dbp, "decision": e.decision}
+            {
+                "encounter_id": e.encounter_id,
+                "age_days": (state.as_of - e.encounter_date).days,
+                "sbp": e.sbp,
+                "dbp": e.dbp,
+                "decision": e.decision,
+            }
             for e in state.encounters
         ],
         "intake_notes": state.intake_notes,
@@ -169,8 +176,8 @@ def from_wire(raw: dict[str, Any]) -> PatientState:
         state.encounters.append(
             PriorEncounter(
                 encounter_id=str(row.get("encounter_id") or f"H{index}"),
-                encounter_date=as_of - timedelta(days=_int(row.get("age_days", 90 * index),
-                                                           "history age_days")),
+                encounter_date=as_of
+                - timedelta(days=_int(row.get("age_days", 90 * index), "history age_days")),
                 sbp=_num(row["sbp"], "history sbp") if row.get("sbp") else None,
                 dbp=_num(row["dbp"], "history dbp") if row.get("dbp") else None,
                 decision=str(row.get("decision") or "") or None,

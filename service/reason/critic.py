@@ -68,11 +68,7 @@ def system_prompt() -> str:
 
 
 def build_prompt(context: str, proposal_json: str) -> str:
-    return (
-        f"{context}\n\n"
-        "--- the draft under review ---\n"
-        f"{proposal_json}\n"
-    )
+    return f"{context}\n\n--- the draft under review ---\n{proposal_json}\n"
 
 
 @dataclass
@@ -117,7 +113,7 @@ class CriticReviewedReasoner:
                 uncertainty_notes=(
                     proposal.uncertainty_notes
                     + f" Second-model review did not run ({type(exc).__name__}); "
-                      "this draft is unreviewed."
+                    "this draft is unreviewed."
                 ).strip(),
             )
 

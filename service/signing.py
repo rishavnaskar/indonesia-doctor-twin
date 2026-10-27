@@ -79,16 +79,22 @@ class AuditLog:
         path = Path(self.path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps({
-                "practitioner_id": record.practitioner_id,
-                "role": record.role,
-                "licence_expires": record.licence_expires.isoformat(),
-                "decision": record.decision,
-                "proposal_provenance": list(record.proposal_provenance),
-                "signed_at": record.signed_at.isoformat(),
-                "rejection_reason": record.rejection_reason,
-                "edit_diff": record.edit_diff,
-            }, default=str) + "\n")
+            fh.write(
+                json.dumps(
+                    {
+                        "practitioner_id": record.practitioner_id,
+                        "role": record.role,
+                        "licence_expires": record.licence_expires.isoformat(),
+                        "decision": record.decision,
+                        "proposal_provenance": list(record.proposal_provenance),
+                        "signed_at": record.signed_at.isoformat(),
+                        "rejection_reason": record.rejection_reason,
+                        "edit_diff": record.edit_diff,
+                    },
+                    default=str,
+                )
+                + "\n"
+            )
 
     def _load(self) -> None:
         if self.path is None:
@@ -98,16 +104,18 @@ class AuditLog:
                 continue
             try:
                 row = json.loads(line)
-                self.records.append(SignatureRecord(
-                    practitioner_id=row["practitioner_id"],
-                    role=row["role"],
-                    licence_expires=date.fromisoformat(row["licence_expires"]),
-                    decision=row["decision"],
-                    proposal_provenance=tuple(row["proposal_provenance"]),
-                    signed_at=datetime.fromisoformat(row["signed_at"]),
-                    rejection_reason=row.get("rejection_reason"),
-                    edit_diff=row.get("edit_diff"),
-                ))
+                self.records.append(
+                    SignatureRecord(
+                        practitioner_id=row["practitioner_id"],
+                        role=row["role"],
+                        licence_expires=date.fromisoformat(row["licence_expires"]),
+                        decision=row["decision"],
+                        proposal_provenance=tuple(row["proposal_provenance"]),
+                        signed_at=datetime.fromisoformat(row["signed_at"]),
+                        rejection_reason=row.get("rejection_reason"),
+                        edit_diff=row.get("edit_diff"),
+                    )
+                )
             except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                 self.damaged.append(line[:200])
 
@@ -120,8 +128,7 @@ def verify_signer(site: dict[str, Any], signer: Signer, when: date) -> dict[str,
     practitioner = roster.get(signer.practitioner_id)
     if practitioner is None:
         raise SignatureRefused(
-            f"{signer.practitioner_id} is not on the roster for "
-            f"{site.get('site_id', 'this site')}."
+            f"{signer.practitioner_id} is not on the roster for {site.get('site_id', 'this site')}."
         )
 
     expires = practitioner.get("sip_expires")

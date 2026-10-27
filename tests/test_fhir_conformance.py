@@ -25,7 +25,8 @@ from service.packs.loader import load_pack
 from service.reason import reference
 
 UUID_URN = re.compile(
-    r"^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+    r"^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
+)
 
 # R4 minimum cardinality for the resources this bundle emits.
 REQUIRED = {
@@ -46,8 +47,9 @@ def payload(rules):
     site = rules.sites["SITE-A"]
     state = make_patient(101, controlled=False)
     proposal = reference.propose(state, rules, site)
-    return build_bundle(state, build_claim(state, rules), proposal, site,
-                        "PRAC-A-001", rules, encounter_id="ENC-1").payload
+    return build_bundle(
+        state, build_claim(state, rules), proposal, site, "PRAC-A-001", rules, encounter_id="ENC-1"
+    ).payload
 
 
 def _entries(payload):
@@ -71,8 +73,9 @@ def test_every_full_url_is_a_real_uuid_urn(payload):
     """`urn:uuid:ENC-1` is not a UUID. A validating server rejects the whole
     transaction, and it does so at submission — the worst place to find out."""
     for index, entry in enumerate(_entries(payload)):
-        assert UUID_URN.match(entry.get("fullUrl", "")), \
+        assert UUID_URN.match(entry.get("fullUrl", "")), (
             f"entry[{index}] fullUrl {entry.get('fullUrl')!r}"
+        )
 
 
 def test_full_urls_are_unique_within_the_bundle(payload):
@@ -89,9 +92,18 @@ def test_full_urls_are_stable_across_rebuilds(rules):
 
     def build():
         proposal = reference.propose(state, rules, site)
-        return [e["fullUrl"] for e in build_bundle(
-            state, build_claim(state, rules), proposal, site, "PRAC-A-001",
-            rules, encounter_id="ENC-1").payload["entry"]]
+        return [
+            e["fullUrl"]
+            for e in build_bundle(
+                state,
+                build_claim(state, rules),
+                proposal,
+                site,
+                "PRAC-A-001",
+                rules,
+                encounter_id="ENC-1",
+            ).payload["entry"]
+        ]
 
     assert build() == build()
 
@@ -101,16 +113,16 @@ def test_a_put_url_matches_the_resource_it_carries(payload):
         if entry["request"]["method"] != "PUT":
             continue
         resource = entry["resource"]
-        assert entry["request"]["url"] == \
-            f"{resource['resourceType']}/{resource['id']}", f"entry[{index}]"
+        assert entry["request"]["url"] == f"{resource['resourceType']}/{resource['id']}", (
+            f"entry[{index}]"
+        )
 
 
 def test_required_fields_are_present_on_every_resource(payload):
     for index, entry in enumerate(_entries(payload)):
         resource = entry["resource"]
         for field in REQUIRED.get(resource["resourceType"], []):
-            assert field in resource, \
-                f"entry[{index}] {resource['resourceType']} missing {field}"
+            assert field in resource, f"entry[{index}] {resource['resourceType']} missing {field}"
 
 
 def test_a_medication_request_names_a_medication(payload):
@@ -118,8 +130,7 @@ def test_a_medication_request_names_a_medication(payload):
         resource = entry["resource"]
         if resource["resourceType"] != "MedicationRequest":
             continue
-        assert any(k in resource for k in
-                   ("medicationCodeableConcept", "medicationReference"))
+        assert any(k in resource for k in ("medicationCodeableConcept", "medicationReference"))
 
 
 # Elements that are a bare Coding rather than a CodeableConcept, so they carry
@@ -143,8 +154,12 @@ def test_every_coding_declares_its_system(payload):
                 if "system" not in coding:
                     problems.append(f"{path}.coding: {coding}")
             for key, value in node.items():
-                if (key in _BARE_CODING and isinstance(value, dict)
-                        and "code" in value and "system" not in value):
+                if (
+                    key in _BARE_CODING
+                    and isinstance(value, dict)
+                    and "code" in value
+                    and "system" not in value
+                ):
                     problems.append(f"{path}.{key}: {value}")
                 walk(value, f"{path}.{key}")
         elif isinstance(node, list):
@@ -163,8 +178,7 @@ def test_the_only_unresolved_references_are_the_ones_we_never_create(payload):
     sandbox these three must be seeded first.
 
     Anything else dangling would be a bug."""
-    created = {f"{e['resource']['resourceType']}/{e['resource']['id']}"
-               for e in _entries(payload)}
+    created = {f"{e['resource']['resourceType']}/{e['resource']['id']}" for e in _entries(payload)}
     dangling = set()
 
     def walk(node):

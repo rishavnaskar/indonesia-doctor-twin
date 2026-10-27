@@ -18,15 +18,37 @@ from __future__ import annotations
 
 import json
 import os
-import ssl
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
+from service.router.backends.transport import (
+    BackendError,
+    RateLimited,
+    ResidencyError,
+    TransientTransport,
+    TruncatedResponse,
+    _reason,
+    _retry_after,
+    _ssl_context,
+    list_free_models,
+)
+
+# Re-exported: these have always been imported from here, and moving a
+# class is not a reason to break every caller.
+__all__ = [
+    "BackendError",
+    "HostedChatBackend",
+    "RateLimited",
+    "ResidencyError",
+    "TransientTransport",
+    "TruncatedResponse",
+    "list_free_models",
+]
+
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 # A free model by default, so the prototype can be run end to end without a
 # bill. Free models are weaker and rate-limited; that is a feature for this
@@ -56,61 +78,6 @@ DEFAULT_FALLBACKS: tuple[str, ...] = (
 # trying a different one.
 RETRIES_PER_MODEL = 2
 BACKOFF_S = 2.0
-
-
-def _ssl_context() -> ssl.SSLContext:
-    """Build a context with a real CA bundle.
-
-    Python installed from python.org ships without root certificates on macOS,
-    so the default context fails every HTTPS request with an opaque
-    CERTIFICATE_VERIFY_FAILED. Prefer certifi's bundle when present; fall back
-    to the system default otherwise. We never disable verification — an
-    encrypted channel we do not authenticate is not a secure one, and this
-    carries clinical data even when synthetic.
-    """
-    try:
-        import certifi
-
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:  # pragma: no cover
-        return ssl.create_default_context()
-
-
-class ResidencyError(PermissionError):
-    """Raised rather than returned. Never catchable by accident."""
-
-
-class BackendError(RuntimeError):
-    pass
-
-
-class RateLimited(BackendError):
-    """The pool is busy. Distinct from a broken request, because the response
-    to it is different: wait or move, rather than fix."""
-
-
-class TransientTransport(BackendError):
-    """The connection failed in a way that says nothing about the request.
-
-    A reset peer, a dropped socket, a timeout. Retryable for the same reason a
-    429 is: nothing about the proposal changed. Kept distinct from BackendError
-    because a connection reset misreported as a model failure is the same class
-    of wrong conclusion as a truncation misreported as a parse failure.
-
-    This also happens to be the failure mode a rural site sees constantly, which
-    is the case the offline queue exists for.
-    """
-
-
-class TruncatedResponse(BackendError):
-    """The model ran out of output budget mid-answer.
-
-    Named separately because the failure it otherwise produces — half a JSON
-    object reaching the parser — reads as "the model cannot follow the
-    contract" when the real cause is our token budget. Misattributing a config
-    bug to model quality is exactly the kind of wrong conclusion this
-    prototype exists to avoid.
-    """
 
 
 @dataclass
@@ -156,8 +123,9 @@ class HostedChatBackend:
                 seen.append(name)
         return seen
 
-    def complete(self, system: str, user: str, *, allow_egress: bool,
-                 schema: dict | None = None) -> str:
+    def complete(
+        self, system: str, user: str, *, allow_egress: bool, schema: dict | None = None
+    ) -> str:
         if not allow_egress:
             raise ResidencyError(
                 "Refusing to send patient data to a hosted endpoint. Only "
@@ -167,8 +135,7 @@ class HostedChatBackend:
         api_key = os.environ.get(self.api_key_env)
         if not api_key:
             raise BackendError(
-                f"{self.api_key_env} is not set. Put it in .env (gitignored) "
-                "or export it."
+                f"{self.api_key_env} is not set. Put it in .env (gitignored) or export it."
             )
 
         busy: list[str] = []
@@ -190,9 +157,17 @@ class HostedChatBackend:
             "now and pass --model, or retry in a minute."
         )
 
-    def complete_with_tools(self, system: str, user: str, *, allow_egress: bool,
-                            schema: dict | None = None, tools: list | None = None,
-                            dispatch=None, max_calls: int = 8) -> str:
+    def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        *,
+        allow_egress: bool,
+        schema: dict | None = None,
+        tools: list | None = None,
+        dispatch=None,
+        max_calls: int = 8,
+    ) -> str:
         """Let the model ask for what it needs before it drafts.
 
         A bounded loop: every tool is read-only, the count is capped, and the
@@ -230,37 +205,49 @@ class HostedChatBackend:
                 )
                 return self._content(body)
 
-            messages.append({
-                "role": "assistant",
-                "content": message.get("content") or "",
-                "tool_calls": calls,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": message.get("content") or "",
+                    "tool_calls": calls,
+                }
+            )
             for call in calls:
                 function = call.get("function") or {}
                 try:
                     arguments = json.loads(function.get("arguments") or "{}")
                 except json.JSONDecodeError:
                     arguments = {}
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call.get("id"),
-                    "content": dispatch(function.get("name", ""), arguments),
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.get("id"),
+                        "content": dispatch(function.get("name", ""), arguments),
+                    }
+                )
 
         # Out of budget. Ask once more, without tools, so the loop ends in a
         # draft rather than in silence.
-        messages.append({
-            "role": "user",
-            "content": "No more lookups. Answer now with the proposal JSON only.",
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": "No more lookups. Answer now with the proposal JSON only.",
+            }
+        )
         body = self._post_messages(messages, api_key, tools=None, schema=schema)
         self._answered_by = (
             f"{body.get('model') or self.model}@{body.get('provider') or 'unknown-provider'}"
         )
         return self._content(body)
 
-    def _post_messages(self, messages: list[dict[str, Any]], api_key: str, *, tools=None,
-                       schema: dict | None = None) -> dict:
+    def _post_messages(
+        self,
+        messages: list[dict[str, Any]],
+        api_key: str,
+        *,
+        tools=None,
+        schema: dict | None = None,
+    ) -> dict:
         payload: dict = {
             "model": self.model,
             "messages": messages,
@@ -294,15 +281,15 @@ class HostedChatBackend:
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             raise TransientTransport(f"{type(exc).__name__}: {exc}") from exc
 
-    def _call_model(self, model: str, system: str, user: str, api_key: str,
-                    schema: dict | None = None) -> dict:
+    def _call_model(
+        self, model: str, system: str, user: str, api_key: str, schema: dict | None = None
+    ) -> dict:
         # Strongest enforcement first, degrading on refusal. A schema the
         # provider enforces removes a whole class of failure — a live run
         # produced `titraate_up`, correctly rejected by the parser at the cost
         # of a wasted call — but support is uneven, and a 400 for asking is not
         # a reason to give up on the model.
-        mode = "schema" if (schema and self.json_mode) else (
-            "object" if self.json_mode else "off")
+        mode = "schema" if (schema and self.json_mode) else ("object" if self.json_mode else "off")
         for attempt in range(RETRIES_PER_MODEL):
             try:
                 return self._post(model, system, user, api_key, mode=mode, schema=schema)
@@ -380,8 +367,14 @@ class HostedChatBackend:
         )
 
     def _post(
-        self, model: str, system: str, user: str, api_key: str, *,
-        mode: str = "object", schema: dict | None = None,
+        self,
+        model: str,
+        system: str,
+        user: str,
+        api_key: str,
+        *,
+        mode: str = "object",
+        schema: dict | None = None,
     ) -> dict:
         payload = {
             "model": model,
@@ -442,52 +435,3 @@ class HostedChatBackend:
             # they escape the handler above and surface as an unhandled crash
             # mid-clinic. Observed in a live run.
             raise TransientTransport(f"{type(exc).__name__} talking to {model}: {exc}") from exc
-
-
-def _retry_after(exc: urllib.error.HTTPError) -> float | None:
-    try:
-        return float(exc.headers.get("Retry-After"))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-
-
-def _reason(detail: str) -> str:
-    """Dig the human-readable half out of a nested provider error."""
-    try:
-        error = json.loads(detail).get("error") or {}
-    except (json.JSONDecodeError, AttributeError):
-        return detail[:120]
-    meta = error.get("metadata") or {}
-    provider = meta.get("provider_name")
-    raw = meta.get("raw")
-    if isinstance(raw, str) and raw:
-        return f"{raw[:150]}"
-    return f"{error.get('message', 'rate limited')}" + (f" ({provider})" if provider else "")
-
-
-def list_free_models(timeout_s: float = 25.0) -> list[dict]:
-    """Ask which models are free right now, rather than hard-coding slugs.
-
-    Availability changes, and a stale list in a source file is worse than no
-    list at all: it fails at demo time with a confusing 404.
-    """
-    request = urllib.request.Request(MODELS_URL, headers={"User-Agent": "ai-clinician/0.1"})
-    with urllib.request.urlopen(request, timeout=timeout_s, context=_ssl_context()) as response:
-        data = json.loads(response.read().decode("utf-8"))
-
-    free = []
-    for model in data.get("data", []):
-        pricing = model.get("pricing") or {}
-        try:
-            if float(pricing.get("prompt", 1)) or float(pricing.get("completion", 1)):
-                continue
-        except (TypeError, ValueError):
-            continue
-        free.append(
-            {
-                "id": model["id"],
-                "context": model.get("context_length") or 0,
-                "structured": "response_format" in (model.get("supported_parameters") or []),
-            }
-        )
-    return sorted(free, key=lambda m: (not m["structured"], -m["context"]))

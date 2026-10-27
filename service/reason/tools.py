@@ -49,8 +49,10 @@ def tool_specs(rules) -> list[dict[str, Any]]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "code": {"type": "string",
-                                 "enum": [*sorted(rules.investigations), "sbp", "dbp"]},
+                        "code": {
+                            "type": "string",
+                            "enum": [*sorted(rules.investigations), "sbp", "dbp"],
+                        },
                     },
                     "required": ["code"],
                 },
@@ -60,9 +62,7 @@ def tool_specs(rules) -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "get_drug",
-                "description": (
-                    "Dosing limits, class and restrictions for one prescribable drug."
-                ),
+                "description": ("Dosing limits, class and restrictions for one prescribable drug."),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -159,9 +159,12 @@ class Toolbox:
     def _history(self, _args: dict) -> dict:
         return {
             "encounters": [
-                {"date": e.encounter_date.isoformat(), "sbp": e.sbp, "dbp": e.dbp,
-                 "decision": e.decision}
-                for e in sorted(self.state.encounters,
-                                key=lambda e: e.encounter_date, reverse=True)
+                {
+                    "date": e.encounter_date.isoformat(),
+                    "sbp": e.sbp,
+                    "dbp": e.dbp,
+                    "decision": e.decision,
+                }
+                for e in sorted(self.state.encounters, key=lambda e: e.encounter_date, reverse=True)
             ]
         }
