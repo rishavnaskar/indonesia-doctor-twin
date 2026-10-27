@@ -1,0 +1,123 @@
+[project]
+name = "indonesia-doctor-twin"
+version = "0.2.0"
+description = "A supervised AI clinician prototype: rule packs, a plain-code safety gate, and a signature line."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "PyYAML>=6.0",
+    "certifi>=2024.0",
+    "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+# Only needed to run a real model behind the router. CI never installs it: a
+# test suite that costs money per run is not a test suite.
+model = ["anthropic>=1.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["service*", "adapters*", "datagen*", "eval*", "tools*"]
+exclude = ["tests*"]
+
+# ----------------------------------------------------------------- ruff
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", ".store", ".tools", ".eval_out"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "W",    # warnings
+    "I",    # import order
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "RUF",  # ruff's own
+    "BLE",  # blind except
+    "N",    # naming
+]
+ignore = [
+    # The HTML templates and the clinical prose are deliberately wide.
+    "E501",
+    "B008",
+    # Exceptions here are named for what they are, not for what they inherit:
+    # SignatureRefused and RateLimited read correctly at the call site and
+    # `SignatureRefusedError` does not.
+    "N818",
+    # `class X(str, Enum)` rather than StrEnum, deliberately. The two differ in
+    # what `str(x)` returns ("Severity.BLOCK" against "block"), and that string
+    # reaches stored checkpoints and rendered pages. Changing it would silently
+    # rewrite what is on the record.
+    "UP042",
+    # Ambiguous unicode in strings: the packs and the surface are multilingual.
+    "RUF001", "RUF002", "RUF003",
+    # Mutable class attributes are not a pattern this codebase uses in a way
+    # that needs ClassVar noise.
+    "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests name fixtures after the thing under test and shadow freely.
+"tests/*" = ["B011", "SIM117", "E402"]
+# ci_checks names the characters it is looking for.
+"tools/ci_checks.py" = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["service", "adapters", "datagen", "eval", "tools"]
+
+# ----------------------------------------------------------------- mypy
+
+[tool.mypy]
+python_version = "3.11"
+files = ["service"]
+# The gate and the contracts are typed; the surrounding prototype is not yet.
+# This is deliberately a floor that CI enforces rather than a ceiling nobody
+# meets: it fails on a real type error and does not fail on a missing
+# annotation, so the check stays green and stays useful.
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+no_implicit_optional = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+exclude = "(^|/)(\\.venv|\\.store|\\.tools)/"
+
+[[tool.mypy.overrides]]
+# The safety gate is the part that has to be right, so it is checked hardest.
+module = ["service.gate.*", "service.contracts.*", "service.rules.*"]
+check_untyped_defs = true
+
+# ----------------------------------------------------------------- coverage
+
+[tool.coverage.run]
+source = ["service", "adapters", "datagen", "eval", "tools"]
+branch = true
+omit = [
+    "*/__pycache__/*",
+    "tools/demo/templates/*",
+    # Exercised by `make`, not by pytest: it shells out to subprocesses.
+    "tools/run.py",
+    "tools/live.py",
+    "tools/validate_fhir.py",
+]
+
+[tool.coverage.report]
+# The floor CI enforces. Raise it when the suite earns it; never lower it to
+# make a red build green.
+fail_under = 60
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

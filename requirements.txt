@@ -1,16 +1,19 @@
-# Runtime. Deliberately tiny.
-# /service/gate imports nothing from this list — it is stdlib only, by rule.
-PyYAML>=6.0
+# Runtime dependencies, pinned exactly. Development and test tools live in
+# requirements-dev.txt, so a deployment installs neither a test runner nor a
+# linter. requirements.lock pins the transitive closure of this file; CI
+# installs the lock, which is what makes "it worked on my machine" checkable.
+#
+# /service/gate imports nothing from this list. It is stdlib only, by rule.
+
+# Rule packs. The gate is plain code; everything national is YAML.
+PyYAML==6.0.3
 
 # Root certificates. Python installed from python.org ships without them on
 # macOS, which turns every HTTPS call into an opaque CERTIFICATE_VERIFY_FAILED.
-certifi>=2024.0
-
-# Dev
-pytest>=8.0
+certifi==2026.10.23
 
 # Postgres. Optional at runtime: with no database reachable the store falls
 # back to append-only files and says so. Installed by default because the
 # fallback should be a deployment's choice, not an accident of what was
 # available on the machine.
-psycopg[binary]>=3.1
+psycopg[binary]==3.3.6

@@ -16,3 +16,9 @@ docs/DEMO.md
 
 # Durable state from a run: checkpoints, signatures, outbound queue.
 .store/
+
+# Lockfile resolution scratch, and the dev-tools stamp.
+.lockenv/
+.venv-dev
+.coverage
+coverage.xml

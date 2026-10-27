@@ -1,0 +1,14 @@
+# Runtime lockfile: the transitive closure of requirements.txt, pinned.
+#
+#   pip install -r requirements.lock
+#
+# Regenerate after changing requirements.txt:
+#
+#   make lock
+#
+# Generated against CPython 3.13. Every pin here has a wheel for Linux and
+# macOS on 3.11 through 3.13, which is the range CI covers.
+certifi==2026.10.23
+psycopg-binary==3.3.6
+psycopg==3.3.6
+PyYAML==6.0.3

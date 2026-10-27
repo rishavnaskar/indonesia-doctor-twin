@@ -1,0 +1,21 @@
+# Test and quality tools. Never installed by a deployment.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# CI installs requirements.lock and requirements-dev.lock instead, which pin
+# the transitive closure of these two files.
+
+-r requirements.txt
+
+pytest==9.1.1
+pytest-cov==7.1.0
+
+# Lint and format. Configured in pyproject.toml.
+ruff==0.17.3
+
+# Type check. Configured in pyproject.toml.
+mypy==2.4.0
+types-PyYAML==6.0.12.20260906
+
+# Dependency audit. Runs in CI against the lockfile.
+pip-audit==2.10.1
