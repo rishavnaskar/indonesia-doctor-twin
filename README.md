@@ -117,8 +117,9 @@ content and credentials dropped by field name before the line is written. There
 is no SaaS error tracker and no log drain, deliberately: a stack trace here can
 carry the record that produced it.
 
-Every environment variable the system reads is in [.env.example](.env.example).
-None is required.
+Every environment variable the system reads is in [.env.example](.env.example),
+and CI fails the build if the code starts reading one that is not. None is
+required.
 
 ---
 
@@ -193,15 +194,16 @@ anywhere, because health data must be processed in-country.
 
 ## Configuration
 
-Every variable the system reads, all of them optional. Placeholders and the
-longer explanations are in [.env.example](.env.example); `cp .env.example .env`
-and fill in what you need.
+Every variable the system reads, all of them optional. The longer explanations
+are in [.env.example](.env.example), where each line is already set to its
+default, so `cp .env.example .env` changes nothing until you edit one. Only the
+two API keys are placeholders to fill in.
 
 | Variable | Default | What it changes |
 |---|---|---|
 | `OPENROUTER_API_KEY` | unset | the key for `make live`. Without it the drafter is the rule-following reference reasoner, which needs no network |
 | `ANTHROPIC_API_KEY` | unset | only for `--provider anthropic`. `ANTHROPIC_AUTH_TOKEN` is the gateway alternative |
-| `CLINICIAN_DATABASE_URL` | unset | Postgres. Unreachable or unset, the store falls back to append-only files and logs why |
+| `CLINICIAN_DATABASE_URL` | `localhost:5544`, where `docker compose up` puts it | Postgres. Tried even when unset; if nothing answers, the store falls back to append-only files and logs why |
 | `CLINICIAN_STORE` | `.store` | where the file backend writes |
 | `CLINICIAN_STORE_BACKEND` | unset | `files` pins the file backend even with a database running. The test suite sets it |
 | `CLINICIAN_FRESH` | unset | `1` re-runs work even when a stored result would match |

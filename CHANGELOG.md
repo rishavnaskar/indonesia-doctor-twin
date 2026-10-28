@@ -11,6 +11,40 @@ and a test fails if they disagree.
 
 ## [Unreleased]
 
+### Added
+
+- **`.env.example` is checked in CI** (`tools/env_example.py`, run by
+  `tools/ci_checks.py`). Every environment variable read under `service/`,
+  `tools/`, `eval/` or `datagen/` must have a line, found from the syntax tree
+  rather than by searching text, and every line must be read by something. The
+  README has always said every variable is in the file; that was true by
+  diligence, and is now true by construction.
+
+### Changed
+
+- **`.env.example` sets each line to its default** instead of commenting it
+  out, so copying it to `.env` changes nothing until a line is edited, and
+  each default is a value rather than a sentence. That is the code's own
+  default where it has one and empty where empty and absent read the same,
+  which is not the same thing: `CLINICIAN_STORE=` would put the store in the
+  repository root and `HOST=` would bind every interface.
+  `tests/test_env_example.py` asks each deciding function what the system
+  would do with the file loaded and without it, and fails on any difference.
+  Two lines stay commented because no value means the same as leaving them
+  out: `CLINICIAN_ALLOW_RESET`, where even an empty value is a decision, and
+  `ANTHROPIC_AUTH_TOKEN`, which the SDK reads directly.
+- `platform_port()` is out of `tools/demo/__main__.py`'s `main()`, so the
+  decision about `PORT` can be tested without starting a server. Behaviour is
+  unchanged.
+
+### Fixed
+
+- **The README said an unset `CLINICIAN_DATABASE_URL` meant files.** It does
+  not: unset, the store still tries `localhost:5544`, where `docker compose up`
+  puts Postgres, and only falls back to files when nothing answers.
+- `tools/ci_checks.py` described five checks and a 500-line limit. It runs
+  eight, and the limit is 400.
+
 ## [0.2.0] - 2026-10-28
 
 The build is now reproducible and enforced. Nothing clinical changed except

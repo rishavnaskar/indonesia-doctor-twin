@@ -10,7 +10,10 @@ argument for having them on day one.
      library, and no YAML.
   3. Only /service/graph may import the orchestration library.
   4. No hosted tracing endpoint is configured anywhere.
-  5. No Python file is over 500 lines.
+  5. No em-dashes in the docs, nor in any text the system renders.
+  6. No Python file is over 400 lines.
+  7. Every environment variable the code reads has a line in .env.example,
+     and every line there is read by something. tools/env_example.py.
 
 Check 1 inspects identifiers and non-docstring string literals — not comments
 and not docstrings. A comment explaining *why* a rule is national is exactly
@@ -316,6 +319,16 @@ def check_no_long_files() -> list[str]:
     return failures
 
 
+def check_env_example() -> list[str]:
+    # Its own module, with its own tests: it parses two kinds of file and has
+    # a second half (tests/test_env_example.py) that this file has no reason
+    # to know about.
+    sys.path.insert(0, str(ROOT))
+    from tools.env_example import check
+
+    return check(ROOT)
+
+
 CHECKS = [
     ("no country/payer/drug/guideline names under /service", check_no_national_names),
     ("gate imports no orchestration library, no YAML, nothing from /reason", check_gate_purity),
@@ -327,6 +340,7 @@ CHECKS = [
         check_no_em_dashes_in_rendered_text,
     ),
     (f"no Python file over {MAX_FILE_LINES} lines", check_no_long_files),
+    ("every environment variable the code reads is in .env.example", check_env_example),
 ]
 
 

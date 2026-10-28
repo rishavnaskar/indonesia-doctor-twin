@@ -113,15 +113,25 @@ def export(args) -> int:
     return 0
 
 
+def platform_port(argv: list[str] | None = None) -> int | None:
+    """The port a platform assigned, or None when there is none to obey.
+
+    A platform tells the process which port to listen on, and it is not
+    negotiable: bind the wrong one and the health check fails with the app
+    running perfectly. --port still wins, so local use is unchanged.
+    """
+    if os.environ.get("PORT") and "--port" not in (argv if argv is not None else sys.argv):
+        return int(os.environ["PORT"])
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     configure(args.log_level, force=True)
 
-    # A platform tells the process which port to listen on, and it is not
-    # negotiable: bind the wrong one and the health check fails with the app
-    # running perfectly. --port still wins, so local use is unchanged.
-    if os.environ.get("PORT") and "--port" not in (argv if argv is not None else sys.argv):
-        args.port = int(os.environ["PORT"])
+    port = platform_port(argv)
+    if port is not None:
+        args.port = port
 
     from service.packs.loader import PackError, load_pack
 
