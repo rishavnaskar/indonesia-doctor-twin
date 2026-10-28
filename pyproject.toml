@@ -1,6 +1,6 @@
 [project]
 name = "indonesia-doctor-twin"
-version = "0.2.0"
+version = "0.3.0"
 description = "A supervised AI clinician prototype: rule packs, a plain-code safety gate, and a signature line."
 requires-python = ">=3.11"
 license = { file = "LICENSE" }

@@ -7,9 +7,21 @@ that nothing here is a published package: the version pins what the scorecard
 and the FHIR bundles were produced by.
 
 The version lives in two places, `pyproject.toml` and `service/__init__.py`,
-and a test fails if they disagree.
+and a test fails if they disagree. `uv.lock` records it as well, and the
+lockfile check fails if that copy is stale.
+
+0.3.0 is the first version cut as a release and tagged. 0.1.0 and 0.2.0 were
+written up afterwards, together, in 857dd20, and never tagged, so their
+headings link to nothing rather than to a commit picked after the fact.
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-10-29
+
+Nothing clinical changed. The dependency files and `.env.example` can now be
+read by tools as well as by people, and CI holds them to it. Every file is
+under 400 lines, the container reports its own health, and the defects found
+on the way are fixed, each with a test that fails without the fix.
 
 ### Added
 
@@ -27,13 +39,26 @@ and a test fails if they disagree.
 - **Tests for the lockfile check** (`tests/test_lockfiles.py`), which had only
   ever run as a CI step. They copy the real files and make each mistake the
   check exists to catch.
-
 - **`.env.example` is checked in CI** (`tools/env_example.py`, run by
   `tools/ci_checks.py`). Every environment variable read under `service/`,
   `tools/`, `eval/` or `datagen/` must have a line, found from the syntax tree
   rather than by searching text, and every line must be read by something. The
   README has always said every variable is in the file; that was true by
   diligence, and is now true by construction.
+- **A container health check.** The Dockerfile has a `HEALTHCHECK` that polls
+  `/health` with the standard library, since the image has no curl. Until now
+  only compose's Postgres had one, so a platform could tell the application
+  container was running but not whether it was working.
+- **The store says why it chose its backend.** `store.opened` names the
+  backend, where it is, and whether `CLINICIAN_STORE_BACKEND` pinned it;
+  `db.unreachable` and `db.driver_missing` say why Postgres was not used,
+  without the password; `store.reset` records what it destroyed. The page and
+  `/health` already said which backend answered, never why the other did not.
+- **`LICENSE`** (MIT). `pyproject.toml` declared MIT with no file behind it,
+  and now points at the file.
+- **Reference sections in the README**: install, commands, tests,
+  configuration, HTTP endpoints and layout, each a section of its own beside
+  the argument rather than inside it.
 
 ### Changed
 
@@ -48,15 +73,45 @@ and a test fails if they disagree.
   Two lines stay commented because no value means the same as leaving them
   out: `CLINICIAN_ALLOW_RESET`, where even an empty value is a decision, and
   `ANTHROPIC_AUTH_TOKEN`, which the SDK reads directly.
+- **No Python file over 400 lines**, down from 500, enforced in
+  `tools/ci_checks.py`. Five files were split along seams their authors had
+  already marked: `tests/test_resume.py` keeps the thread-id rules while the
+  clinic and live surfaces that apply them have files of their own, reply
+  parsing has moved from `service/router/backends/hosted.py` to `replies.py`,
+  the two `tools.live` modes that make no model call are in
+  `tools/live_inspect.py`, the diabetic cohort is in `datagen/diabetic.py`,
+  and the helpers `datagen/adversarial.py` writes its cases with are in
+  `datagen/mutation_kit.py`.
+- **The coverage floor is 66, up from 60**, a couple of points under the 68.2
+  measured over `/service`: the margin a branch skipped on one interpreter
+  costs.
+- A reply that cannot be parsed now names the model that answered, not the one
+  that was asked. In a fallback chain they differ.
 - `platform_port()` is out of `tools/demo/__main__.py`'s `main()`, so the
   decision about `PORT` can be tested without starting a server. Behaviour is
   unchanged.
+- GitHub Actions, bumped by Dependabot: `actions/checkout` 5 to 7,
+  `actions/setup-python` 6 to 7, `actions/upload-artifact` 4 to 7.
 
 ### Fixed
 
+- **`tools.live` and `tools.store` never installed a log handler.** `/service`
+  leaves that to the application by design, and these two are applications.
+  Their warnings came out through logging's last-resort handler as a bare
+  event name with every field stripped, which looks like logging working.
+  Covered by a test that runs the entry point as a subprocess, because
+  `configure()` is idempotent and an in-process test would pass on a handler
+  some earlier test installed.
+- **A redaction test failed one run in a thousand.** It planted the integer
+  180 and searched the whole log line, whose timestamp ends in a three-digit
+  millisecond field. The canaries are now strings no timestamp can spell, and
+  the nested secret, which was `"x"` and could not be searched for, has an
+  assertion of its own.
 - **The README said an unset `CLINICIAN_DATABASE_URL` meant files.** It does
   not: unset, the store still tries `localhost:5544`, where `docker compose up`
   puts Postgres, and only falls back to files when nothing answers.
+- The README said `make clean` removes the store. It removes the virtualenv and
+  the caches, and leaves the store alone.
 - `tools/ci_checks.py` described five checks and a 500-line limit. It runs
   eight, and the limit is 400.
 
@@ -136,6 +191,5 @@ packs, eligibility routing, the signature line, the durable store with Postgres
 and file backends, FHIR R4 emission validated against the official HL7
 validator, the scorecard and the pressure suite, and both demo surfaces.
 
-[Unreleased]: https://github.com/rishavnaskar/indonesia-doctor-twin/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/rishavnaskar/indonesia-doctor-twin/releases/tag/v0.2.0
-[0.1.0]: https://github.com/rishavnaskar/indonesia-doctor-twin/releases/tag/v0.1.0
+[Unreleased]: https://github.com/rishavnaskar/indonesia-doctor-twin/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rishavnaskar/indonesia-doctor-twin/releases/tag/v0.3.0
