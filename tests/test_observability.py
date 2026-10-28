@@ -46,6 +46,17 @@ def test_a_log_line_is_one_json_object():
     assert payload["ts"].endswith("Z")
 
 
+# Canaries for the redaction test below. They are strings rather than the
+# numbers and single letters they stand in for, because that test searches the
+# whole rendered line and the line is not only the field under test: `ts` ends
+# in a three-digit millisecond field, so the old canary of 180 failed roughly
+# one run in a thousand on a timestamp reading ".180Z" and nothing else. A
+# value that can prove a leak has to be one no other field can spell, and
+# letters and hyphens are enough to put it out of a timestamp's reach.
+VITAL_CANARY = "sbp-canary-9f2c"
+SECRET_CANARY = "sk-live-canary-4b81"
+
+
 @pytest.mark.parametrize(
     "field",
     [
@@ -65,11 +76,20 @@ def test_patient_content_and_credentials_never_reach_a_log_line(field):
     A stack trace or a log line from a clinical system is health data if it
     carries the record that produced it, and health data may not leave the
     country. The cheapest way to honour that is never to put it in the line.
+
+    Checked twice over, because the two ways this breaks look nothing alike.
+    The parsed field catches redaction returning the wrong shape; the search
+    over the raw line catches the nested values surviving somewhere else in
+    the record, which is the failure that would never show up in the field a
+    reader thinks to look at.
     """
-    line = JSONFormatter().format(_record(**{field: {"sbp": 180, "secret": "x"}}))
+    line = JSONFormatter().format(
+        _record(**{field: {"sbp": VITAL_CANARY, "secret": SECRET_CANARY}})
+    )
 
     assert json.loads(line)[field] == "[redacted]"
-    assert "180" not in line
+    assert VITAL_CANARY not in line
+    assert SECRET_CANARY not in line
 
 
 def test_redaction_reaches_nested_fields():
