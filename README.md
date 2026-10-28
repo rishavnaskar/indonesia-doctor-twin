@@ -162,7 +162,7 @@ docker build -t clinician .          # or the whole surface as an image
 | `make test` | `pytest --cov`, which fails under the coverage floor |
 | `make audit` | `pip-audit --strict` against `requirements.lock` |
 | `make lock` | regenerate both lockfiles in throwaway virtualenvs |
-| `make clean` | remove the venv, the store and the caches |
+| `make clean` | remove the venv and the caches. The store survives; `python -m tools.store --reset` destroys that |
 | `python -m tools.store` | what the deployment has kept: summary, signatures, one replayed encounter, or `--reset` |
 | `python -m tools.live --list-free` | models that cost nothing right now, queried live |
 | `python -m tools.live --show-prompt` | exactly what would be sent, without sending it |
