@@ -25,7 +25,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from datagen.synthetic import make_diabetic, make_patient
+from datagen.diabetic import make_diabetic
+from datagen.synthetic import make_patient
 from service.emit.coding import build_claim
 from service.emit.fhir import build_bundle
 from service.packs.loader import load_pack

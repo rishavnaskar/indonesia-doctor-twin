@@ -3,7 +3,7 @@ name = "indonesia-doctor-twin"
 version = "0.2.0"
 description = "A supervised AI clinician prototype: rule packs, a plain-code safety gate, and a signature line."
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 dependencies = [
     "PyYAML>=6.0",
     "certifi>=2024.0",
@@ -112,7 +112,11 @@ omit = [
 [tool.coverage.report]
 # The floor CI enforces. Raise it when the suite earns it; never lower it to
 # make a red build green.
-fail_under = 60
+# Measured 68.2 over /service. The floor sits a couple of points under that
+# rather than at it, which is the margin a conditional branch skipped on one
+# interpreter costs: a gate that fails on noise gets raised by whoever it
+# wakes, and then it is not a gate. Raise it when the measurement does.
+fail_under = 66
 show_missing = true
 skip_covered = true
 exclude_lines = [

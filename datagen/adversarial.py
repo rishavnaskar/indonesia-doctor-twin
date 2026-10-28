@@ -11,62 +11,20 @@ how a safety claim rots.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import timedelta
 
+from datagen.mutation_kit import BrokenCase, _change, _controlled, _set_obs, _uncontrolled
 from datagen.proposer import propose
-from datagen.synthetic import TODAY, _obs, make_patient
+from datagen.synthetic import TODAY, make_patient
 from service.contracts.proposal import (
     Assertion,
     ChangeAction,
-    MedicationChange,
     Provenance,
     Recommendation,
     Target,
 )
 from service.state.models import Allergy, Source
-
-
-@dataclass
-class BrokenCase:
-    name: str
-    state: object
-    proposal: object
-    site_id: str
-    expected_rules: set[str]
-    description: str
-
-
-def _uncontrolled(seed):
-    return make_patient(seed, controlled=False)
-
-
-def _controlled(seed):
-    return make_patient(seed, controlled=True)
-
-
-def _set_obs(state, code, value, days_ago=0):
-    state.observations = [
-        o
-        for o in state.observations
-        if not (o.code == code and o.taken_at == TODAY - timedelta(days=days_ago))
-    ]
-    state.observations.append(_obs(code, value, days_ago))
-    return state
-
-
-def _change(
-    molecule, mg, per_day, action=ChangeAction.START, citation="fornas-prb-2025-12-31#amlodipine"
-):
-    return MedicationChange(
-        action=action,
-        molecule=molecule,
-        mg_per_dose=mg,
-        doses_per_day=per_day,
-        rationale="planted error",
-        citation=citation,
-    )
-
 
 # --------------------------------------------------------------- mutations
 

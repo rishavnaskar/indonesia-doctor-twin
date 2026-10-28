@@ -313,3 +313,55 @@ def test_destroying_the_store_is_logged(tmp_path, caplog):
     assert reset_records, "a wipe logged nothing"
     assert reset_records[-1].destroyed == counts
     assert counts["checkpoints"] == 1
+
+
+def test_a_cli_entry_point_installs_the_handler(tmp_path):
+    """A library that logs into the void is a library nobody can debug.
+
+    `/service` deliberately never calls `configure()`, which leaves it on each
+    application to do so. `tools.live` did not, so the store's own warning -
+    the one that says which host refused the connection and why - came out
+    through logging's last-resort handler as the bare string "db.unreachable"
+    with every field stripped off. That is worse than silence: it looks like
+    logging is working.
+
+    A subprocess rather than a monkeypatched import, because the thing under
+    test is what the handler does to a real process's stderr, and because
+    `configure()` is idempotent - an in-process check passes on a handler some
+    earlier test installed. That mistake was made once here already.
+    """
+    import os
+    import subprocess
+    import sys
+
+    env = {
+        **os.environ,
+        "CLINICIAN_DATABASE_URL": "postgresql://clinician:hunter2@127.0.0.1:1/nothing",
+        "CLINICIAN_STORE": str(tmp_path / "store"),
+        "CLINICIAN_STORE_BACKEND": "",
+        "CLINICIAN_LOG_FORMAT": "",
+    }
+    done = subprocess.run(
+        [sys.executable, "-m", "tools.store"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    events = {}
+    for line in done.stderr.splitlines():
+        if line.startswith("{"):
+            payload = json.loads(line)
+            events[payload["event"]] = payload
+
+    assert "store.opened" in events, f"no structured line on stderr: {done.stderr!r}"
+    opened = events["store.opened"]
+    assert opened["level"] == "info"
+    assert opened["logger"] == "service.store"
+    assert opened["backend"] == "files"
+    # The whole point of the line: it fell back, and the reason is on stderr
+    # next to it rather than nowhere.
+    assert "db.unreachable" in events or "db.driver_missing" in events
+    assert "hunter2" not in done.stderr, "the connection string's password reached stderr"

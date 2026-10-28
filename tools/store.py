@@ -17,10 +17,15 @@ from __future__ import annotations
 import argparse
 import sys
 
+from service.logging import configure
 from service.store import Store
 
 
 def main() -> int:
+    # An application, so it installs the handler. Asking which backend
+    # answered is most of what this tool is for, and the store says so in a
+    # log line that nothing would otherwise format.
+    configure()
     parser = argparse.ArgumentParser(description="Inspect the durable store.")
     parser.add_argument("--dir", default=None)
     parser.add_argument("--thread", help="replay one encounter step by step")

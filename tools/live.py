@@ -32,10 +32,12 @@ from datagen.synthetic import make_patient
 from service.emit.queue import OutboundQueue
 from service.graph.runtime import InMemoryRuntime
 from service.graph.workflow import Outcome, run_encounter
+from service.logging import configure
 from service.packs.loader import PackError, load_pack
 from service.reason.parse import ProposalParseError
 from service.router.router import router_with_model
 from service.signing import AuditLog, Signer
+from tools import live_inspect
 
 RULE = "─" * 74
 
@@ -163,18 +165,15 @@ def main() -> int:
     args = parser.parse_args()
 
     load_env()
+    # This is an application, so it installs the handler; /service never does.
+    # After load_env, so CLINICIAN_LOG_LEVEL in .env is honoured. Without this
+    # the engine's own warnings - "the database refused the connection, here is
+    # where and why" - came out through logging's last-resort handler as a bare
+    # event name with every field stripped off.
+    configure()
 
     if args.list_free:
-        from service.router.backends.hosted import list_free_models
-
-        print("\n  Free models available right now (queried live, not hard-coded):\n")
-        for model in list_free_models():
-            mark = "json" if model["structured"] else "    "
-            print(f"    [{mark}] {model['id']:<52} ctx {model['context']:,}")
-        print("\n  [json] = advertises structured output. Prefer those; the others")
-        print("  still work, because the strict parser does not trust either.\n")
-        print("  Use with: python -m tools.live --n 5 --model <id>\n")
-        return 0
+        return live_inspect.list_free()
 
     try:
         rules = load_pack(args.pack if hasattr(args, "pack") else "id")
@@ -227,16 +226,7 @@ def main() -> int:
 
     if args.show_prompt:
         # Inspecting the prompt costs nothing and needs no credentials.
-        from service.reason import prompt as prompt_module
-        from service.rules.predicates import Context
-        from service.rules.targets import resolve_target
-
-        state = make_patient(900, controlled=False)
-        target = resolve_target(rules.guideline, Context(state)).target
-        print("\n--- system ---\n" + prompt_module.system_prompt())
-        print("\n--- user (truncated) ---")
-        print(prompt_module.build_user_prompt(state, rules, site, target)[:1500] + "\n...")
-        return 0
+        return live_inspect.show_prompt(rules, site)
 
     # Credential handling differs by provider, and the difference matters.
     #

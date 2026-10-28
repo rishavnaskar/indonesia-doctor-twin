@@ -24,6 +24,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
+from service.router.backends.replies import raise_if_error_body, read_content
 from service.router.backends.transport import (
     BackendError,
     RateLimited,
@@ -142,13 +143,13 @@ class HostedChatBackend:
         for model in self.chain:
             try:
                 body = self._call_model(model, system, user, api_key, schema)
-                self._raise_if_error_body(body, model)
+                raise_if_error_body(body, model)
             except (RateLimited, TransientTransport):
                 busy.append(model)
                 continue
             served_by = body.get("provider") or "unknown-provider"
             self._answered_by = f"{body.get('model') or model}@{served_by}"
-            return self._content(body)
+            return read_content(body, model=self.model, max_tokens=self.max_tokens)
 
         raise RateLimited(
             "every model in the chain is rate-limited upstream "
@@ -195,7 +196,7 @@ class HostedChatBackend:
 
         for _ in range(max_calls):
             body = self._post_messages(messages, api_key, tools=tools)
-            self._raise_if_error_body(body, self.model)
+            raise_if_error_body(body, self.model)
             message = body["choices"][0]["message"]
             calls = message.get("tool_calls") or []
             if not calls:
@@ -203,7 +204,7 @@ class HostedChatBackend:
                     f"{body.get('model') or self.model}"
                     f"@{body.get('provider') or 'unknown-provider'}"
                 )
-                return self._content(body)
+                return read_content(body, model=self.model, max_tokens=self.max_tokens)
 
             messages.append(
                 {
@@ -238,7 +239,7 @@ class HostedChatBackend:
         self._answered_by = (
             f"{body.get('model') or self.model}@{body.get('provider') or 'unknown-provider'}"
         )
-        return self._content(body)
+        return read_content(body, model=self.model, max_tokens=self.max_tokens)
 
     def _post_messages(
         self,
@@ -298,73 +299,6 @@ class HostedChatBackend:
                     raise
                 time.sleep(getattr(exc, "retry_after", None) or BACKOFF_S * (attempt + 1))
         raise AssertionError("unreachable")
-
-    @staticmethod
-    def _raise_if_error_body(body: dict, model: str) -> None:
-        """An error arriving with HTTP 200.
-
-        This provider returns rate limits and upstream failures as a 200 with an
-        `error` object in the body at least as often as it returns a 4xx. Only
-        the status code was being checked, so those fell through to the content
-        reader and surfaced as "unexpected response shape" — which is both
-        useless to read and, worse, silent: the fallback chain never fired,
-        because nothing had raised RateLimited.
-        """
-        error = body.get("error")
-        if not isinstance(error, dict):
-            return
-        message = str(error.get("message") or error)
-        code = error.get("code")
-        metadata = error.get("metadata") or {}
-        raw = str(metadata.get("raw") or "")
-        # Hyphens and spacing vary between providers and between messages from
-        # the same provider: "rate limit", "rate-limited", "ratelimit". Match
-        # the word, not the punctuation — the first version of this missed
-        # "temporarily rate-limited upstream" and silently stopped the chain
-        # falling through, which is the exact failure it was written to fix.
-        haystack = f"{message} {raw}".lower().replace("-", " ").replace("_", " ")
-        if code == 429 or "rate limit" in haystack or "quota" in haystack:
-            raise RateLimited(f"{model}: {(raw or message)[:150]}")
-        raise BackendError(f"{model}: {message[:200]}")
-
-    def _content(self, body: dict) -> str:
-        """Pull the assistant text out, and refuse an empty one.
-
-        Some reasoning models return `content: null` and put everything in a
-        `reasoning` field. Returning that null downstream produces a parser
-        crash three layers away from the cause, so it is caught here and named.
-        """
-        try:
-            message = body["choices"][0]["message"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise BackendError(f"unexpected response shape: {json.dumps(body)[:300]}") from exc
-
-        if body["choices"][0].get("finish_reason") == "length":
-            details = (body.get("usage") or {}).get("completion_tokens_details") or {}
-            spent = details.get("reasoning_tokens", "?")
-            raise TruncatedResponse(
-                f"{body.get('model', self.model)} hit the {self.max_tokens}-token "
-                f"output budget mid-answer ({spent} of it went to reasoning). "
-                "This is our budget, not the model failing the contract. Raise "
-                "max_tokens rather than reading it as a parse failure."
-            )
-
-        content = message.get("content")
-        if isinstance(content, str) and content.strip():
-            return content
-
-        reasoning = message.get("reasoning")
-        if isinstance(reasoning, str) and reasoning.strip():
-            # Not silently accepted as an answer: it is the model thinking, not
-            # the model answering. Handed to the strict parser, which will
-            # reject it unless it genuinely contains the contract.
-            return reasoning
-
-        raise BackendError(
-            f"{body.get('model', self.model)} returned an empty message "
-            f"(finish_reason={body['choices'][0].get('finish_reason')!r}). "
-            "Nothing to parse."
-        )
 
     def _post(
         self,

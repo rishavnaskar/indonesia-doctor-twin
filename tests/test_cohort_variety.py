@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import pytest
 
-from datagen.synthetic import make_diabetic, make_patient
+from datagen.diabetic import make_diabetic
+from datagen.synthetic import make_patient
 from tools.demo.patients import generate
 from tools.demo.run import run_patients, vocabulary
 

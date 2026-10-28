@@ -17,7 +17,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from datagen.synthetic import TODAY, make_diabetic, make_patient
+from datagen.diabetic import make_diabetic
+from datagen.synthetic import TODAY, make_patient
 from service.state.models import (
     Allergy,
     Diagnosis,

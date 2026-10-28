@@ -262,9 +262,8 @@ def test_an_error_arriving_with_http_200_is_still_an_error():
     silently did not fall through."""
     import pytest as _pytest
 
-    from service.router.backends.hosted import BackendError, HostedChatBackend, RateLimited
-
-    check = HostedChatBackend._raise_if_error_body
+    from service.router.backends.hosted import BackendError, RateLimited
+    from service.router.backends.replies import raise_if_error_body as check
 
     with _pytest.raises(RateLimited):
         check({"error": {"code": 429, "message": "Rate limit exceeded"}}, "m")
@@ -297,7 +296,7 @@ def test_the_prompt_shows_the_measurements_this_pathway_actually_reads(rules):
     The consequence was not cosmetic: a diabetic's HbA1c never reached the
     model, so it judged whether their diabetes was controlled without the one
     number that defines control."""
-    from datagen.synthetic import make_diabetic
+    from datagen.diabetic import make_diabetic
     from service.reason.prompt import _relevant_codes
     from service.rules import pathways
     from service.rules.predicates import Context
@@ -315,7 +314,7 @@ def test_the_prompt_shows_the_measurements_this_pathway_actually_reads(rules):
 
 
 def test_a_diabetic_patients_hba1c_reaches_the_model(rules):
-    from datagen.synthetic import make_diabetic
+    from datagen.diabetic import make_diabetic
     from service.rules import pathways
 
     dm2 = pathways.with_pathway(rules, "diabetes")

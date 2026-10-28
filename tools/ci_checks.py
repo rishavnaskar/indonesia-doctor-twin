@@ -294,7 +294,11 @@ def check_no_em_dashes_in_rendered_text() -> list[str]:
 # down, because a convention nothing checks drifts back within a month, and the
 # formatter alone pushed two of those files back over the line the day they were
 # split.
-MAX_FILE_LINES = 500
+# Was 500. Dropped to 400 once nothing in the tree needed the slack: every
+# file over it had a seam the author had already marked with a comment
+# divider, which is the tell that it was two files waiting for someone to
+# notice. A limit only does work while it is binding.
+MAX_FILE_LINES = 400
 
 
 def check_no_long_files() -> list[str]:
