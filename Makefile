@@ -10,7 +10,8 @@
 #
 #   make check  every check CI runs, in the same order, without the browser.
 #
-#   make lock   regenerate the lockfiles after editing requirements*.txt.
+#   make lock   regenerate the lockfiles after editing requirements*.txt or the
+#               dependencies in pyproject.toml.
 #
 # The surface binds port 8000; `make PORT=8001` moves it.
 #
@@ -23,6 +24,10 @@
 
 PY := ./.venv/bin/python
 PIP := ./.venv/bin/pip
+
+# Writes uv.lock. Only `make lock` uses it, inside the throwaway environment it
+# resolves in, so it is pinned here rather than installed with the dev tools.
+UV_VERSION := 0.11.28
 
 # The surface binds this. Override when something already has it:
 #   make PORT=8001
@@ -97,6 +102,10 @@ lock:
 	  echo "#   make lock"; \
 	  ./.lockenv/bin/pip freeze --exclude-editable | sort -f; \
 	} > requirements-dev.lock
+	@echo "  Resolving pyproject.toml into uv.lock, at requirements.lock's versions ..."
+	@./.lockenv/bin/pip install -q uv==$(UV_VERSION)
+	@./.lockenv/bin/uv lock --quiet $$(sed -nE \
+	  's/^([A-Za-z0-9._-]+)==([^[:space:]#]+).*/--upgrade-package \1==\2/p' requirements.lock)
 	@rm -rf .lockenv
 	@$(PY) tools/check_lockfiles.py
 

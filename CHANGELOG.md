@@ -13,6 +13,21 @@ and a test fails if they disagree.
 
 ### Added
 
+- **`uv.lock`**, the lock that belongs to `pyproject.toml`. The existing
+  `requirements.lock` is a pip requirements file under a name tooling built
+  around `pyproject.toml` does not look for, and a code scanner that read this
+  repository reported no lockfile at all. `make lock` now also writes
+  `uv.lock`, at `requirements.lock`'s exact versions, with uv installed into
+  the throwaway environment at a version pinned in the Makefile.
+  `tools/check_lockfiles.py` fails the build if `uv.lock` was resolved from a
+  `pyproject.toml` other than the current one (a dependency, the version or
+  `requires-python` changed without relocking), or if it and
+  `requirements.lock` disagree about any version. It also locks the optional
+  `model` extra, which nothing did before.
+- **Tests for the lockfile check** (`tests/test_lockfiles.py`), which had only
+  ever run as a CI step. They copy the real files and make each mistake the
+  check exists to catch.
+
 - **`.env.example` is checked in CI** (`tools/env_example.py`, run by
   `tools/ci_checks.py`). Every environment variable read under `service/`,
   `tools/`, `eval/` or `datagen/` must have a line, found from the syntax tree

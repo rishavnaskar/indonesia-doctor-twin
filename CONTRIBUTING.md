@@ -86,16 +86,22 @@ only reads what you remember writing stays true for about a week.
 
 `requirements.txt` is what a deployment installs. `requirements-dev.txt` is the
 tools. Both are exactly pinned, and both have a lockfile pinning their
-transitive closure, which is what CI installs.
+transitive closure, which is what CI installs. `pyproject.toml` declares the
+same runtime dependencies as ranges, and `uv.lock` locks them at
+`requirements.lock`'s versions, for tooling that reads `pyproject.toml` rather
+than requirements files.
 
-After changing either input:
+After changing any of them:
 
 ```bash
 make lock
 ```
 
-That resolves both into clean virtualenvs and rewrites the locks.
-`tools/check_lockfiles.py` fails the build if you forget.
+That resolves them in clean virtualenvs and rewrites all three locks. The
+step that writes `uv.lock` installs uv into the same throwaway environment, at
+the version pinned in the Makefile, so there is nothing to install first.
+`tools/check_lockfiles.py` fails the build if you forget, including when
+`uv.lock` and `requirements.lock` disagree about a single version.
 
 ## Pull requests
 
