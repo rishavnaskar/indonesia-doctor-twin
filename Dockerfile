@@ -11,7 +11,7 @@
 # doing exactly what it was built for. See docs/CODE.md, "The second run picks up
 # where the first stopped".
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 # Faster starts and no .pyc litter in a read-only-ish layer.
 ENV PYTHONUNBUFFERED=1 \
