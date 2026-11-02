@@ -7,14 +7,14 @@
 
 -r requirements.txt
 
-pytest==9.1.1
+pytest==9.2.0
 pytest-cov==7.1.0
 
 # Lint and format. Configured in pyproject.toml.
 ruff==0.17.3
 
 # Type check. Configured in pyproject.toml.
-mypy==2.4.0
+mypy==2.4.1
 types-PyYAML==6.0.12.20260906
 
 # Dependency audit. Runs in CI against the lockfile.
